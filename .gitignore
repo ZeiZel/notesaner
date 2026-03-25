@@ -1,0 +1,66 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build
+dist/
+.next/
+.turbo/
+out/
+
+# NX
+.nx/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+playwright-report/
+test-results/
+
+# Prisma
+apps/server/prisma/*.db
+
+# Docker
+docker/data/
+
+# Logs
+*.log
+logs/
+
+# Claude Code
+.claude/backups/
+.claude/cache/
+.claude/chrome/
+.claude/debug/
+.claude/downloads/
+.claude/file-history/
+.claude/ide/
+.claude/paste-cache/
+.claude/plans/
+.claude/projects/
+.claude/session-env/
+.claude/shell-snapshots/
+.claude/statsig/
+.claude/tasks/
+.claude/telemetry/
+.claude/todos/
+.claude/history.jsonl
+.claude/stats-cache.json
+.claude/mcp-needs-auth-cache.json
+.claude/*-cache.json
+.claude/settings.local.json

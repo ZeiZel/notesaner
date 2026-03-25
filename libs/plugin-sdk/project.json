@@ -1,0 +1,11 @@
+{
+  "name": "plugin-sdk",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/plugin-sdk/src",
+  "projectType": "library",
+  "targets": {
+    "type-check": {
+      "command": "tsc --noEmit -p libs/plugin-sdk/tsconfig.json"
+    }
+  }
+}

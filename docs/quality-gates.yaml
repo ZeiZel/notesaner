@@ -1,0 +1,47 @@
+gates:
+  planning:
+    threshold: 95
+    validators:
+      - requirements_coverage
+      - architecture_completeness
+      - api_contract_defined
+
+  development:
+    threshold: 85
+    validators:
+      - code_coverage
+      - linting
+      - type_check
+      - security_scan
+      - bundle_size
+
+  release:
+    threshold: 95
+    validators:
+      - all_tests_pass
+      - e2e_tests_pass
+      - documentation_complete
+      - docker_build_success
+      - no_critical_vulnerabilities
+
+rules:
+  code_coverage:
+    unit: 80
+    integration: 60
+
+  bundle_size:
+    web_initial: "200KB"
+    web_total: "1MB"
+
+  performance:
+    lighthouse_score: 90
+    editor_input_latency: "16ms"
+    search_response: "200ms"
+    websocket_latency: "50ms"
+
+  security:
+    no_hardcoded_secrets: true
+    csp_enabled: true
+    cors_configured: true
+    rate_limiting: true
+    input_validation: true

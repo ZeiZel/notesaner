@@ -1,0 +1,15 @@
+export const SYNC_DEBOUNCE_MS = 500;
+export const VERSION_SNAPSHOT_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+export const MAX_NOTE_SIZE_BYTES = 10 * 1024 * 1024; // 10 MB
+export const MAX_ATTACHMENT_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
+export const SEARCH_RESULTS_LIMIT = 50;
+export const GRAPH_MAX_NODES = 5000;
+export const JWT_ACCESS_TOKEN_TTL = '15m';
+export const JWT_REFRESH_TOKEN_TTL = '7d';
+export const PLUGIN_REGISTRY_TAG = 'notesaner-plugin';
+export const NOTE_FILE_EXTENSION = '.md';
+export const FRONTMATTER_DELIMITER = '---';
+export const WIKI_LINK_REGEX = /\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g;
+export const EMBED_REGEX = /!\[\[([^\]]+)\]\]/g;
+export const BLOCK_REF_REGEX = /\[\[([^#\]]+)#\^([a-zA-Z0-9-]+)\]\]/g;
+export const HEADING_LINK_REGEX = /\[\[([^#\]]+)#([^\]|]+)(?:\|([^\]]+))?\]\]/g;

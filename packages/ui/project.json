@@ -1,0 +1,11 @@
+{
+  "name": "ui",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/ui/src",
+  "projectType": "library",
+  "targets": {
+    "type-check": {
+      "command": "tsc --noEmit -p packages/ui/tsconfig.json"
+    }
+  }
+}

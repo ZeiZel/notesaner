@@ -1,0 +1,328 @@
+# Database Schema (Prisma)
+
+```prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// AUTH
+// ==========================================
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String?   // null for SSO-only users
+  displayName   String
+  avatarUrl     String?
+  isActive      Boolean   @default(true)
+  isSuperAdmin  Boolean   @default(false)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  sessions      Session[]
+  memberships   WorkspaceMember[]
+  createdNotes  Note[]     @relation("CreatedBy")
+  editedNotes   Note[]     @relation("LastEditedBy")
+  noteVersions  NoteVersion[]
+  comments      Comment[]
+
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshToken String   @unique
+  userAgent    String?
+  ipAddress    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+model AuthProvider {
+  id          String   @id @default(uuid())
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  type        AuthProviderType
+  name        String
+  config      Json     // SAML/OIDC configuration
+  isEnabled   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("auth_providers")
+}
+
+enum AuthProviderType {
+  SAML
+  OIDC
+  LOCAL
+}
+
+// ==========================================
+// WORKSPACE
+// ==========================================
+
+model Workspace {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  storagePath String   // filesystem path for notes
+  isPublic    Boolean  @default(false) // public vault
+  publicSlug  String?  @unique // URL for public access
+  settings    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  members       WorkspaceMember[]
+  notes         Note[]
+  tags          Tag[]
+  authProviders AuthProvider[]
+  plugins       InstalledPlugin[]
+  layouts       Layout[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  workspaceId String
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role        WorkspaceRole @default(EDITOR)
+  joinedAt    DateTime      @default(now())
+
+  @@unique([workspaceId, userId])
+  @@map("workspace_members")
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  EDITOR
+  VIEWER
+}
+
+// ==========================================
+// NOTES
+// ==========================================
+
+model Note {
+  id            String    @id @default(uuid())
+  workspaceId   String
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  path          String    // relative path in vault (e.g. "folder/note.md")
+  title         String
+  contentHash   String?   // SHA-256 for change detection
+  wordCount     Int       @default(0)
+  frontmatter   Json      @default("{}")
+  isPublished   Boolean   @default(false)
+  isTrashed     Boolean   @default(false)
+  trashedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  createdById   String
+  createdBy     User      @relation("CreatedBy", fields: [createdById], references: [id])
+  lastEditedById String
+  lastEditedBy   User     @relation("LastEditedBy", fields: [lastEditedById], references: [id])
+
+  outgoingLinks NoteLink[] @relation("SourceNote")
+  incomingLinks NoteLink[] @relation("TargetNote")
+  tags          NoteTag[]
+  versions      NoteVersion[]
+  attachments   Attachment[]
+  comments      Comment[]
+
+  // Full-text search
+  searchVector  Unsupported("tsvector")?
+
+  @@unique([workspaceId, path])
+  @@index([workspaceId])
+  @@index([title])
+  @@index([isTrashed])
+  @@index([isPublished])
+  @@map("notes")
+}
+
+model NoteLink {
+  id           String   @id @default(uuid())
+  sourceNoteId String
+  sourceNote   Note     @relation("SourceNote", fields: [sourceNoteId], references: [id], onDelete: Cascade)
+  targetNoteId String
+  targetNote   Note     @relation("TargetNote", fields: [targetNoteId], references: [id], onDelete: Cascade)
+  linkType     LinkType
+  context      String?  // surrounding text for preview
+  position     Json?    // { line, col } in source
+
+  @@unique([sourceNoteId, targetNoteId, linkType])
+  @@index([sourceNoteId])
+  @@index([targetNoteId])
+  @@map("note_links")
+}
+
+enum LinkType {
+  WIKI       // [[link]]
+  MARKDOWN   // [text](url)
+  EMBED      // ![[embed]]
+  BLOCK_REF  // [[note#^block]]
+}
+
+model NoteVersion {
+  id        String   @id @default(uuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  version   Int
+  content   String   // full content snapshot
+  diff      String?  // diff from previous
+  message   String?
+  createdAt DateTime @default(now())
+  createdById String
+  createdBy   User   @relation(fields: [createdById], references: [id])
+
+  @@unique([noteId, version])
+  @@index([noteId])
+  @@map("note_versions")
+}
+
+model Tag {
+  id          String   @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  color       String?
+  noteCount   Int      @default(0) // denormalized count
+
+  notes       NoteTag[]
+
+  @@unique([workspaceId, name])
+  @@map("tags")
+}
+
+model NoteTag {
+  noteId String
+  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tagId  String
+  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+
+  @@id([noteId, tagId])
+  @@map("note_tags")
+}
+
+model Attachment {
+  id        String   @id @default(uuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  filename  String
+  mimeType  String
+  size      Int      // bytes
+  path      String   // storage path
+  createdAt DateTime @default(now())
+
+  @@index([noteId])
+  @@map("attachments")
+}
+
+// ==========================================
+// COLLABORATION
+// ==========================================
+
+model Comment {
+  id        String   @id @default(uuid())
+  noteId    String
+  note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  content   String
+  position  Json?    // text position the comment refers to
+  isResolved Boolean @default(false)
+  parentId  String?  // for threaded replies
+  parent    Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  replies   Comment[] @relation("CommentReplies")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([noteId])
+  @@map("comments")
+}
+
+// ==========================================
+// WORKSPACE UI
+// ==========================================
+
+model Layout {
+  id          String   @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  name        String
+  config      Json     // panel arrangement, sizes, open tabs
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("layouts")
+}
+
+// ==========================================
+// PLUGINS
+// ==========================================
+
+model InstalledPlugin {
+  id          String   @id @default(uuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  pluginId    String   // from manifest
+  name        String
+  version     String
+  repository  String   // GitHub URL
+  manifest    Json     // full manifest
+  isEnabled   Boolean  @default(true)
+  settings    Json     @default("{}") // user settings
+  installedAt DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([workspaceId, pluginId])
+  @@map("installed_plugins")
+}
+```
+
+## PostgreSQL Extensions
+
+```sql
+-- Full-text search
+CREATE EXTENSION IF NOT EXISTS pg_trgm;
+
+-- Full-text search vector update trigger
+CREATE OR REPLACE FUNCTION update_note_search_vector()
+RETURNS trigger AS $$
+BEGIN
+  -- This will be updated by the application after MD file is read
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+```
+
+## Indexes for Performance
+
+```sql
+-- Full-text search GIN index
+CREATE INDEX idx_notes_search ON notes USING GIN(search_vector);
+
+-- Trigram index for fuzzy search
+CREATE INDEX idx_notes_title_trgm ON notes USING GIN(title gin_trgm_ops);
+
+-- JSONB index on frontmatter
+CREATE INDEX idx_notes_frontmatter ON notes USING GIN(frontmatter);
+```

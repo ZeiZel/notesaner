@@ -1,0 +1,45 @@
+{
+  "name": "@notesaner/source",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Web-first Obsidian alternative with real-time collaboration",
+  "license": "AGPL-3.0",
+  "scripts": {
+    "dev": "nx run-many -t serve -p web server",
+    "dev:web": "nx serve web",
+    "dev:server": "nx serve server",
+    "build": "nx run-many -t build",
+    "test": "nx run-many -t test",
+    "lint": "nx run-many -t lint",
+    "type-check": "nx run-many -t type-check",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "db:generate": "nx run server:prisma-generate",
+    "db:migrate": "nx run server:prisma-migrate",
+    "db:push": "nx run server:prisma-push",
+    "db:studio": "nx run server:prisma-studio",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "prepare": "husky"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "pnpm": ">=10.0.0"
+  },
+  "packageManager": "pnpm@10.12.4",
+  "devDependencies": {
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@nx/eslint": "^22.6.1",
+    "@nx/js": "^22.6.1",
+    "@nx/next": "^22.6.1",
+    "@nx/workspace": "^22.6.1",
+    "@types/node": "^25.5.0",
+    "eslint": "^10.1.0",
+    "husky": "^9.1.7",
+    "nx": "^22.6.1",
+    "prettier": "^3.8.1",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1"
+  }
+}

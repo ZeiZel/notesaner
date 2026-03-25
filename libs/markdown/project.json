@@ -1,0 +1,11 @@
+{
+  "name": "markdown",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/markdown/src",
+  "projectType": "library",
+  "targets": {
+    "type-check": {
+      "command": "tsc --noEmit -p libs/markdown/tsconfig.json"
+    }
+  }
+}

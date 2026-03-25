@@ -1,0 +1,34 @@
+FROM node:22-alpine AS base
+RUN corepack enable && corepack prepare pnpm@latest --activate
+
+FROM base AS deps
+WORKDIR /app
+COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
+COPY apps/server/package.json ./apps/server/
+COPY libs/contracts/package.json ./libs/contracts/
+COPY libs/constants/package.json ./libs/constants/
+COPY libs/utils/package.json ./libs/utils/
+COPY libs/sync-engine/package.json ./libs/sync-engine/
+COPY libs/markdown/package.json ./libs/markdown/
+COPY libs/plugin-sdk/package.json ./libs/plugin-sdk/
+RUN pnpm install --frozen-lockfile
+
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN pnpm nx build server --configuration=production
+RUN pnpm prisma generate --schema=apps/server/prisma/schema.prisma
+
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nestjs
+COPY --from=builder /app/dist/apps/server ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/apps/server/prisma ./prisma
+RUN mkdir -p /data/notes && chown nestjs:nodejs /data/notes
+USER nestjs
+EXPOSE 4000
+CMD ["node", "main.js"]

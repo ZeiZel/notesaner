@@ -1,0 +1,11 @@
+{
+  "name": "utils",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/utils/src",
+  "projectType": "library",
+  "targets": {
+    "type-check": {
+      "command": "tsc --noEmit -p libs/utils/tsconfig.json"
+    }
+  }
+}
