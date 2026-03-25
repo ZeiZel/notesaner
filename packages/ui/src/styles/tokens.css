@@ -1,0 +1,474 @@
+/*
+ * Notesaner Design Tokens
+ * ========================
+ * Dark-first design system inspired by Catppuccin Mocha.
+ * All tokens are CSS custom properties for runtime theme switching.
+ *
+ * Usage:
+ *   :root             = dark theme (default)
+ *   [data-theme="light"] = light theme overrides
+ *   [data-theme="system"] = resolved by ThemeProvider at runtime
+ *
+ * Token naming convention:
+ *   --ns-{category}-{property}[-{variant}]
+ *   ns = notesaner prefix (avoids collisions with libraries)
+ */
+
+/* ================================================================
+   1. COLOR TOKENS — Dark Theme (Default / Catppuccin Mocha)
+   ================================================================ */
+
+:root {
+  /* --- 1.1 Background Colors --- */
+  --ns-color-background:          #1e1e2e;  /* Main workspace background (Mocha Base) */
+  --ns-color-background-surface:  #252537;  /* Sidebars, panels */
+  --ns-color-background-elevated: #2d2d44;  /* Cards, popovers */
+  --ns-color-background-overlay:  #36365a;  /* Modals, dropdowns */
+  --ns-color-background-input:    #1a1a2e;  /* Form inputs */
+  --ns-color-background-hover:    rgba(255, 255, 255, 0.05);
+  --ns-color-background-active:   rgba(255, 255, 255, 0.09);
+
+  /* --- 1.2 Foreground / Text Colors --- */
+  --ns-color-foreground:          #cdd6f4;  /* Primary content text (Mocha Text) */
+  --ns-color-foreground-secondary:#a6adc8;  /* Labels, hints (Mocha Subtext0) */
+  --ns-color-foreground-muted:    #6c7086;  /* Disabled, placeholders (Mocha Overlay0) */
+  --ns-color-foreground-inverse:  #1e1e2e;  /* Text on accent/primary fills */
+
+  /* --- 1.3 Primary (Mauve / Purple) --- */
+  --ns-color-primary:             #cba6f7;  /* Primary actions, links (Mocha Mauve) */
+  --ns-color-primary-hover:       #b98ef5;  /* Primary hover state */
+  --ns-color-primary-active:      #a876f3;  /* Primary pressed state */
+  --ns-color-primary-muted:       rgba(203, 166, 247, 0.15);  /* Primary tinted bg */
+  --ns-color-primary-foreground:  #1e1e2e;  /* Text on primary fill */
+
+  /* --- 1.4 Secondary --- */
+  --ns-color-secondary:           #45475a;  /* Secondary fills (Mocha Surface1) */
+  --ns-color-secondary-hover:     #525466;
+  --ns-color-secondary-foreground:#cdd6f4;  /* Text on secondary fill */
+
+  /* --- 1.5 Accent (Pink) --- */
+  --ns-color-accent:              #f5c2e7;  /* Accent highlights (Mocha Pink) */
+  --ns-color-accent-hover:        #f0b0dd;
+  --ns-color-accent-muted:        rgba(245, 194, 231, 0.15);
+  --ns-color-accent-foreground:   #1e1e2e;  /* Text on accent fill */
+
+  /* --- 1.6 Muted --- */
+  --ns-color-muted:               #45475a;  /* Muted fills (Mocha Surface1) */
+  --ns-color-muted-foreground:    #a6adc8;  /* Muted text (Mocha Subtext0) */
+
+  /* --- 1.7 Destructive --- */
+  --ns-color-destructive:         #f38ba8;  /* Error/danger actions (Mocha Red) */
+  --ns-color-destructive-hover:   #f07090;
+  --ns-color-destructive-muted:   rgba(243, 139, 168, 0.15);
+  --ns-color-destructive-foreground: #1e1e2e;
+
+  /* --- 1.8 Semantic Status Colors --- */
+  --ns-color-success:             #a6e3a1;  /* Success (Mocha Green) */
+  --ns-color-success-muted:       rgba(166, 227, 161, 0.15);
+  --ns-color-warning:             #fab387;  /* Warning (Mocha Peach) */
+  --ns-color-warning-muted:       rgba(250, 179, 135, 0.15);
+  --ns-color-error:               #f38ba8;  /* Error (Mocha Red) */
+  --ns-color-error-muted:         rgba(243, 139, 168, 0.15);
+  --ns-color-info:                #89dceb;  /* Info (Mocha Sky) */
+  --ns-color-info-muted:          rgba(137, 220, 235, 0.15);
+
+  /* --- 1.9 Border Colors --- */
+  --ns-color-border:              #45475a;  /* Default borders (Mocha Surface1) */
+  --ns-color-border-subtle:       rgba(255, 255, 255, 0.08);  /* Very subtle separators */
+  --ns-color-border-focus:        var(--ns-color-primary);
+  --ns-color-border-error:        var(--ns-color-destructive);
+
+  /* --- 1.10 Input --- */
+  --ns-color-input:               #45475a;  /* Input border color */
+  --ns-color-input-background:    #1a1a2e;
+
+  /* --- 1.11 Ring (Focus Ring) --- */
+  --ns-color-ring:                #cba6f7;  /* Focus ring color = primary */
+
+  /* --- 1.12 Card --- */
+  --ns-color-card:                #313244;  /* Card backgrounds (Mocha Surface0) */
+  --ns-color-card-foreground:     #cdd6f4;  /* Card text */
+
+  /* --- 1.13 Popover --- */
+  --ns-color-popover:             #313244;  /* Popover backgrounds */
+  --ns-color-popover-foreground:  #cdd6f4;  /* Popover text */
+
+  /* --- 1.14 Sidebar --- */
+  --ns-color-sidebar-background:  #181825;  /* Sidebar bg (Mocha Mantle) */
+  --ns-color-sidebar-foreground:  #cdd6f4;  /* Sidebar text */
+  --ns-color-sidebar-border:      #313244;  /* Sidebar dividers */
+  --ns-color-sidebar-accent:      #45475a;  /* Sidebar active item bg */
+  --ns-color-sidebar-accent-foreground: #cdd6f4;
+  --ns-color-sidebar-muted:       #a6adc8;  /* Sidebar secondary text */
+  --ns-color-sidebar-ring:        #cba6f7;  /* Sidebar focus ring */
+
+  /* --- 1.15 Extended Catppuccin Palette (for graphs, tags, cursors) --- */
+  --ns-color-rosewater:           #f5e0dc;
+  --ns-color-flamingo:            #f2cdcd;
+  --ns-color-pink:                #f5c2e7;
+  --ns-color-mauve:               #cba6f7;
+  --ns-color-red:                 #f38ba8;
+  --ns-color-maroon:              #eba0ac;
+  --ns-color-peach:               #fab387;
+  --ns-color-yellow:              #f9e2af;
+  --ns-color-green:               #a6e3a1;
+  --ns-color-teal:                #94e2d5;
+  --ns-color-sky:                 #89dceb;
+  --ns-color-sapphire:            #74c7ec;
+  --ns-color-blue:                #89b4fa;
+  --ns-color-lavender:            #b4befe;
+
+  /* --- 1.16 Chart / Data Visualization --- */
+  --ns-color-chart-1:             #cba6f7;
+  --ns-color-chart-2:             #89b4fa;
+  --ns-color-chart-3:             #a6e3a1;
+  --ns-color-chart-4:             #fab387;
+  --ns-color-chart-5:             #f38ba8;
+
+
+  /* ================================================================
+     2. TYPOGRAPHY TOKENS
+     ================================================================ */
+
+  /* --- 2.1 Font Families --- */
+  --ns-font-sans:    'Inter Variable', 'Inter', system-ui, -apple-system, sans-serif;
+  --ns-font-mono:    'JetBrains Mono Variable', 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  --ns-font-serif:   'Lora', 'Georgia', 'Times New Roman', serif;
+
+  /* --- 2.2 Font Size Scale --- */
+  --ns-text-2xs:     0.6875rem;  /* 11px — smallest labels */
+  --ns-text-xs:      0.75rem;    /* 12px — captions, badges */
+  --ns-text-sm:      0.8125rem;  /* 13px — secondary text, sidebar */
+  --ns-text-base:    0.875rem;   /* 14px — body text, editor default */
+  --ns-text-md:      1rem;       /* 16px — emphasized body */
+  --ns-text-lg:      1.125rem;   /* 18px — section headers */
+  --ns-text-xl:      1.25rem;    /* 20px — page titles */
+  --ns-text-2xl:     1.5rem;     /* 24px — large headers */
+  --ns-text-3xl:     1.875rem;   /* 30px — hero text */
+  --ns-text-4xl:     2.25rem;    /* 36px — display */
+  --ns-text-5xl:     3rem;       /* 48px — splash/onboarding */
+
+  /* --- 2.3 Line Heights --- */
+  --ns-leading-none:     1;
+  --ns-leading-tight:    1.25;
+  --ns-leading-snug:     1.375;
+  --ns-leading-normal:   1.5;
+  --ns-leading-relaxed:  1.625;
+  --ns-leading-loose:    1.75;     /* Editor prose */
+
+  /* --- 2.4 Letter Spacing --- */
+  --ns-tracking-tighter: -0.05em;
+  --ns-tracking-tight:   -0.025em;
+  --ns-tracking-normal:  0em;
+  --ns-tracking-wide:    0.025em;
+  --ns-tracking-wider:   0.05em;
+  --ns-tracking-widest:  0.1em;
+
+  /* --- 2.5 Font Weights --- */
+  --ns-font-thin:        100;
+  --ns-font-light:       300;
+  --ns-font-regular:     400;
+  --ns-font-medium:      500;
+  --ns-font-semibold:    600;
+  --ns-font-bold:        700;
+  --ns-font-extrabold:   800;
+
+
+  /* ================================================================
+     3. SPACING TOKENS (4px grid)
+     ================================================================ */
+
+  --ns-space-0:    0px;
+  --ns-space-px:   1px;
+  --ns-space-0-5:  2px;     /* 0.5 * 4 */
+  --ns-space-1:    4px;     /* 1 * 4 */
+  --ns-space-1-5:  6px;     /* 1.5 * 4 */
+  --ns-space-2:    8px;     /* 2 * 4 */
+  --ns-space-2-5:  10px;    /* 2.5 * 4 */
+  --ns-space-3:    12px;    /* 3 * 4 */
+  --ns-space-4:    16px;    /* 4 * 4 */
+  --ns-space-5:    20px;    /* 5 * 4 */
+  --ns-space-6:    24px;    /* 6 * 4 */
+  --ns-space-8:    32px;    /* 8 * 4 */
+  --ns-space-10:   40px;    /* 10 * 4 */
+  --ns-space-12:   48px;    /* 12 * 4 */
+  --ns-space-16:   64px;    /* 16 * 4 */
+  --ns-space-20:   80px;    /* 20 * 4 */
+  --ns-space-24:   96px;    /* 24 * 4 */
+  --ns-space-32:   128px;   /* 32 * 4 */
+  --ns-space-40:   160px;   /* 40 * 4 */
+  --ns-space-48:   192px;   /* 48 * 4 */
+  --ns-space-64:   256px;   /* 64 * 4 */
+
+
+  /* ================================================================
+     4. BORDER RADIUS TOKENS
+     ================================================================ */
+
+  --ns-radius-none:  0px;
+  --ns-radius-sm:    4px;      /* Small elements: badges, chips */
+  --ns-radius-md:    8px;      /* Medium elements: buttons, inputs */
+  --ns-radius-lg:    12px;     /* Large elements: cards, modals */
+  --ns-radius-xl:    16px;     /* Extra large: sheets, dialogs */
+  --ns-radius-2xl:   24px;     /* Extra extra large */
+  --ns-radius-full:  9999px;   /* Pills, avatars */
+
+
+  /* ================================================================
+     5. SHADOW TOKENS
+     ================================================================ */
+
+  --ns-shadow-none:      none;
+  --ns-shadow-xs:        0 1px 2px rgba(0, 0, 0, 0.3);
+  --ns-shadow-sm:        0 1px 3px rgba(0, 0, 0, 0.4);
+  --ns-shadow-md:        0 4px 12px rgba(0, 0, 0, 0.5);
+  --ns-shadow-lg:        0 8px 24px rgba(0, 0, 0, 0.6);
+  --ns-shadow-xl:        0 12px 36px rgba(0, 0, 0, 0.65);
+  --ns-shadow-floating:  0 16px 48px rgba(0, 0, 0, 0.7);
+
+  /* Inset shadows for inputs/wells */
+  --ns-shadow-inset:     inset 0 1px 3px rgba(0, 0, 0, 0.3);
+
+  /* Focus ring shadow (used with box-shadow for focus states) */
+  --ns-shadow-ring:      0 0 0 3px rgba(203, 166, 247, 0.4);
+  --ns-shadow-ring-error:0 0 0 3px rgba(243, 139, 168, 0.4);
+
+
+  /* ================================================================
+     6. MOTION / ANIMATION TOKENS
+     ================================================================ */
+
+  /* --- 6.1 Durations --- */
+  --ns-duration-instant:   0ms;
+  --ns-duration-fast:      100ms;
+  --ns-duration-normal:    150ms;
+  --ns-duration-moderate:  200ms;
+  --ns-duration-slow:      300ms;
+  --ns-duration-slower:    500ms;
+
+  /* --- 6.2 Easing Curves --- */
+  --ns-ease-linear:        linear;
+  --ns-ease-in:            cubic-bezier(0.4, 0, 1, 1);
+  --ns-ease-out:           cubic-bezier(0.22, 1, 0.36, 1);
+  --ns-ease-in-out:        cubic-bezier(0.4, 0, 0.2, 1);
+  --ns-ease-bounce:        cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* --- 6.3 Transitions (shorthand presets) --- */
+  --ns-transition-colors:  color, background-color, border-color, text-decoration-color, fill, stroke;
+  --ns-transition-opacity: opacity;
+  --ns-transition-shadow:  box-shadow;
+  --ns-transition-transform: transform;
+
+
+  /* ================================================================
+     7. LAYOUT TOKENS
+     ================================================================ */
+
+  /* --- 7.1 Application Shell --- */
+  --ns-ribbon-width:         48px;
+  --ns-sidebar-width:        260px;
+  --ns-sidebar-min:          180px;
+  --ns-sidebar-max:          480px;
+  --ns-right-sidebar-width:  280px;
+  --ns-statusbar-height:     24px;
+  --ns-tabbar-height:        38px;
+  --ns-toolbar-height:       44px;
+
+  /* --- 7.2 Breakpoints (for reference, used in Tailwind config) --- */
+  /* sm:  640px  — large phones, landscape */
+  /* md:  768px  — tablets */
+  /* lg:  1024px — small laptops */
+  /* xl:  1280px — desktops */
+  /* 2xl: 1536px — large displays */
+
+  /* --- 7.3 Content widths --- */
+  --ns-max-width-prose:      65ch;   /* Optimal reading width */
+  --ns-max-width-content:    960px;  /* Settings, onboarding */
+  --ns-max-width-wide:       1280px; /* Dashboard, admin */
+
+  /* --- 7.4 Z-Index Scale --- */
+  --ns-z-base:         0;
+  --ns-z-dropdown:     50;
+  --ns-z-sticky:       100;
+  --ns-z-overlay:      200;
+  --ns-z-modal:        300;
+  --ns-z-popover:      400;
+  --ns-z-tooltip:      500;
+  --ns-z-toast:        600;
+  --ns-z-spotlight:    700;   /* Command palette */
+  --ns-z-max:          9999;
+
+
+  /* ================================================================
+     8. OPACITY TOKENS
+     ================================================================ */
+
+  --ns-opacity-disabled:   0.5;
+  --ns-opacity-hover:      0.8;
+  --ns-opacity-placeholder: 0.5;
+  --ns-opacity-overlay:    0.6;
+}
+
+
+/* ================================================================
+   LIGHT THEME OVERRIDES
+   Applied via [data-theme="light"] on <html>
+   ================================================================ */
+
+[data-theme="light"] {
+  /* --- Backgrounds (Catppuccin Latte) --- */
+  --ns-color-background:          #eff1f5;  /* Latte Base */
+  --ns-color-background-surface:  #e6e9ef;  /* Latte Mantle */
+  --ns-color-background-elevated: #ffffff;  /* White cards */
+  --ns-color-background-overlay:  #ffffff;
+  --ns-color-background-input:    #ffffff;
+  --ns-color-background-hover:    rgba(0, 0, 0, 0.04);
+  --ns-color-background-active:   rgba(0, 0, 0, 0.08);
+
+  /* --- Foreground / Text --- */
+  --ns-color-foreground:          #4c4f69;  /* Latte Text */
+  --ns-color-foreground-secondary:#5c5f77;  /* Latte Subtext1 */
+  --ns-color-foreground-muted:    #6c6f85;  /* Latte Subtext0 */
+  --ns-color-foreground-inverse:  #ffffff;
+
+  /* --- Primary (Mauve) --- */
+  --ns-color-primary:             #8839ef;  /* Latte Mauve */
+  --ns-color-primary-hover:       #7528e0;
+  --ns-color-primary-active:      #6520c7;
+  --ns-color-primary-muted:       rgba(136, 57, 239, 0.1);
+  --ns-color-primary-foreground:  #ffffff;
+
+  /* --- Secondary --- */
+  --ns-color-secondary:           #e6e9ef;  /* Latte Mantle */
+  --ns-color-secondary-hover:     #dce0e8;
+  --ns-color-secondary-foreground:#4c4f69;
+
+  /* --- Accent (Pink) --- */
+  --ns-color-accent:              #ea76cb;  /* Latte Pink */
+  --ns-color-accent-hover:        #e560c0;
+  --ns-color-accent-muted:        rgba(234, 118, 203, 0.1);
+  --ns-color-accent-foreground:   #ffffff;
+
+  /* --- Muted --- */
+  --ns-color-muted:               #e6e9ef;
+  --ns-color-muted-foreground:    #6c6f85;
+
+  /* --- Destructive --- */
+  --ns-color-destructive:         #d20f39;  /* Latte Red */
+  --ns-color-destructive-hover:   #b80d32;
+  --ns-color-destructive-muted:   rgba(210, 15, 57, 0.1);
+  --ns-color-destructive-foreground: #ffffff;
+
+  /* --- Semantic Status --- */
+  --ns-color-success:             #40a02b;  /* Latte Green */
+  --ns-color-success-muted:       rgba(64, 160, 43, 0.1);
+  --ns-color-warning:             #fe640b;  /* Latte Peach */
+  --ns-color-warning-muted:       rgba(254, 100, 11, 0.1);
+  --ns-color-error:               #d20f39;
+  --ns-color-error-muted:         rgba(210, 15, 57, 0.1);
+  --ns-color-info:                #04a5e5;  /* Latte Sky */
+  --ns-color-info-muted:          rgba(4, 165, 229, 0.1);
+
+  /* --- Borders --- */
+  --ns-color-border:              #ccd0da;  /* Latte Surface2 */
+  --ns-color-border-subtle:       rgba(0, 0, 0, 0.06);
+  --ns-color-border-focus:        var(--ns-color-primary);
+  --ns-color-border-error:        var(--ns-color-destructive);
+
+  /* --- Input --- */
+  --ns-color-input:               #ccd0da;
+  --ns-color-input-background:    #ffffff;
+
+  /* --- Ring --- */
+  --ns-color-ring:                #8839ef;
+
+  /* --- Card --- */
+  --ns-color-card:                #ffffff;
+  --ns-color-card-foreground:     #4c4f69;
+
+  /* --- Popover --- */
+  --ns-color-popover:             #ffffff;
+  --ns-color-popover-foreground:  #4c4f69;
+
+  /* --- Sidebar --- */
+  --ns-color-sidebar-background:  #dce0e8;  /* Latte Crust */
+  --ns-color-sidebar-foreground:  #4c4f69;
+  --ns-color-sidebar-border:      #ccd0da;
+  --ns-color-sidebar-accent:      #e6e9ef;
+  --ns-color-sidebar-accent-foreground: #4c4f69;
+  --ns-color-sidebar-muted:       #6c6f85;
+  --ns-color-sidebar-ring:        #8839ef;
+
+  /* --- Extended Latte Palette --- */
+  --ns-color-rosewater:           #dc8a78;
+  --ns-color-flamingo:            #dd7878;
+  --ns-color-pink:                #ea76cb;
+  --ns-color-mauve:               #8839ef;
+  --ns-color-red:                 #d20f39;
+  --ns-color-maroon:              #e64553;
+  --ns-color-peach:               #fe640b;
+  --ns-color-yellow:              #df8e1d;
+  --ns-color-green:               #40a02b;
+  --ns-color-teal:                #179299;
+  --ns-color-sky:                 #04a5e5;
+  --ns-color-sapphire:            #209fb5;
+  --ns-color-blue:                #1e66f5;
+  --ns-color-lavender:            #7287fd;
+
+  /* --- Charts --- */
+  --ns-color-chart-1:             #8839ef;
+  --ns-color-chart-2:             #1e66f5;
+  --ns-color-chart-3:             #40a02b;
+  --ns-color-chart-4:             #fe640b;
+  --ns-color-chart-5:             #d20f39;
+
+  /* --- Shadows (lighter for light theme) --- */
+  --ns-shadow-xs:        0 1px 2px rgba(0, 0, 0, 0.04);
+  --ns-shadow-sm:        0 1px 3px rgba(0, 0, 0, 0.08);
+  --ns-shadow-md:        0 4px 12px rgba(0, 0, 0, 0.12);
+  --ns-shadow-lg:        0 8px 24px rgba(0, 0, 0, 0.15);
+  --ns-shadow-xl:        0 12px 36px rgba(0, 0, 0, 0.18);
+  --ns-shadow-floating:  0 16px 48px rgba(0, 0, 0, 0.2);
+  --ns-shadow-inset:     inset 0 1px 3px rgba(0, 0, 0, 0.06);
+  --ns-shadow-ring:      0 0 0 3px rgba(136, 57, 239, 0.3);
+  --ns-shadow-ring-error:0 0 0 3px rgba(210, 15, 57, 0.3);
+}
+
+
+/* ================================================================
+   REDUCED MOTION
+   Respects user accessibility preferences.
+   ================================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --ns-duration-instant:  0ms;
+    --ns-duration-fast:     0ms;
+    --ns-duration-normal:   0ms;
+    --ns-duration-moderate: 0ms;
+    --ns-duration-slow:     0ms;
+    --ns-duration-slower:   0ms;
+  }
+}
+
+
+/* ================================================================
+   HIGH CONTRAST MODE
+   Overrides for users who need stronger contrast.
+   ================================================================ */
+
+@media (prefers-contrast: more) {
+  :root {
+    --ns-color-foreground:          #ffffff;
+    --ns-color-border:              #7f849c;
+    --ns-color-border-subtle:       rgba(255, 255, 255, 0.2);
+    --ns-color-foreground-muted:    #9399b2;
+  }
+
+  [data-theme="light"] {
+    --ns-color-foreground:          #000000;
+    --ns-color-border:              #8c8fa1;
+    --ns-color-border-subtle:       rgba(0, 0, 0, 0.15);
+    --ns-color-foreground-muted:    #5c5f77;
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "open-pencil": {
+      "command": "/Users/zeizel/.bun/bin/openpencil-mcp",
+      "args": [],
+      "env": {
+        "OPEN_PENCIL_DESIGNS_DIR": "./designs"
+      }
+    },
+    "context7": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@upstash/context7-mcp@latest"
+      ]
+    }
+  }
+}
