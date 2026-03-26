@@ -3,9 +3,16 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/constants/src",
   "projectType": "library",
+  "tags": ["scope:lib"],
   "targets": {
     "type-check": {
       "command": "tsc --noEmit -p libs/constants/tsconfig.json"
+    },
+    "test": {
+      "command": "vitest run --config libs/constants/vitest.config.ts"
+    },
+    "test:watch": {
+      "command": "vitest --config libs/constants/vitest.config.ts"
     }
   }
 }

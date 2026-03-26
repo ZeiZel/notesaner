@@ -1,5 +1,8 @@
 name: CI
 
+# Run on every push to integration branches and on all PRs targeting main.
+# Concurrency group cancels in-progress runs for the same ref so stale
+# pipeline runs don't consume runner minutes after a force-push or rebase.
 on:
   push:
     branches: [main, develop]
@@ -11,7 +14,74 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  lint-test-build:
+  # ── Lint ────────────────────────────────────────────────────────────────────
+  # Run ESLint only on projects affected by the change set.
+  # Keeping lint as a separate job lets it run in parallel with type-check
+  # and provides a clearer signal in the GitHub status checks UI.
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history is required for NX affected to compute the change set
+          # relative to the base branch (defaultBase: main in nx.json).
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set NX SHAs
+        uses: nrwl/nx-set-shas@v4
+
+      - name: Lint affected projects
+        run: pnpm nx affected -t lint
+
+  # ── Type check ──────────────────────────────────────────────────────────────
+  # Runs tsc --noEmit across affected projects.
+  # A dedicated step surfaces type errors independently of lint failures.
+  type-check:
+    name: Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set NX SHAs
+        uses: nrwl/nx-set-shas@v4
+
+      - name: Type check affected projects
+        run: pnpm nx affected -t type-check
+
+  # ── Test ────────────────────────────────────────────────────────────────────
+  # Runs Vitest via `nx affected -t test` so only projects touched by the
+  # change set are tested. Services (postgres, valkey) are always started
+  # because integration tests in apps/server require them; unit-only lib
+  # tests simply ignore the env vars.
+  test:
+    name: Test
     runs-on: ubuntu-latest
 
     services:
@@ -59,17 +129,50 @@ jobs:
       - name: Set NX SHAs
         uses: nrwl/nx-set-shas@v4
 
-      - name: Lint affected
-        run: pnpm nx affected -t lint
-
-      - name: Type check affected
-        run: pnpm nx affected -t type-check
-
-      - name: Test affected
+      - name: Run tests for affected projects
         run: pnpm nx affected -t test
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/notesaner_test
           VALKEY_URL: valkey://localhost:6379
 
-      - name: Build affected
+  # ── Build ───────────────────────────────────────────────────────────────────
+  # Build only what has changed. Depends on lint, type-check, and test so
+  # that a broken build artifact is never produced for a failing commit.
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: [lint, type-check, test]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set NX SHAs
+        uses: nrwl/nx-set-shas@v4
+
+      # Restore the NX remote cache so repeated builds of unchanged projects
+      # are instant. The cache key changes when nx.json or pnpm-lock.yaml
+      # changes, which are the two files most likely to invalidate all targets.
+      - name: Restore NX build cache
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}
+          restore-keys: |
+            nx-${{ runner.os }}-
+
+      - name: Build affected projects
         run: pnpm nx affected -t build

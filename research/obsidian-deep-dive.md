@@ -484,5 +484,4 @@ These areas are where Obsidian is strong and a head-on competition would be diff
 - [Obsidian Sync: Complete Guide and Alternatives](https://notionist.app/alternative-to-obsidian-sync)
 - [Pane Relief Plugin (GitHub)](https://github.com/pjeby/pane-relief)
 - [How to limit split view (Forum)](https://forum.obsidian.md/t/how-to-limit-split-view-to-just-2-panes-and-open-new-tabs-in-those-panes/61526)
-- [Obsidian Electron performance (Hacker News)](https://news.ycombinator.com/item?id=36616563)
-- [Search performance degradation in Obsidian 1.9.10 (Forum)](https://forum.obsidian.md/t/performance-degradation-in-1-9-10-installer-electron-37/104418)
+- [Obsidian Electron performance (Hacker News)](https://news.ycombinator.com/item?id=36616563)- [Search performance degradation in Obsidian 1.9.10 (Forum)](https://forum.obsidian.md/t/performance-degradation-in-1-9-10-installer-electron-37/104418)

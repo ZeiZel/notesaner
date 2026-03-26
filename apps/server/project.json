@@ -1,0 +1,76 @@
+{
+  "name": "server",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/server/src",
+  "projectType": "application",
+  "tags": ["type:app", "platform:server"],
+  "targets": {
+    "build": {
+      "executor": "@nx/js:tsc",
+      "outputs": ["{options.outputPath}"],
+      "options": {
+        "outputPath": "dist/apps/server",
+        "tsConfig": "apps/server/tsconfig.json",
+        "main": "apps/server/src/main.ts",
+        "assets": []
+      }
+    },
+    "serve": {
+      "executor": "@nx/js:node",
+      "options": {
+        "buildTarget": "server:build",
+        "watch": true,
+        "inspect": false
+      }
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "outputs": ["{workspaceRoot}/coverage/apps/server"],
+      "options": {
+        "reportsDirectory": "../../coverage/apps/server"
+      }
+    },
+    "lint": {
+      "executor": "@nx/eslint:lint",
+      "outputs": ["{options.outputFile}"],
+      "options": {
+        "lintFilePatterns": ["apps/server/**/*.ts"]
+      }
+    },
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "tsc --noEmit",
+        "cwd": "apps/server"
+      }
+    },
+    "prisma-generate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm prisma generate --schema=./prisma/schema.prisma",
+        "cwd": "apps/server"
+      }
+    },
+    "prisma-migrate": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm prisma migrate dev --schema=./prisma/schema.prisma",
+        "cwd": "apps/server"
+      }
+    },
+    "prisma-push": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm prisma db push --schema=./prisma/schema.prisma",
+        "cwd": "apps/server"
+      }
+    },
+    "prisma-studio": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm prisma studio --schema=./prisma/schema.prisma",
+        "cwd": "apps/server"
+      }
+    }
+  }
+}

@@ -9,7 +9,8 @@
     "dev:web": "nx serve web",
     "dev:server": "nx serve server",
     "build": "nx run-many -t build",
-    "test": "nx run-many -t test",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "lint": "nx run-many -t lint",
     "type-check": "nx run-many -t type-check",
     "format": "prettier --write .",
@@ -27,10 +28,21 @@
     "pnpm": ">=10.0.0"
   },
   "packageManager": "pnpm@10.12.4",
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@nestjs/core",
+      "@prisma/client",
+      "@prisma/engines",
+      "prisma",
+      "sharp",
+      "msgpackr-extract"
+    ]
+  },
   "devDependencies": {
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@nx/eslint": "^22.6.1",
+    "@nx/eslint-plugin": "^22.6.1",
     "@nx/js": "^22.6.1",
     "@nx/next": "^22.6.1",
     "@nx/workspace": "^22.6.1",
@@ -40,6 +52,7 @@
     "nx": "^22.6.1",
     "prettier": "^3.8.1",
     "typescript": "^6.0.2",
+    "typescript-eslint": "^8.0.0",
     "vitest": "^4.1.1"
   }
 }
