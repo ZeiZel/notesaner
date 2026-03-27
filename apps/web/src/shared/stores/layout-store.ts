@@ -1,5 +1,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
+import type { SavedLayout, SnapTemplateId } from '@/features/workspace/snap-layout-types';
+import { SNAP_TEMPLATES } from '@/features/workspace/snap-layout-types';
 
 type SnapZone =
   | 'left-half'
@@ -14,14 +16,15 @@ type SnapZone =
   | 'center-third'
   | 'right-third';
 
-interface PanelConfig {
+export interface PanelConfig {
   id: string;
   type: 'editor' | 'graph' | 'preview' | 'terminal';
   noteId?: string;
-  size: number; // percentage
+  /** Size as a percentage of the available space in the split direction */
+  size: number;
 }
 
-interface TabConfig {
+export interface TabConfig {
   id: string;
   panelId: string;
   noteId: string;
@@ -30,10 +33,14 @@ interface TabConfig {
   isDirty: boolean;
 }
 
-interface LayoutConfig {
+export interface LayoutConfig {
   panels: PanelConfig[];
   tabs: TabConfig[];
   splitDirection: 'horizontal' | 'vertical' | null;
+  /** Active snap template id for grid rendering */
+  snapTemplateId?: SnapTemplateId;
+  /** Custom ratios in CSS fr units per column/row, e.g. [7, 3] for 70/30 */
+  customRatios?: number[];
 }
 
 interface LayoutDto {
@@ -47,6 +54,7 @@ const DEFAULT_LAYOUT: LayoutConfig = {
   panels: [{ id: 'main', type: 'editor', size: 100 }],
   tabs: [],
   splitDirection: null,
+  snapTemplateId: 'single',
 };
 
 interface LayoutState {
@@ -57,6 +65,10 @@ interface LayoutState {
   isResizing: boolean;
   draggedPanelId: string | null;
   snapZoneActive: SnapZone | null;
+  /** Whether the snap layout picker popup is open */
+  isSnapPickerOpen: boolean;
+  /** Named layouts saved by the user (persisted in localStorage) */
+  savedLayouts: SavedLayout[];
 
   // Actions
   setLayout: (config: LayoutConfig) => void;
@@ -73,6 +85,18 @@ interface LayoutState {
   setResizing: (isResizing: boolean) => void;
   setDraggedPanel: (panelId: string | null) => void;
   setSnapZone: (zone: SnapZone | null) => void;
+  /** Open or close the snap layout picker popup */
+  setSnapPickerOpen: (open: boolean) => void;
+  /** Apply a snap template, generating panels from its definition */
+  applySnapTemplate: (templateId: SnapTemplateId) => void;
+  /** Update custom column/row ratios after a divider drag */
+  setCustomRatios: (ratios: number[]) => void;
+  /** Save the current layout under a custom name */
+  saveCurrentLayout: (name: string) => void;
+  /** Load a previously saved named layout */
+  loadSavedLayout: (savedLayoutId: string) => void;
+  /** Delete a saved layout by id */
+  deleteSavedLayout: (savedLayoutId: string) => void;
 }
 
 export const useLayoutStore = create<LayoutState>()(
@@ -86,6 +110,8 @@ export const useLayoutStore = create<LayoutState>()(
         isResizing: false,
         draggedPanelId: null,
         snapZoneActive: null,
+        isSnapPickerOpen: false,
+        savedLayouts: [],
 
         // Actions
         setLayout: (config) =>
@@ -249,12 +275,128 @@ export const useLayoutStore = create<LayoutState>()(
 
         setSnapZone: (snapZoneActive) =>
           set({ snapZoneActive }, false, 'layout/setSnapZone'),
+
+        setSnapPickerOpen: (isSnapPickerOpen) =>
+          set({ isSnapPickerOpen }, false, 'layout/setSnapPickerOpen'),
+
+        applySnapTemplate: (templateId) =>
+          set(
+            (state) => {
+              const template = SNAP_TEMPLATES.find((t) => t.id === templateId);
+              if (!template) return state;
+
+              // Re-use existing tabs, distribute evenly across new panels
+              const existingTabs = state.currentLayout.tabs;
+
+              // Build panels from template definition
+              const newPanels: PanelConfig[] = template.panels.map((_tp, i) => ({
+                id: `panel-${i + 1}`,
+                type: 'editor' as const,
+                size: Math.floor(100 / template.panels.length),
+              }));
+
+              // Re-assign tabs: keep them in their closest existing panel
+              const reassignedTabs = existingTabs.map((tab, i) => ({
+                ...tab,
+                panelId: newPanels[i % newPanels.length]?.id ?? newPanels[0].id,
+              }));
+
+              return {
+                currentLayout: {
+                  panels: newPanels,
+                  tabs: reassignedTabs,
+                  splitDirection:
+                    template.panels.length > 1 ? 'horizontal' : null,
+                  snapTemplateId: templateId,
+                  customRatios: undefined,
+                },
+                isSnapPickerOpen: false,
+              };
+            },
+            false,
+            'layout/applySnapTemplate',
+          ),
+
+        setCustomRatios: (customRatios) =>
+          set(
+            (state) => ({
+              currentLayout: { ...state.currentLayout, customRatios },
+            }),
+            false,
+            'layout/setCustomRatios',
+          ),
+
+        saveCurrentLayout: (name) =>
+          set(
+            (state) => {
+              const saved: SavedLayout = {
+                id: `saved-${Date.now()}`,
+                name,
+                templateId: state.currentLayout.snapTemplateId ?? 'single',
+                customRatios: state.currentLayout.customRatios,
+                createdAt: new Date().toISOString(),
+              };
+              return { savedLayouts: [...state.savedLayouts, saved] };
+            },
+            false,
+            'layout/saveCurrentLayout',
+          ),
+
+        loadSavedLayout: (savedLayoutId) =>
+          set(
+            (state) => {
+              const saved = state.savedLayouts.find(
+                (l) => l.id === savedLayoutId,
+              );
+              if (!saved) return state;
+
+              const template = SNAP_TEMPLATES.find(
+                (t) => t.id === saved.templateId,
+              );
+              if (!template) return state;
+
+              const newPanels: PanelConfig[] = template.panels.map((_p, i) => ({
+                id: `panel-${i + 1}`,
+                type: 'editor' as const,
+                size: Math.floor(100 / template.panels.length),
+              }));
+
+              return {
+                currentLayout: {
+                  panels: newPanels,
+                  tabs: state.currentLayout.tabs.map((tab, i) => ({
+                    ...tab,
+                    panelId: newPanels[i % newPanels.length]?.id ?? newPanels[0].id,
+                  })),
+                  splitDirection:
+                    template.panels.length > 1 ? 'horizontal' : null,
+                  snapTemplateId: saved.templateId,
+                  customRatios: saved.customRatios,
+                },
+                isSnapPickerOpen: false,
+              };
+            },
+            false,
+            'layout/loadSavedLayout',
+          ),
+
+        deleteSavedLayout: (savedLayoutId) =>
+          set(
+            (state) => ({
+              savedLayouts: state.savedLayouts.filter(
+                (l) => l.id !== savedLayoutId,
+              ),
+            }),
+            false,
+            'layout/deleteSavedLayout',
+          ),
       }),
       {
         name: 'notesaner-layout',
         partialize: (state) => ({
           currentLayout: state.currentLayout,
           activeLayoutId: state.activeLayoutId,
+          savedLayouts: state.savedLayouts,
         }),
       },
     ),

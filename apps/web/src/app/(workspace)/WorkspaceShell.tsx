@@ -2,6 +2,9 @@
 
 import { type ReactNode } from 'react';
 import { useSidebarStore } from '@/shared/stores/sidebar-store';
+import { useLayoutStore } from '@/shared/stores/layout-store';
+import { useSnapLayout } from '@/features/workspace/useSnapLayout';
+import { SnapLayoutPicker } from '@/features/workspace/SnapLayoutPicker';
 
 interface WorkspaceShellProps {
   children: ReactNode;
@@ -19,6 +22,9 @@ interface WorkspaceShellProps {
  * Panel visibility and widths are persisted in the sidebar Zustand store.
  */
 export function WorkspaceShell({ children }: WorkspaceShellProps) {
+  // Register Cmd+Shift+L shortcut for snap layout picker
+  useSnapLayout();
+
   const leftSidebarOpen = useSidebarStore((s) => s.leftSidebarOpen);
   const rightSidebarOpen = useSidebarStore((s) => s.rightSidebarOpen);
   const leftSidebarWidth = useSidebarStore((s) => s.leftSidebarWidth);
@@ -111,6 +117,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           )}
           <span className="text-xs text-foreground-muted">No file open</span>
           <div className="ml-auto flex items-center gap-1">
+            {/* Snap layout picker toggle */}
+            <SnapLayoutButton />
+
             <button
               onClick={toggleRightSidebar}
               aria-label="Toggle right sidebar"
@@ -122,6 +131,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               </svg>
             </button>
           </div>
+
+          {/* Floating snap layout picker (keyboard-triggered, no anchor) */}
+          <SnapLayoutPicker />
         </div>
 
         {/* Page content */}
@@ -179,6 +191,45 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         </aside>
       )}
     </div>
+  );
+}
+
+// --- Snap layout toolbar button ---
+
+function SnapLayoutButton() {
+  const isOpen = useLayoutStore((s) => s.isSnapPickerOpen);
+  const setOpen = useLayoutStore((s) => s.setSnapPickerOpen);
+  const currentTemplateId = useLayoutStore(
+    (s) => s.currentLayout.snapTemplateId ?? 'single',
+  );
+
+  return (
+    <button
+      onClick={() => setOpen(!isOpen)}
+      aria-label="Snap layout picker"
+      aria-pressed={isOpen}
+      title="Snap layout picker (Cmd+Shift+L)"
+      className="flex h-6 w-6 items-center justify-center rounded text-foreground-muted transition-colors hover:bg-secondary hover:text-foreground aria-pressed:bg-secondary aria-pressed:text-foreground"
+    >
+      {/* Icon: grid squares layout icon */}
+      {currentTemplateId === 'split-50-50' || currentTemplateId === 'split-70-30' || currentTemplateId === 'split-30-70' ? (
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+          <path d="M2 2h5v12H2V2zm7 0h5v12H9V2z" />
+        </svg>
+      ) : currentTemplateId === 'three-columns' ? (
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+          <path d="M1 2h4v12H1V2zm5 0h4v12H6V2zm5 0h4v12h-4V2z" />
+        </svg>
+      ) : currentTemplateId === 'two-x-two' ? (
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+          <path d="M2 2h5v5H2V2zm7 0h5v5H9V2zM2 9h5v5H2V9zm7 0h5v5H9V9z" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+          <path d="M2 2h12v12H2V2z" />
+        </svg>
+      )}
+    </button>
   );
 }
 
