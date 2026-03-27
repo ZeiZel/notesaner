@@ -2,6 +2,14 @@ import { Module } from '@nestjs/common';
 import { SearchController } from './search.controller';
 import { SearchService } from './search.service';
 
+/**
+ * SearchModule — provides full-text search, fuzzy search, and recent-search
+ * history backed by ValKey.
+ *
+ * Both PrismaModule and ValkeyModule are @Global(), so their providers
+ * (PrismaService, ValkeyService) are injected automatically without
+ * explicitly importing them here.
+ */
 @Module({
   controllers: [SearchController],
   providers: [SearchService],
