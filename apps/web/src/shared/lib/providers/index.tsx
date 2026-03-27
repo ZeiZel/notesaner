@@ -25,3 +25,4 @@ export function Providers({ children }: ProvidersProps) {
 
 export { QueryProvider } from './QueryProvider';
 export { ThemeProvider, useTheme } from './ThemeProvider';
+export { KeyboardShortcutsProvider } from './KeyboardShortcutsProvider';
