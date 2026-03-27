@@ -10,4 +10,6 @@ export default defineWorkspace([
   'libs/utils/vitest.config.ts',
   'libs/constants/vitest.config.ts',
   'libs/contracts/vitest.config.ts',
+  // Applications
+  'apps/server/vitest.config.ts',
 ]);
