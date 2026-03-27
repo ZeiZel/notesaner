@@ -5,6 +5,7 @@ import { configuration } from './config/configuration';
 import { validateConfig } from './config/validation';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
+import { PrismaModule } from './prisma/prisma.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { WorkspacesModule } from './modules/workspaces/workspaces.module';
@@ -15,6 +16,7 @@ import { SyncModule } from './modules/sync/sync.module';
 import { PluginsModule } from './modules/plugins/plugins.module';
 import { PublishModule } from './modules/publish/publish.module';
 import { HealthModule } from './modules/health/health.module';
+import { JobsModule } from './modules/jobs/jobs.module';
 
 @Module({
   imports: [
@@ -24,6 +26,10 @@ import { HealthModule } from './modules/health/health.module';
       validate: validateConfig,
       envFilePath: ['.env.local', '.env'],
     }),
+    // Global Prisma client — available everywhere via DI
+    PrismaModule,
+    // Jobs module registers BullMQ queues and processors
+    JobsModule,
     AuthModule,
     UsersModule,
     WorkspacesModule,
