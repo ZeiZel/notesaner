@@ -12,7 +12,7 @@ interface ProvidersProps {
  * Root provider composition. Wraps the application with all global providers.
  *
  * Order matters:
- * 1. ThemeProvider — applies data-theme attribute immediately
+ * 1. ThemeProvider — applies data-theme attribute and CSS variables immediately
  * 2. QueryProvider — provides TanStack Query context (may depend on auth)
  */
 export function Providers({ children }: ProvidersProps) {
