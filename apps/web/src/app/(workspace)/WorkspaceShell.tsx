@@ -2,6 +2,7 @@
 
 import { type ReactNode } from 'react';
 import { useSidebarStore } from '@/shared/stores/sidebar-store';
+import { KeyboardShortcutsProvider } from '@/shared/lib/providers/KeyboardShortcutsProvider';
 
 interface WorkspaceShellProps {
   children: ReactNode;
@@ -30,6 +31,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   const setRightTab = useSidebarStore((s) => s.setRightTab);
 
   return (
+    <KeyboardShortcutsProvider>
     <div className="flex h-screen w-screen overflow-hidden bg-background">
       {/* Left Sidebar */}
       <aside
@@ -179,6 +181,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
         </aside>
       )}
     </div>
+    </KeyboardShortcutsProvider>
   );
 }
 
