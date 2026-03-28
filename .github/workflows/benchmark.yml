@@ -1,0 +1,310 @@
+name: Performance Benchmarks
+
+# Runs on release branches and manually. Can also be triggered by PRs
+# that touch performance-critical paths.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/web/src/**'
+      - 'libs/editor-core/**'
+      - 'libs/sync-engine/**'
+      - 'libs/markdown/**'
+      - 'tools/benchmarks/**'
+      - '.lighthouserc.js'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/web/src/**'
+      - 'libs/editor-core/**'
+      - 'libs/sync-engine/**'
+      - 'libs/markdown/**'
+      - 'tools/benchmarks/**'
+      - '.lighthouserc.js'
+  workflow_dispatch:
+    inputs:
+      save_baseline:
+        description: 'Save results as new baseline'
+        required: false
+        default: 'false'
+        type: boolean
+      suite:
+        description: 'Which suite to run (all, editor, render, browser, lighthouse)'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - editor
+          - render
+          - browser
+          - lighthouse
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PNPM_STORE_PATH: ~/.pnpm-store
+
+jobs:
+  # ── Vitest Performance Benchmarks ──────────────────────────────────────────
+  # Runs unit-level benchmarks (editor, render, search, websocket) in Node.js.
+  # These are fast and deterministic, suitable for every PR.
+  unit-benchmarks:
+    name: Unit Benchmarks
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.suite == 'all' ||
+      github.event.inputs.suite == 'editor' ||
+      github.event.inputs.suite == 'render'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Restore pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run Vitest performance benchmarks
+        run: |
+          pnpm vitest run \
+            --config apps/web/vitest.config.ts \
+            --reporter=verbose \
+            "src/__tests__/performance/"
+        env:
+          NODE_ENV: test
+          BENCHMARK_MODE: 'true'
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-benchmark-results
+          path: reports/benchmarks/
+          retention-days: 30
+
+  # ── Playwright Browser Benchmarks ──────────────────────────────────────────
+  # Runs browser-based benchmarks (input latency, LCP, note open, WebSocket).
+  # More expensive, so only runs on main pushes and manual triggers.
+  browser-benchmarks:
+    name: Browser Benchmarks
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.suite == 'all' || github.event.inputs.suite == 'browser')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Restore pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright benchmarks
+        run: |
+          pnpm exec playwright test \
+            --config=apps/web/playwright/benchmark.config.ts
+        env:
+          NODE_ENV: test
+          BENCHMARK_MODE: 'true'
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: browser-benchmark-results
+          path: |
+            reports/benchmarks/
+            reports/benchmarks/playwright-benchmarks.json
+          retention-days: 30
+
+  # ── Lighthouse CI ──────────────────────────────────────────────────────────
+  # Runs Lighthouse CI to verify performance score > 90 and Core Web Vitals.
+  lighthouse:
+    name: Lighthouse CI
+    runs-on: ubuntu-latest
+    if: >
+      github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.suite == 'all' || github.event.inputs.suite == 'lighthouse')
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Restore pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Lighthouse CI
+        run: pnpm add -Dw @lhci/cli
+
+      - name: Build application
+        run: pnpm nx build web
+
+      - name: Run Lighthouse CI
+        run: npx @lhci/cli autorun --config=.lighthouserc.js
+        env:
+          LHCI_BASE_URL: http://localhost:3000
+
+      - name: Upload Lighthouse reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: lighthouse-reports
+          path: reports/lighthouse/
+          retention-days: 30
+
+  # ── Regression Check ────────────────────────────────────────────────────────
+  # Compares current results against the saved baseline.
+  # Alerts on > 20% regression.
+  regression-check:
+    name: Regression Check
+    runs-on: ubuntu-latest
+    needs: [unit-benchmarks]
+    if: always() && needs.unit-benchmarks.result == 'success'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Download benchmark results
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-benchmark-results
+          path: reports/benchmarks/
+
+      - name: Restore baseline
+        uses: actions/cache@v4
+        with:
+          path: reports/benchmarks/baseline.json
+          key: benchmark-baseline-${{ github.ref_name }}
+          restore-keys: |
+            benchmark-baseline-main
+            benchmark-baseline-
+
+      - name: Run regression check
+        id: regression
+        run: |
+          SAVE_FLAG=""
+          if [ "${{ github.event.inputs.save_baseline }}" = "true" ] || [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            SAVE_FLAG="--save-baseline"
+          fi
+          npx tsx tools/benchmarks/regression-check.ts $SAVE_FLAG || echo "regression_found=true" >> "$GITHUB_OUTPUT"
+        continue-on-error: true
+
+      - name: Save baseline cache
+        if: github.ref == 'refs/heads/main' || github.event.inputs.save_baseline == 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: reports/benchmarks/baseline.json
+          key: benchmark-baseline-${{ github.ref_name }}-${{ github.sha }}
+
+      - name: Upload regression report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: regression-report
+          path: reports/benchmarks/regression-report.json
+          retention-days: 30
+
+      - name: Comment on PR with regression results
+        if: github.event_name == 'pull_request' && steps.regression.outputs.regression_found == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const reportPath = 'reports/benchmarks/regression-report.json';
+
+            if (!fs.existsSync(reportPath)) {
+              return;
+            }
+
+            const report = JSON.parse(fs.readFileSync(reportPath, 'utf-8'));
+
+            if (!report.hasRegression) {
+              return;
+            }
+
+            let body = '## Performance Regression Detected\n\n';
+            body += '| Benchmark | Baseline (p95) | Current (p95) | Regression | Severity |\n';
+            body += '|-----------|---------------|--------------|------------|----------|\n';
+
+            for (const alert of report.alerts) {
+              body += `| ${alert.benchmark} | ${alert.baseline.toFixed(2)}ms | ${alert.current.toFixed(2)}ms | +${alert.regressionPercent}% | ${alert.severity} |\n`;
+            }
+
+            body += '\n> Threshold: 20% regression triggers an alert.\n';
+            body += '> To update the baseline, re-run with `save_baseline: true`.\n';
+
+            await github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body,
+            });
