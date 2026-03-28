@@ -1,0 +1,182 @@
+# Prometheus alert rules for Notesaner
+# ─────────────────────────────────────────────────────────────────────────────
+
+groups:
+  - name: notesaner.server
+    rules:
+      # ── Error Rate ───────────────────────────────────────────────────────────
+
+      - alert: HighErrorRate
+        expr: >
+          (
+            sum(rate(http_errors_total{status_code=~"5.."}[5m]))
+            /
+            sum(rate(http_request_duration_seconds_count[5m]))
+          ) > 0.05
+        for: 2m
+        labels:
+          severity: critical
+          service: notesaner-server
+        annotations:
+          summary: 'High server error rate (> 5%)'
+          description: >
+            The 5xx error rate has been above 5% for more than 2 minutes.
+            Current value: {{ $value | humanizePercentage }}.
+          runbook_url: 'https://docs.notesaner.io/runbooks/high-error-rate'
+
+      - alert: ElevatedClientErrors
+        expr: >
+          (
+            sum(rate(http_errors_total{status_code=~"4.."}[5m]))
+            /
+            sum(rate(http_request_duration_seconds_count[5m]))
+          ) > 0.20
+        for: 5m
+        labels:
+          severity: warning
+          service: notesaner-server
+        annotations:
+          summary: 'Elevated client error rate (> 20%)'
+          description: >
+            The 4xx error rate has been above 20% for more than 5 minutes.
+            This may indicate a broken client, scraping, or API misuse.
+            Current value: {{ $value | humanizePercentage }}.
+
+      # ── Latency ──────────────────────────────────────────────────────────────
+
+      - alert: HighP95Latency
+        expr: >
+          histogram_quantile(0.95,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 2
+        for: 5m
+        labels:
+          severity: critical
+          service: notesaner-server
+        annotations:
+          summary: 'P95 HTTP latency > 2 seconds'
+          description: >
+            The 95th percentile HTTP request latency has exceeded 2 seconds
+            for the past 5 minutes. Current P95: {{ $value | humanizeDuration }}.
+          runbook_url: 'https://docs.notesaner.io/runbooks/high-latency'
+
+      - alert: HighP99Latency
+        expr: >
+          histogram_quantile(0.99,
+            sum(rate(http_request_duration_seconds_bucket[5m])) by (le)
+          ) > 5
+        for: 5m
+        labels:
+          severity: warning
+          service: notesaner-server
+        annotations:
+          summary: 'P99 HTTP latency > 5 seconds'
+          description: >
+            The 99th percentile HTTP request latency has exceeded 5 seconds.
+            Current P99: {{ $value | humanizeDuration }}.
+
+      # ── Disk Usage (host-level, requires node-exporter) ──────────────────────
+
+      - alert: HighDiskUsage
+        expr: >
+          (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) > 0.80
+        for: 10m
+        labels:
+          severity: warning
+          service: infrastructure
+        annotations:
+          summary: 'Disk usage > 80%'
+          description: >
+            Root filesystem usage is above 80% on {{ $labels.instance }}.
+            Current usage: {{ $value | humanizePercentage }}.
+          runbook_url: 'https://docs.notesaner.io/runbooks/high-disk-usage'
+
+      - alert: CriticalDiskUsage
+        expr: >
+          (1 - (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"})) > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          service: infrastructure
+        annotations:
+          summary: 'Disk usage > 95% — CRITICAL'
+          description: >
+            Root filesystem usage is above 95% on {{ $labels.instance }}.
+            Immediate action required.
+
+      # ── Node.js Process ──────────────────────────────────────────────────────
+
+      - alert: HighHeapUsage
+        expr: >
+          nodejs_heap_size_used_bytes / nodejs_heap_size_total_bytes > 0.90
+        for: 10m
+        labels:
+          severity: warning
+          service: notesaner-server
+        annotations:
+          summary: 'Node.js heap usage > 90%'
+          description: >
+            The Node.js process heap utilisation has been above 90% for 10 minutes.
+            This may indicate a memory leak. Current usage:
+            {{ $value | humanizePercentage }}.
+
+      - alert: HighEventLoopLag
+        expr: >
+          nodejs_eventloop_lag_seconds > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          service: notesaner-server
+        annotations:
+          summary: 'Node.js event loop lag > 500ms'
+          description: >
+            The event loop lag is {{ $value | humanizeDuration }}, which may
+            cause request timeouts and degraded performance.
+
+      # ── Background Jobs ──────────────────────────────────────────────────────
+
+      - alert: HighJobFailureRate
+        expr: >
+          (
+            sum(rate(job_duration_seconds_count{status="failed"}[15m]))
+            /
+            sum(rate(job_duration_seconds_count[15m]))
+          ) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          service: notesaner-server
+        annotations:
+          summary: 'Background job failure rate > 10%'
+          description: >
+            More than 10% of background jobs have failed in the past 15 minutes.
+            Check queue processors and downstream services.
+
+      # ── WebSocket ────────────────────────────────────────────────────────────
+
+      - alert: HighWebSocketConnections
+        expr: ws_connections_active > 500
+        for: 5m
+        labels:
+          severity: warning
+          service: notesaner-server
+        annotations:
+          summary: 'WebSocket connections exceed 500'
+          description: >
+            There are currently {{ $value }} active WebSocket connections.
+            Consider scaling if this continues to grow.
+
+      # ── Service Availability ─────────────────────────────────────────────────
+
+      - alert: ServiceDown
+        expr: up{job="notesaner-server"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: notesaner-server
+        annotations:
+          summary: 'Notesaner server is down'
+          description: >
+            Prometheus cannot reach the Notesaner server metrics endpoint.
+            The service may be unresponsive or crashed.
+          runbook_url: 'https://docs.notesaner.io/runbooks/service-down'
