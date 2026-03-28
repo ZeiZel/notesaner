@@ -62,6 +62,8 @@ interface TabState {
   closeOthers: (tabId: string) => void;
   /** Close all tabs to the right of the given tab. */
   closeToTheRight: (tabId: string) => void;
+  /** Close all non-dirty tabs. Pinned tabs are always preserved. */
+  closeSaved: () => void;
   /** Close all tabs. Pinned tabs are preserved unless force is true. */
   closeAll: (force?: boolean) => void;
   /** Set the active tab by ID. */
@@ -74,6 +76,8 @@ interface TabState {
   togglePinTab: (tabId: string) => void;
   /** Update the title of a tab (e.g., when note is renamed). */
   updateTabTitle: (tabId: string, title: string) => void;
+  /** Cycle to the next tab (wraps around). direction: 1 = forward, -1 = backward. */
+  cycleTab: (direction: 1 | -1) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +201,21 @@ export const useTabStore = create<TabState>()(
             'tabs/closeToTheRight',
           ),
 
+        closeSaved: () =>
+          set(
+            (state) => {
+              const newTabs = state.tabs.filter((t) => t.isPinned || t.isDirty);
+              const activeStillExists = newTabs.find((t) => t.id === state.activeTabId);
+
+              return {
+                tabs: newTabs,
+                activeTabId: activeStillExists ? state.activeTabId : (newTabs[0]?.id ?? null),
+              };
+            },
+            false,
+            'tabs/closeSaved',
+          ),
+
         closeAll: (force = false) =>
           set(
             (state) => {
@@ -270,6 +289,20 @@ export const useTabStore = create<TabState>()(
             }),
             false,
             'tabs/updateTabTitle',
+          ),
+
+        cycleTab: (direction) =>
+          set(
+            (state) => {
+              if (state.tabs.length === 0) return state;
+
+              const currentIndex = state.tabs.findIndex((t) => t.id === state.activeTabId);
+              const nextIndex = (currentIndex + direction + state.tabs.length) % state.tabs.length;
+
+              return { activeTabId: state.tabs[nextIndex]?.id ?? state.activeTabId };
+            },
+            false,
+            'tabs/cycleTab',
           ),
       }),
       {
