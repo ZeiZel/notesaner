@@ -25,6 +25,9 @@
 import { useRef, type ReactNode, type KeyboardEvent } from 'react';
 import { useGridLayoutStore, type GridPaneConfig } from './grid-layout-store';
 import { useLayoutStore, type PanelConfig } from '@/shared/stores/layout-store';
+import { usePanelControlsStore } from './panel-controls-store';
+import { usePanelControlShortcuts } from './components/PanelControls';
+import { useKeyboardShortcuts } from '@/shared/hooks/useKeyboardShortcuts';
 import { GridPane } from './GridPane';
 import { GridDivider } from './GridDivider';
 import { SnapLayoutPicker } from './SnapLayoutPicker';
@@ -75,8 +78,16 @@ export function GridLayout({ renderPane }: GridLayoutProps) {
   const isTablet = breakpoint === 'tablet';
 
   const gridConfig = useGridLayoutStore((s) => s.gridConfig);
+  const focusedPaneId = useGridLayoutStore((s) => s.focusedPaneId);
   const moveFocus = useGridLayoutStore((s) => s.moveFocus);
   const dropZone = useGridLayoutStore((s) => s.dropZone);
+
+  // Panel controls: maximize/minimize state
+  const maximizedPaneId = usePanelControlsStore((s) => s.maximizedPaneId);
+
+  // Register keyboard shortcuts for panel maximize/minimize
+  const panelShortcuts = usePanelControlShortcuts(focusedPaneId);
+  useKeyboardShortcuts(panelShortcuts);
 
   // Legacy store bridge: read panels for backward compatibility
   const legacyPanels = useLayoutStore((s) => s.currentLayout.panels);
@@ -195,25 +206,27 @@ export function GridLayout({ renderPane }: GridLayoutProps) {
           );
         })}
 
-        {/* Render column dividers */}
-        {columnDividers.map((dividerIndex) => (
-          <GridDivider
-            key={`col-${dividerIndex}`}
-            axis="column"
-            index={dividerIndex}
-            containerRef={containerRef}
-          />
-        ))}
+        {/* Render column dividers (hidden when a pane is maximized) */}
+        {!maximizedPaneId &&
+          columnDividers.map((dividerIndex) => (
+            <GridDivider
+              key={`col-${dividerIndex}`}
+              axis="column"
+              index={dividerIndex}
+              containerRef={containerRef}
+            />
+          ))}
 
-        {/* Render row dividers */}
-        {rowDividers.map((dividerIndex) => (
-          <GridDivider
-            key={`row-${dividerIndex}`}
-            axis="row"
-            index={dividerIndex}
-            containerRef={containerRef}
-          />
-        ))}
+        {/* Render row dividers (hidden when a pane is maximized) */}
+        {!maximizedPaneId &&
+          rowDividers.map((dividerIndex) => (
+            <GridDivider
+              key={`row-${dividerIndex}`}
+              axis="row"
+              index={dividerIndex}
+              containerRef={containerRef}
+            />
+          ))}
 
         {/* Drop zone indicator */}
         {dropZone && (
