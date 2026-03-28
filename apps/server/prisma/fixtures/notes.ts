@@ -10,6 +10,9 @@ export const NOTE_IDS = {
   dailyNote: '00000000-0000-4000-d000-000000000001',
   researchNote: '00000000-0000-4000-d000-000000000002',
   readingList: '00000000-0000-4000-d000-000000000003',
+  inboxQuickCapture: '00000000-0000-4000-d000-000000000004',
+  projectNotesaner: '00000000-0000-4000-d000-000000000005',
+  archiveOldIdeas: '00000000-0000-4000-d000-000000000006',
 
   // Engineering team wiki
   onboarding: '00000000-0000-4000-d000-000000000010',
@@ -32,6 +35,11 @@ export const TAG_IDS = {
   api: '00000000-0000-4000-e000-000000000006',
   published: '00000000-0000-4000-e000-000000000007',
   zettelkasten: '00000000-0000-4000-e000-000000000008',
+  // Canonical tag set requested by task spec
+  project: '00000000-0000-4000-e000-000000000009',
+  idea: '00000000-0000-4000-e000-000000000010',
+  todo: '00000000-0000-4000-e000-000000000011',
+  reference: '00000000-0000-4000-e000-000000000012',
 } as const;
 
 export const LINK_IDS = {
@@ -402,6 +410,91 @@ Zettelkasten cards. The key addition is the emphasis on **continuous refinement*
 - [[Spaced Repetition and Note-Taking]]
 `;
 
+// ─── Folder-Structure Sample Notes ──────────────────────────────────────────
+
+const INBOX_QUICK_CAPTURE_CONTENT = `# Quick Capture
+
+A scratchpad for fleeting thoughts before they get processed.
+
+## Captured Ideas
+- CRDT garbage collection strategy: periodic snapshot + trim history
+- Look into TipTap extension for \`/slash\` commands
+- Compare Yjs sub-document lazy-loading performance
+
+## TODO
+- [ ] Move processed items to [[Projects/Notesaner|project notes]]
+- [ ] Archive anything older than 2 weeks
+- [ ] Review [[Reading List]] for new additions
+
+> **Inbox Zero Rule**: Process this list daily. Anything not actionable
+> within a week should be archived or linked to a project.
+`;
+
+const PROJECT_NOTESANER_CONTENT = `# Project: Notesaner
+
+## Status
+**Active** | Started: 2026-01-01 | Target: 2026-06-30
+
+## Goals
+1. Build a web-first Obsidian alternative
+2. Real-time collaboration via Yjs CRDT
+3. Plugin ecosystem with iframe sandboxing
+4. Self-hostable with Docker
+
+## Milestones
+
+| Milestone | Target | Status |
+|-----------|--------|--------|
+| Core editor with TipTap | 2026-02 | Done |
+| Auth & workspaces | 2026-03 | Done |
+| Real-time sync | 2026-04 | In Progress |
+| Plugin SDK v1 | 2026-05 | Planned |
+| Public beta | 2026-06 | Planned |
+
+## Architecture
+- Frontend: Next.js 15, React 19, Ant Design
+- Backend: NestJS 11, Prisma 6, PostgreSQL 17
+- Sync: Yjs + y-websocket
+- Cache: ValKey 8
+
+## Related Notes
+- [[Architecture Decision Records]]
+- [[API Design Guidelines]]
+- [[Research — Distributed Systems]]
+
+#project #todo
+`;
+
+const ARCHIVE_OLD_IDEAS_CONTENT = `# Archive: Old Ideas
+
+Ideas that were evaluated and either deferred or rejected.
+
+## Deferred
+
+### Native Desktop App (Electron)
+**Decision**: Deferred to v2. Web-first approach covers 90% of use cases.
+Focus on PWA support instead.
+
+### MongoDB for Note Storage
+**Decision**: Rejected. PostgreSQL with FTS handles our query patterns well,
+and we avoid operational complexity of running two databases.
+
+### GraphQL API
+**Decision**: Deferred. REST with cursor pagination is simpler for our
+current needs. May revisit when plugin API matures.
+
+## Lessons Learned
+1. Start with the simplest thing that works
+2. Defer complexity until there is clear demand
+3. Document *why* decisions were made, not just *what*
+
+---
+
+*Moved from Inbox on 2026-03-15*
+
+#reference
+`;
+
 // ─── Fixture Builders ────────────────────────────────────────────────────────
 
 export interface SeedNote {
@@ -474,6 +567,32 @@ export function buildNotes(): SeedNote[] {
       'Reading List',
       READING_LIST_CONTENT,
       { frontmatter: { type: 'index' } },
+    ),
+
+    // ── Alice's folder structure samples ────────────────────────────────
+    buildNote(
+      NOTE_IDS.inboxQuickCapture,
+      WORKSPACE_IDS.personal,
+      'inbox/quick-capture.md',
+      'Quick Capture',
+      INBOX_QUICK_CAPTURE_CONTENT,
+      { frontmatter: { type: 'inbox', tags: ['todo'] } },
+    ),
+    buildNote(
+      NOTE_IDS.projectNotesaner,
+      WORKSPACE_IDS.personal,
+      'projects/notesaner.md',
+      'Project: Notesaner',
+      PROJECT_NOTESANER_CONTENT,
+      { frontmatter: { type: 'project', status: 'active', tags: ['project', 'todo'] } },
+    ),
+    buildNote(
+      NOTE_IDS.archiveOldIdeas,
+      WORKSPACE_IDS.personal,
+      'archive/old-ideas.md',
+      'Archive: Old Ideas',
+      ARCHIVE_OLD_IDEAS_CONTENT,
+      { frontmatter: { type: 'archive', tags: ['reference'] } },
     ),
 
     // ── Engineering team wiki ────────────────────────────────────────────
@@ -589,6 +708,31 @@ export function buildTags(): SeedTag[] {
       name: 'reading',
       color: '#10b981',
     },
+    // Canonical tags: #project, #idea, #todo, #reference
+    {
+      id: TAG_IDS.project,
+      workspaceId: WORKSPACE_IDS.personal,
+      name: 'project',
+      color: '#0ea5e9',
+    },
+    {
+      id: TAG_IDS.idea,
+      workspaceId: WORKSPACE_IDS.personal,
+      name: 'idea',
+      color: '#f59e0b',
+    },
+    {
+      id: TAG_IDS.todo,
+      workspaceId: WORKSPACE_IDS.personal,
+      name: 'todo',
+      color: '#ef4444',
+    },
+    {
+      id: TAG_IDS.reference,
+      workspaceId: WORKSPACE_IDS.personal,
+      name: 'reference',
+      color: '#8b5cf6',
+    },
 
     // Team wiki tags
     {
@@ -633,6 +777,11 @@ export function buildNoteTags(): SeedNoteTag[] {
     { noteId: NOTE_IDS.dailyNote, tagId: TAG_IDS.daily },
     { noteId: NOTE_IDS.researchNote, tagId: TAG_IDS.research },
     { noteId: NOTE_IDS.readingList, tagId: TAG_IDS.reading },
+    { noteId: NOTE_IDS.inboxQuickCapture, tagId: TAG_IDS.todo },
+    { noteId: NOTE_IDS.projectNotesaner, tagId: TAG_IDS.project },
+    { noteId: NOTE_IDS.projectNotesaner, tagId: TAG_IDS.todo },
+    { noteId: NOTE_IDS.archiveOldIdeas, tagId: TAG_IDS.reference },
+    { noteId: NOTE_IDS.researchNote, tagId: TAG_IDS.idea },
     { noteId: NOTE_IDS.onboarding, tagId: TAG_IDS.onboarding },
     { noteId: NOTE_IDS.archDecisions, tagId: TAG_IDS.architecture },
     { noteId: NOTE_IDS.apiGuidelines, tagId: TAG_IDS.api },

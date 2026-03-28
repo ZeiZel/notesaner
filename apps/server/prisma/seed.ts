@@ -40,6 +40,14 @@ function detectEnvironment(): SeedEnv {
     process.exit(1);
   }
 
+  // When SEED_DATA env var is set, it must be "true" to proceed.
+  // This allows CI scripts to conditionally opt-in to seeding.
+  const seedDataFlag = process.env['SEED_DATA'];
+  if (seedDataFlag !== undefined && seedDataFlag !== 'true') {
+    console.log('\n  SEED_DATA is set but not "true" — skipping seed.\n');
+    process.exit(0);
+  }
+
   if (env === 'staging') return 'staging';
   return 'development';
 }
