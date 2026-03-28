@@ -21,6 +21,8 @@
     "db:studio": "nx run server:prisma-studio",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
+    "storybook": "nx storybook ui",
+    "storybook:build": "nx storybook:build ui",
     "prepare": "husky"
   },
   "engines": {
@@ -55,12 +57,18 @@
     "@nx/js": "^22.6.1",
     "@nx/next": "^22.6.1",
     "@nx/workspace": "^22.6.1",
+    "@radix-ui/react-separator": "^1.1.8",
+    "@storybook/addon-a11y": "^10.3.3",
+    "@storybook/react": "^10.3.3",
+    "@storybook/react-vite": "^10.3.3",
+    "@tailwindcss/vite": "^4.1.10",
     "@types/node": "^25.5.0",
     "eslint": "^10.1.0",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "nx": "^22.6.1",
     "prettier": "^3.8.1",
+    "storybook": "^10.3.3",
     "typescript": "^6.0.2",
     "typescript-eslint": "^8.0.0",
     "vitest": "^4.1.1"
