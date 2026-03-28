@@ -9,6 +9,7 @@ import { AdminAuthProvidersService } from './admin-auth-providers.service';
 import { UserApiKeyController } from './api-keys/api-key.controller';
 import { UserApiKeyService } from './api-keys/api-key.service';
 import { UserApiKeyGuard } from './api-keys/api-key.guard';
+import { ApiKeyOrJwtGuard } from './api-keys/api-key-or-jwt.guard';
 import { EmailModule } from '../email/email.module';
 import { ValkeyModule } from '../valkey/valkey.module';
 
@@ -30,7 +31,13 @@ import { ValkeyModule } from '../valkey/valkey.module';
     ValkeyModule,
   ],
   controllers: [AuthController, AdminAuthProvidersController, UserApiKeyController],
-  providers: [AuthService, AdminAuthProvidersService, UserApiKeyService, UserApiKeyGuard],
-  exports: [AuthService, JwtModule, UserApiKeyService, UserApiKeyGuard],
+  providers: [
+    AuthService,
+    AdminAuthProvidersService,
+    UserApiKeyService,
+    UserApiKeyGuard,
+    ApiKeyOrJwtGuard,
+  ],
+  exports: [AuthService, JwtModule, UserApiKeyService, UserApiKeyGuard, ApiKeyOrJwtGuard],
 })
 export class AuthModule {}

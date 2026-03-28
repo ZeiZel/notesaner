@@ -1,13 +1,15 @@
-import {
-  CanActivate,
-  ExecutionContext,
-  Injectable,
-  Logger,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
 import { HttpException, HttpStatus } from '@nestjs/common';
+import { Reflector } from '@nestjs/core';
 import type { Request } from 'express';
 import { UserApiKeyService, ValidatedUserApiKey } from './api-key.service';
+import { REQUIRE_SCOPES_KEY } from './decorators/require-scopes.decorator';
+import type { UserApiKeyScope } from './dto/create-api-key.dto';
+
+// ─── Constants ─────────────────────────────────────────────────────────────
+
+/** Prefix that identifies user-scoped API keys. */
+const API_KEY_PREFIX = 'nts_';
 
 // ─── Request Extension ──────────────────────────────────────────────────────
 
@@ -26,12 +28,17 @@ export interface RequestWithUserApiKey extends Request {
 // ─── Guard ──────────────────────────────────────────────────────────────────
 
 /**
- * UserApiKeyGuard -- extracts the `X-API-Key` header, validates the key
- * against the database, enforces per-key rate limiting, and attaches
- * the resolved context to the request.
+ * UserApiKeyGuard -- checks the `Authorization: Bearer nts_xxx` header or
+ * the `X-API-Key` header, validates the key against the database, enforces
+ * per-key rate limiting, and attaches the resolved context to the request.
  *
- * This guard is designed for user-scoped API keys (nts_ prefix), distinct
- * from the workspace-scoped API keys in the api-v1 module (nsk_ prefix).
+ * This guard supports two authentication methods:
+ *   1. `Authorization: Bearer nts_xxx` -- preferred for API key auth
+ *   2. `X-API-Key: nts_xxx` -- legacy / alternative header
+ *
+ * When the Authorization header contains a Bearer token that does NOT start
+ * with the `nts_` prefix, the guard returns false (allowing the JWT guard
+ * to handle it instead).
  *
  * Usage:
  * ```ts
@@ -49,14 +56,18 @@ export interface RequestWithUserApiKey extends Request {
 export class UserApiKeyGuard implements CanActivate {
   private readonly logger = new Logger(UserApiKeyGuard.name);
 
-  constructor(private readonly apiKeyService: UserApiKeyService) {}
+  constructor(
+    private readonly apiKeyService: UserApiKeyService,
+    private readonly reflector: Reflector,
+  ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<RequestWithUserApiKey>();
     const rawKey = this.extractKey(request);
 
     if (!rawKey) {
-      throw new UnauthorizedException('X-API-Key header is required');
+      // No API key found -- let downstream guards handle auth
+      return false;
     }
 
     // Validate the key (throws on failure)
@@ -76,6 +87,18 @@ export class UserApiKeyGuard implements CanActivate {
       );
     }
 
+    // Check required scopes via @RequireScopes() metadata
+    const requiredScopes = this.reflector.getAllAndOverride<UserApiKeyScope[] | undefined>(
+      REQUIRE_SCOPES_KEY,
+      [context.getHandler(), context.getClass()],
+    );
+
+    if (requiredScopes && requiredScopes.length > 0) {
+      for (const scope of requiredScopes) {
+        this.apiKeyService.assertScope(apiKey, scope);
+      }
+    }
+
     // Attach the validated key context
     request[USER_API_KEY_CONTEXT] = apiKey;
 
@@ -91,12 +114,40 @@ export class UserApiKeyGuard implements CanActivate {
     return true;
   }
 
+  /**
+   * Extracts an API key from the request headers.
+   *
+   * Priority:
+   *   1. `Authorization: Bearer nts_xxx` -- if the Bearer token starts with nts_
+   *   2. `X-API-Key: nts_xxx` -- fallback header
+   *
+   * Returns undefined if no API key is found in either header.
+   */
   private extractKey(request: Request): string | undefined {
-    const header = request.headers['x-api-key'];
-    if (Array.isArray(header)) {
-      return header[0];
+    // 1. Check Authorization: Bearer nts_xxx
+    const authHeader = request.headers['authorization'];
+    if (authHeader) {
+      const headerValue = Array.isArray(authHeader) ? authHeader[0] : authHeader;
+      if (headerValue?.startsWith('Bearer ')) {
+        const token = headerValue.slice(7);
+        if (token.startsWith(API_KEY_PREFIX)) {
+          return token;
+        }
+        // Bearer token without nts_ prefix -- not an API key, skip
+        return undefined;
+      }
     }
-    return header as string | undefined;
+
+    // 2. Check X-API-Key header
+    const apiKeyHeader = request.headers['x-api-key'];
+    if (apiKeyHeader) {
+      const headerValue = Array.isArray(apiKeyHeader) ? apiKeyHeader[0] : apiKeyHeader;
+      if (headerValue?.startsWith(API_KEY_PREFIX)) {
+        return headerValue;
+      }
+    }
+
+    return undefined;
   }
 }
 
@@ -112,4 +163,11 @@ export function getUserApiKey(req: RequestWithUserApiKey): ValidatedUserApiKey {
     throw new Error('UserApiKeyGuard must run before accessing user API key context');
   }
   return key;
+}
+
+/**
+ * Checks whether the current request was authenticated via an API key.
+ */
+export function isApiKeyAuth(req: RequestWithUserApiKey): boolean {
+  return req[USER_API_KEY_CONTEXT] !== undefined;
 }

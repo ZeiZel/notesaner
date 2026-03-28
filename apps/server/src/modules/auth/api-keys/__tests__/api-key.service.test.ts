@@ -120,7 +120,7 @@ describe('UserApiKeyService', () => {
     });
 
     it('should throw BadRequestException when key limit is reached', async () => {
-      vi.mocked(prisma.apiKey!.count).mockResolvedValue(25);
+      vi.mocked(prisma.apiKey!.count).mockResolvedValue(10);
 
       await expect(service.create('user-uuid-1', { name: 'Too Many' })).rejects.toThrow(
         BadRequestException,

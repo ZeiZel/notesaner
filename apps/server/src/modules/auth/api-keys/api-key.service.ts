@@ -24,7 +24,7 @@ const KEY_RANDOM_LENGTH = 40;
 const DISPLAY_PREFIX_LENGTH = 8;
 
 /** Maximum number of active (non-revoked) API keys per user. */
-const MAX_KEYS_PER_USER = 25;
+const MAX_KEYS_PER_USER = 10;
 
 /** ValKey key prefix for per-key rate limiting. */
 const RATE_LIMIT_KEY_PREFIX = 'rate:apikey:';
