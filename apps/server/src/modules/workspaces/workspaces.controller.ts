@@ -24,6 +24,7 @@ import {
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
 import { WorkspacesService } from './workspaces.service';
+import { WorkspaceSwitchService } from './workspace-switch.service';
 
 // ── DTOs ────────────────────────────────────────────────────────────────────
 
@@ -91,7 +92,10 @@ class UpdateMemberRoleDto {
 @ApiBearerAuth('bearer')
 @Controller('workspaces')
 export class WorkspacesController {
-  constructor(private readonly workspacesService: WorkspacesService) {}
+  constructor(
+    private readonly workspacesService: WorkspacesService,
+    private readonly workspaceSwitchService: WorkspaceSwitchService,
+  ) {}
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
@@ -104,11 +108,34 @@ export class WorkspacesController {
   }
 
   @Get()
-  @ApiOperation({ summary: 'List workspaces for the current user' })
-  @ApiOkResponse({ description: 'List of workspaces the user is a member of.' })
+  @ApiOperation({
+    summary: 'List workspaces for the current user',
+    description:
+      'Returns all workspaces the user is a member of, including role, member count, and note count.',
+  })
+  @ApiOkResponse({ description: 'List of workspaces with summary statistics.' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async findAll(@CurrentUser() user: JwtPayload) {
-    return this.workspacesService.findForUser(user.sub);
+    return this.workspaceSwitchService.listUserWorkspaces(user.sub);
+  }
+
+  @Post(':workspaceId/switch')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Switch to a workspace',
+    description:
+      'Validates the user has membership in the target workspace and returns workspace details with the user role. ' +
+      'The active workspace is tracked client-side; this endpoint serves as a validated fetch.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Workspace details and user membership info.' })
+  @ApiNotFoundResponse({ description: 'Workspace not found.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT or not a member.' })
+  async switchWorkspace(
+    @CurrentUser() user: JwtPayload,
+    @Param('workspaceId') workspaceId: string,
+  ) {
+    return this.workspaceSwitchService.switchWorkspace(user.sub, workspaceId);
   }
 
   @Get(':workspaceId')

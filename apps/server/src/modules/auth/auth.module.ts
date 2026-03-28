@@ -6,6 +6,9 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AdminAuthProvidersController } from './admin-auth-providers.controller';
 import { AdminAuthProvidersService } from './admin-auth-providers.service';
+import { UserApiKeyController } from './api-keys/api-key.controller';
+import { UserApiKeyService } from './api-keys/api-key.service';
+import { UserApiKeyGuard } from './api-keys/api-key.guard';
 import { EmailModule } from '../email/email.module';
 import { ValkeyModule } from '../valkey/valkey.module';
 
@@ -26,8 +29,8 @@ import { ValkeyModule } from '../valkey/valkey.module';
     // It is @Global() so importing it here makes it available to all modules.
     ValkeyModule,
   ],
-  controllers: [AuthController, AdminAuthProvidersController],
-  providers: [AuthService, AdminAuthProvidersService],
-  exports: [AuthService, JwtModule],
+  controllers: [AuthController, AdminAuthProvidersController, UserApiKeyController],
+  providers: [AuthService, AdminAuthProvidersService, UserApiKeyService, UserApiKeyGuard],
+  exports: [AuthService, JwtModule, UserApiKeyService, UserApiKeyGuard],
 })
 export class AuthModule {}

@@ -15,7 +15,8 @@ export type EmailTemplateName =
   | 'workspace-invite'
   | 'comment-mention'
   | 'freshness-alert'
-  | 'backup-failure';
+  | 'backup-failure'
+  | 'notification-digest';
 
 export interface EmailTemplateDefinition {
   subject: string;
@@ -217,6 +218,44 @@ The following notes in "{{workspaceName}}" haven't been updated in over {{staleD
 Open workspace: {{{workspaceUrl}}}
 
 You are receiving this because you have freshness alerts enabled for this workspace.
+
+— The Notesaner team
+`,
+  },
+
+  // ── Notification digest ─────────────────────────────────────────────────
+  'notification-digest': {
+    subject: 'Your {{periodLabel}} Notesaner digest — {{notificationCount}} new notifications',
+    html: wrapInLayout(`
+      <h1>Your {{periodLabel}} digest</h1>
+      <p>Hi {{displayName}},</p>
+      <p>Here is a summary of your recent notifications:</p>
+      <ul style="margin: 16px 0; padding: 0 0 0 20px;">
+        {{#each notifications}}
+        <li style="margin-bottom: 12px;">
+          <strong>{{title}}</strong>
+          <p style="margin: 4px 0 0; font-size: 14px; color: #4a4a4a;">{{body}}</p>
+          <span class="muted" style="font-size: 12px;">{{createdAt}}</span>
+        </li>
+        {{/each}}
+      </ul>
+      <a href="{{{appUrl}}}" class="btn">Open Notesaner</a>
+      <hr class="divider" />
+      <p class="muted">You are receiving this {{periodLabel}} digest because of your notification preferences. You can change this in your settings.</p>
+    `),
+    text: `Your {{periodLabel}} Notesaner digest
+
+Hi {{displayName}},
+
+Here is a summary of your recent notifications:
+
+{{#each notifications}}
+- {{title}}: {{body}} ({{createdAt}})
+{{/each}}
+
+Open Notesaner: {{{appUrl}}}
+
+You are receiving this {{periodLabel}} digest because of your notification preferences. You can change this in your settings.
 
 — The Notesaner team
 `,

@@ -7,9 +7,12 @@ import { validateConfig } from './config/validation';
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
 import { MetricsInterceptor } from './common/interceptors/metrics.interceptor';
 import { RateLimitHeadersInterceptor } from './common/interceptors/rate-limit-headers.interceptor';
+import { CacheControlInterceptor } from './common/interceptors/cache-control.interceptor';
+import { ETagInterceptor } from './common/interceptors/etag.interceptor';
 import { CorrelationIdMiddleware } from './common/middleware/correlation-id.middleware';
 import { SecurityHeadersMiddleware } from './common/middleware/security-headers.middleware';
 import { CsrfMiddleware } from './common/middleware/csrf.middleware';
+import { CacheControlMiddleware } from './common/middleware/cache-control.middleware';
 import { ThrottlerBehindProxyGuard } from './common/throttler/throttler-behind-proxy.guard';
 import { ValkeyThrottlerStorage } from './common/throttler/valkey-throttler-storage.service';
 import { AccountLockoutService } from './common/services/account-lockout.service';
@@ -111,6 +114,21 @@ import { BackupModule } from './modules/backup/backup.module';
       useClass: RateLimitHeadersInterceptor,
     },
 
+    // ── Cache & ETag interceptors ───────────────────────────────────────
+    // CacheControlInterceptor sets Cache-Control headers based on @CachePolicy()
+    // decorator metadata, complementing the CacheControlMiddleware (which uses
+    // route pattern matching from cache-policy.ts).
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: CacheControlInterceptor,
+    },
+    // ETagInterceptor computes weak ETags for GET responses, enabling
+    // conditional requests (If-None-Match → 304 Not Modified).
+    {
+      provide: APP_INTERCEPTOR,
+      useClass: ETagInterceptor,
+    },
+
     // ── Shared security services ─────────────────────────────────────────
     AccountLockoutService,
     WsConnectionLimitGuard,
@@ -126,5 +144,8 @@ export class AppModule implements NestModule {
 
     // CSRF protection for state-changing endpoints
     consumer.apply(CsrfMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
+
+    // Cache-Control headers based on route pattern matching (cache-policy.ts)
+    consumer.apply(CacheControlMiddleware).forRoutes({ path: '*', method: RequestMethod.ALL });
   }
 }
