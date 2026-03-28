@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "apps/server/src",
   "projectType": "application",
-  "tags": ["type:app", "platform:server"],
+  "tags": ["type:app", "platform:server", "scope:app"],
   "targets": {
     "build": {
       "executor": "@nx/js:tsc",

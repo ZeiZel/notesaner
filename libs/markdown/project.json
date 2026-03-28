@@ -7,5 +7,6 @@
     "type-check": {
       "command": "tsc --noEmit -p libs/markdown/tsconfig.json"
     }
-  }
+  },
+  "tags": ["scope:lib"]
 }
