@@ -9,3 +9,14 @@ export { WorkspaceSettings } from './WorkspaceSettings';
 export { MemberManagement } from './MemberManagement';
 export { useSettingsStore, FONT_FAMILY_LABELS, editorFontFamilyCss } from './settings-store';
 export type { EditorSettings as EditorSettingsValues, EditorFontFamily } from './settings-store';
+
+// Workspace settings (page-level, not dialog)
+export {
+  GeneralSettings,
+  MembersSettings,
+  PluginsSettings,
+  AppearanceSettings,
+  PublishSettings,
+  DangerZone,
+  useWorkspaceSettingsStore,
+} from './workspace';

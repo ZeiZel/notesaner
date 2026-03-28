@@ -17,6 +17,7 @@
  */
 
 import type { WorkspaceMember } from './members-store';
+import { useFocusTrap } from '@/shared/lib/a11y';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -59,6 +60,13 @@ export function RemoveMemberDialog({
   onConfirm,
   onOpenChange,
 }: RemoveMemberDialogProps) {
+  const focusTrapRef = useFocusTrap<HTMLDivElement>({
+    active: open,
+    onEscape: () => {
+      if (!isPending) onOpenChange(false);
+    },
+  });
+
   if (!open) return null;
 
   const handleBackdropClick = () => {
@@ -71,6 +79,7 @@ export function RemoveMemberDialog({
 
   return (
     <div
+      ref={focusTrapRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="remove-member-title"

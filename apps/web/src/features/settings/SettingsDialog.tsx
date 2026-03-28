@@ -15,16 +15,33 @@
  * All state is local/Zustand — no useEffect needed.
  */
 
-import { useState } from 'react';
+import { useState, Suspense, lazy } from 'react';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
 import { cn } from '@notesaner/ui';
+import { PanelSpinner } from '@/shared/lib/skeletons';
+
+// Lazy-load each settings tab — only the active tab's chunk is downloaded.
+// Profile is imported eagerly since it's the default tab.
 import { ProfileSettings } from './ProfileSettings';
-import { EditorSettings } from './EditorSettings';
-import { ThemeSettingsTab } from './ThemeSettingsTab';
-import { KeybindingSettings } from './KeybindingSettings';
-import { PluginSettings } from './PluginSettings';
-import { WorkspaceSettings } from './WorkspaceSettings';
-import { MemberManagement } from './MemberManagement';
+
+const EditorSettings = lazy(() =>
+  import('./EditorSettings').then((m) => ({ default: m.EditorSettings })),
+);
+const ThemeSettingsTab = lazy(() =>
+  import('./ThemeSettingsTab').then((m) => ({ default: m.ThemeSettingsTab })),
+);
+const KeybindingSettings = lazy(() =>
+  import('./KeybindingSettings').then((m) => ({ default: m.KeybindingSettings })),
+);
+const PluginSettings = lazy(() =>
+  import('./PluginSettings').then((m) => ({ default: m.PluginSettings })),
+);
+const WorkspaceSettings = lazy(() =>
+  import('./WorkspaceSettings').then((m) => ({ default: m.WorkspaceSettings })),
+);
+const MemberManagement = lazy(() =>
+  import('./MemberManagement').then((m) => ({ default: m.MemberManagement })),
+);
 
 // ---------------------------------------------------------------------------
 // Nav items
@@ -235,7 +252,11 @@ export function SettingsDialog({
           </nav>
 
           {/* Content area */}
-          <main className="flex-1 overflow-y-auto">
+          <div
+            role="tabpanel"
+            aria-label={TAB_TITLES[activeTab]}
+            className="flex-1 overflow-y-auto"
+          >
             <div className="max-w-3xl px-8 py-6">
               {/* Section header */}
               <div className="mb-6">
@@ -248,10 +269,10 @@ export function SettingsDialog({
                 <div className="mt-2 h-px" style={{ backgroundColor: 'var(--ns-color-border)' }} />
               </div>
 
-              {/* Active section content */}
-              {renderContent()}
+              {/* Active section content (lazy-loaded tabs wrapped in Suspense) */}
+              <Suspense fallback={<PanelSpinner />}>{renderContent()}</Suspense>
             </div>
-          </main>
+          </div>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>
     </DialogPrimitive.Root>

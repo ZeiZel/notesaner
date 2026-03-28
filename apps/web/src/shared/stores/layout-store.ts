@@ -33,6 +33,24 @@ export interface TabConfig {
   isDirty: boolean;
 }
 
+/**
+ * Grid configuration for the CSS Grid-based layout system.
+ * When present, this replaces the older snapTemplateId + customRatios approach.
+ */
+export interface GridLayoutConfig {
+  columns: string[];
+  rows: string[];
+  panes: Array<{
+    id: string;
+    gridArea: string;
+    colStart: number;
+    colEnd: number;
+    rowStart: number;
+    rowEnd: number;
+    focusedNoteId: string | null;
+  }>;
+}
+
 export interface LayoutConfig {
   panels: PanelConfig[];
   tabs: TabConfig[];
@@ -41,6 +59,11 @@ export interface LayoutConfig {
   snapTemplateId?: SnapTemplateId;
   /** Custom ratios in CSS fr units per column/row, e.g. [7, 3] for 70/30 */
   customRatios?: number[];
+  /**
+   * Full grid layout configuration. When present, the new CSS Grid system
+   * uses this directly rather than deriving from snapTemplateId + customRatios.
+   */
+  gridLayout?: GridLayoutConfig;
 }
 
 interface LayoutDto {
@@ -114,11 +137,9 @@ export const useLayoutStore = create<LayoutState>()(
         savedLayouts: [],
 
         // Actions
-        setLayout: (config) =>
-          set({ currentLayout: config }, false, 'layout/setLayout'),
+        setLayout: (config) => set({ currentLayout: config }, false, 'layout/setLayout'),
 
-        setLayouts: (layouts) =>
-          set({ layouts }, false, 'layout/setLayouts'),
+        setLayouts: (layouts) => set({ layouts }, false, 'layout/setLayouts'),
 
         loadLayout: (layoutId) => {
           const layout = get().layouts.find((l) => l.id === layoutId);
@@ -164,12 +185,8 @@ export const useLayoutStore = create<LayoutState>()(
             (state) => ({
               currentLayout: {
                 ...state.currentLayout,
-                panels: state.currentLayout.panels.filter(
-                  (p) => p.id !== panelId,
-                ),
-                tabs: state.currentLayout.tabs.filter(
-                  (t) => t.panelId !== panelId,
-                ),
+                panels: state.currentLayout.panels.filter((p) => p.id !== panelId),
+                tabs: state.currentLayout.tabs.filter((t) => t.panelId !== panelId),
               },
             }),
             false,
@@ -194,18 +211,13 @@ export const useLayoutStore = create<LayoutState>()(
           set(
             (state) => {
               // If already open, just activate the panel
-              const existing = state.currentLayout.tabs.find(
-                (t) => t.noteId === tab.noteId,
-              );
+              const existing = state.currentLayout.tabs.find((t) => t.noteId === tab.noteId);
               if (existing) return state;
 
               return {
                 currentLayout: {
                   ...state.currentLayout,
-                  tabs: [
-                    ...state.currentLayout.tabs,
-                    { ...tab, isPinned: false, isDirty: false },
-                  ],
+                  tabs: [...state.currentLayout.tabs, { ...tab, isPinned: false, isDirty: false }],
                 },
               };
             },
@@ -258,23 +270,19 @@ export const useLayoutStore = create<LayoutState>()(
             (state) => ({
               currentLayout: {
                 ...state.currentLayout,
-                tabs: state.currentLayout.tabs.map((t) =>
-                  t.id === tabId ? { ...t, isDirty } : t,
-                ),
+                tabs: state.currentLayout.tabs.map((t) => (t.id === tabId ? { ...t, isDirty } : t)),
               },
             }),
             false,
             'layout/markTabDirty',
           ),
 
-        setResizing: (isResizing) =>
-          set({ isResizing }, false, 'layout/setResizing'),
+        setResizing: (isResizing) => set({ isResizing }, false, 'layout/setResizing'),
 
         setDraggedPanel: (draggedPanelId) =>
           set({ draggedPanelId }, false, 'layout/setDraggedPanel'),
 
-        setSnapZone: (snapZoneActive) =>
-          set({ snapZoneActive }, false, 'layout/setSnapZone'),
+        setSnapZone: (snapZoneActive) => set({ snapZoneActive }, false, 'layout/setSnapZone'),
 
         setSnapPickerOpen: (isSnapPickerOpen) =>
           set({ isSnapPickerOpen }, false, 'layout/setSnapPickerOpen'),
@@ -301,14 +309,29 @@ export const useLayoutStore = create<LayoutState>()(
                 panelId: newPanels[i % newPanels.length]?.id ?? newPanels[0].id,
               }));
 
+              // Build grid layout config from template
+              const gridLayout: GridLayoutConfig = {
+                columns: template.gridCols.split(/\s+/),
+                rows: template.gridRows.split(/\s+/),
+                panes: template.panels.map((tp) => ({
+                  id: tp.id,
+                  gridArea: tp.id,
+                  colStart: tp.colStart,
+                  colEnd: tp.colEnd,
+                  rowStart: tp.rowStart,
+                  rowEnd: tp.rowEnd,
+                  focusedNoteId: null,
+                })),
+              };
+
               return {
                 currentLayout: {
                   panels: newPanels,
                   tabs: reassignedTabs,
-                  splitDirection:
-                    template.panels.length > 1 ? 'horizontal' : null,
+                  splitDirection: template.panels.length > 1 ? 'horizontal' : null,
                   snapTemplateId: templateId,
                   customRatios: undefined,
+                  gridLayout,
                 },
                 isSnapPickerOpen: false,
               };
@@ -334,6 +357,13 @@ export const useLayoutStore = create<LayoutState>()(
                 name,
                 templateId: state.currentLayout.snapTemplateId ?? 'single',
                 customRatios: state.currentLayout.customRatios,
+                gridConfig: state.currentLayout.gridLayout
+                  ? {
+                      columns: state.currentLayout.gridLayout.columns,
+                      rows: state.currentLayout.gridLayout.rows,
+                      panes: state.currentLayout.gridLayout.panes,
+                    }
+                  : undefined,
                 createdAt: new Date().toISOString(),
               };
               return { savedLayouts: [...state.savedLayouts, saved] };
@@ -345,14 +375,10 @@ export const useLayoutStore = create<LayoutState>()(
         loadSavedLayout: (savedLayoutId) =>
           set(
             (state) => {
-              const saved = state.savedLayouts.find(
-                (l) => l.id === savedLayoutId,
-              );
+              const saved = state.savedLayouts.find((l) => l.id === savedLayoutId);
               if (!saved) return state;
 
-              const template = SNAP_TEMPLATES.find(
-                (t) => t.id === saved.templateId,
-              );
+              const template = SNAP_TEMPLATES.find((t) => t.id === saved.templateId);
               if (!template) return state;
 
               const newPanels: PanelConfig[] = template.panels.map((_p, i) => ({
@@ -361,6 +387,32 @@ export const useLayoutStore = create<LayoutState>()(
                 size: Math.floor(100 / template.panels.length),
               }));
 
+              // Restore grid layout from saved config, or derive from template
+              const gridLayout: GridLayoutConfig = saved.gridConfig
+                ? {
+                    columns: saved.gridConfig.columns,
+                    rows: saved.gridConfig.rows,
+                    panes: saved.gridConfig.panes,
+                  }
+                : {
+                    columns:
+                      (saved.customRatios ?? template.gridCols.split(/\s+/).map(() => 1)).length > 0
+                        ? saved.customRatios
+                          ? saved.customRatios.map((r) => `${r}fr`)
+                          : template.gridCols.split(/\s+/)
+                        : template.gridCols.split(/\s+/),
+                    rows: template.gridRows.split(/\s+/),
+                    panes: template.panels.map((tp) => ({
+                      id: tp.id,
+                      gridArea: tp.id,
+                      colStart: tp.colStart,
+                      colEnd: tp.colEnd,
+                      rowStart: tp.rowStart,
+                      rowEnd: tp.rowEnd,
+                      focusedNoteId: null,
+                    })),
+                  };
+
               return {
                 currentLayout: {
                   panels: newPanels,
@@ -368,10 +420,10 @@ export const useLayoutStore = create<LayoutState>()(
                     ...tab,
                     panelId: newPanels[i % newPanels.length]?.id ?? newPanels[0].id,
                   })),
-                  splitDirection:
-                    template.panels.length > 1 ? 'horizontal' : null,
+                  splitDirection: template.panels.length > 1 ? 'horizontal' : null,
                   snapTemplateId: saved.templateId,
                   customRatios: saved.customRatios,
+                  gridLayout,
                 },
                 isSnapPickerOpen: false,
               };
@@ -383,9 +435,7 @@ export const useLayoutStore = create<LayoutState>()(
         deleteSavedLayout: (savedLayoutId) =>
           set(
             (state) => ({
-              savedLayouts: state.savedLayouts.filter(
-                (l) => l.id !== savedLayoutId,
-              ),
+              savedLayouts: state.savedLayouts.filter((l) => l.id !== savedLayoutId),
             }),
             false,
             'layout/deleteSavedLayout',

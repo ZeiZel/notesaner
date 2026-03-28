@@ -165,6 +165,8 @@ export function ProfileSettings() {
             placeholder="Your name"
             disabled={isPending}
             autoComplete="name"
+            aria-invalid={!!state.errors.displayName}
+            aria-describedby={state.errors.displayName ? 'settings-displayName-error' : undefined}
             className="w-full rounded-md px-3 py-2 text-sm"
             style={{
               backgroundColor: 'var(--ns-color-background-input)',
@@ -173,7 +175,12 @@ export function ProfileSettings() {
             }}
           />
           {state.errors.displayName && (
-            <p className="text-xs" style={{ color: 'var(--ns-color-destructive)' }}>
+            <p
+              id="settings-displayName-error"
+              role="alert"
+              className="text-xs"
+              style={{ color: 'var(--ns-color-destructive)' }}
+            >
               {state.errors.displayName}
             </p>
           )}
@@ -195,6 +202,8 @@ export function ProfileSettings() {
             placeholder="you@example.com"
             disabled={isPending}
             autoComplete="email"
+            aria-invalid={!!state.errors.email}
+            aria-describedby={state.errors.email ? 'settings-email-error' : undefined}
             className="w-full rounded-md px-3 py-2 text-sm"
             style={{
               backgroundColor: 'var(--ns-color-background-input)',
@@ -203,7 +212,12 @@ export function ProfileSettings() {
             }}
           />
           {state.errors.email && (
-            <p className="text-xs" style={{ color: 'var(--ns-color-destructive)' }}>
+            <p
+              id="settings-email-error"
+              role="alert"
+              className="text-xs"
+              style={{ color: 'var(--ns-color-destructive)' }}
+            >
               {state.errors.email}
             </p>
           )}
@@ -212,6 +226,8 @@ export function ProfileSettings() {
         {/* Feedback */}
         {state.message && (
           <p
+            role="status"
+            aria-live="polite"
             className="text-sm"
             style={{
               color: state.success ? 'var(--ns-color-success)' : 'var(--ns-color-destructive)',

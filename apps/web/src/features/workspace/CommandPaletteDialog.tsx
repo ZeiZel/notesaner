@@ -3,11 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { CommandPalette, type CommandPaletteAction } from '@notesaner/ui';
-import {
-  KEYBOARD_SHORTCUTS,
-  formatCombo,
-  type ShortcutId,
-} from '@/shared/lib/keyboard-shortcuts';
+import { KEYBOARD_SHORTCUTS, formatCombo, type ShortcutId } from '@/shared/lib/keyboard-shortcuts';
 import { useSidebarStore } from '@/shared/stores/sidebar-store';
 import { useWorkspaceStore } from '@/shared/stores/workspace-store';
 import { useTheme } from '@/shared/lib/providers/ThemeProvider';
@@ -34,13 +30,7 @@ interface CommandDefinition {
   action: () => void;
 }
 
-type CommandGroup =
-  | 'Recent'
-  | 'File Operations'
-  | 'Navigation'
-  | 'View'
-  | 'Editor'
-  | 'Settings';
+type CommandGroup = 'Recent' | 'File Operations' | 'Navigation' | 'View' | 'Editor' | 'Settings';
 
 // ---------------------------------------------------------------------------
 // Icons (inline SVGs to avoid extra dependencies)
@@ -225,10 +215,7 @@ function loadRecentCommandIds(): string[] {
 function saveRecentCommandId(commandId: string): void {
   try {
     const existing = loadRecentCommandIds();
-    const next = [commandId, ...existing.filter((id) => id !== commandId)].slice(
-      0,
-      MAX_RECENT,
-    );
+    const next = [commandId, ...existing.filter((id) => id !== commandId)].slice(0, MAX_RECENT);
     localStorage.setItem(RECENT_COMMANDS_KEY, JSON.stringify(next));
   } catch {
     // localStorage may be unavailable (private browsing, etc.) — silent fail
@@ -290,7 +277,7 @@ export function CommandPaletteDialog({
   onOpenQuickSwitcher,
 }: CommandPaletteDialogProps) {
   const router = useRouter();
-  const { setTheme, getTheme } = useTheme();
+  const { preference, resolvedTheme, setPreference } = useTheme();
 
   const toggleLeftSidebar = useSidebarStore((s) => s.toggleLeftSidebar);
   const toggleRightSidebar = useSidebarStore((s) => s.toggleRightSidebar);
@@ -323,10 +310,11 @@ export function CommandPaletteDialog({
   );
 
   // Derive the current theme for the toggle label.
-  // getTheme() reads localStorage — call only when the dialog is open to
-  // avoid SSR issues.
-  const currentTheme = open ? getTheme() : 'dark';
-  const isDark = currentTheme === 'dark' || currentTheme === 'system';
+  // preference and resolvedTheme come from the ThemeProvider context.
+  const isDark =
+    preference === 'system'
+      ? resolvedTheme === 'dark'
+      : preference === 'dark' || preference === 'ayu-dark' || preference === 'nord';
 
   // ---------------------------------------------------------------------------
   // Command definitions
@@ -444,10 +432,11 @@ export function CommandPaletteDialog({
         label: isDark ? 'Switch to light theme' : 'Switch to dark theme',
         description: 'Toggle between Catppuccin Mocha (dark) and Latte (light)',
         group: 'View',
+        shortcutId: 'toggle-theme',
         keywords: ['theme', 'dark', 'light', 'mode', 'appearance', 'color'],
         icon: isDark ? <IconSun /> : <IconMoon />,
         action: () => {
-          setTheme(isDark ? 'light' : 'dark');
+          setPreference(isDark ? 'light' : 'dark');
         },
       },
 
@@ -517,7 +506,6 @@ export function CommandPaletteDialog({
         },
       },
     ],
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     [activeWorkspaceId, isDark, onOpenSearch, onOpenQuickSwitcher],
   );
 
