@@ -30,3 +30,21 @@ export {
   toTimestampedFrontmatter,
   fromTimestampedFrontmatter,
 } from './frontmatter-utils';
+
+// Re-export presence types and helpers
+export type {
+  CursorPosition,
+  PresenceState,
+  PresenceUpdatePayload,
+  PresenceBroadcast,
+  PresenceRemoveBroadcast,
+  PresenceSnapshotResponse,
+} from './presence';
+
+export {
+  PRESENCE_COLORS,
+  assignUserColor,
+  PRESENCE_DEBOUNCE_MS,
+  presenceKey,
+  PRESENCE_TTL_SECONDS,
+} from './presence';

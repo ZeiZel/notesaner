@@ -1,0 +1,89 @@
+/**
+ * Collaboration Cursor Styles
+ *
+ * Styles for real-time presence cursors and selection highlights in the
+ * TipTap editor. Works with @tiptap/extension-collaboration-cursor.
+ *
+ * Structure:
+ *   .collaboration-cursor-caret  — the blinking vertical line
+ *   .collaboration-cursor-label  — name flag above the caret
+ *   .collaboration-cursor--faded — fade-out state after inactivity
+ *
+ * Color and selection background are applied via inline styles by the
+ * extension (user-specific), so this CSS handles shape, animation, and layout.
+ */
+
+/* ─── Cursor Caret ────────────────────────────────────────────────────────── */
+
+.collaboration-cursor-caret {
+  position: relative;
+  display: inline-block;
+  width: 2px;
+  margin-left: -1px;
+  margin-right: -1px;
+  word-break: normal;
+  pointer-events: none;
+  /* Color set via inline style by the extension */
+  border-left-width: 2px;
+  border-left-style: solid;
+
+  /* Smooth opacity transition for fade in/out */
+  opacity: 1;
+  transition: opacity 0.6s ease-out;
+}
+
+/* ─── Cursor Label (Name Flag) ────────────────────────────────────────────── */
+
+.collaboration-cursor-label {
+  position: absolute;
+  left: -1px;
+  bottom: 100%;
+  margin-bottom: 0px;
+  padding: 1px 6px;
+  border-radius: 3px 3px 3px 0;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--ns-font-sans, system-ui, sans-serif);
+  line-height: 16px;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+
+  /* Subtle shadow for readability on any background */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.15);
+
+  /* Smooth opacity transition (matches caret) */
+  opacity: 1;
+  transition: opacity 0.6s ease-out;
+
+  /* Prevent label from being cut off at the top of the editor */
+  z-index: 10;
+}
+
+/* ─── Faded State (Inactivity) ────────────────────────────────────────────── */
+
+.collaboration-cursor--faded .collaboration-cursor-caret,
+.collaboration-cursor--faded .collaboration-cursor-label {
+  opacity: 0;
+}
+
+/* ─── Selection Highlight ─────────────────────────────────────────────────── */
+
+/*
+ * Selection highlights are rendered by the collaboration cursor extension
+ * as inline decorations with a background-color inline style. This class
+ * ensures consistent rendering across browsers and prevents interaction
+ * interference.
+ */
+.collaboration-cursor-selection {
+  pointer-events: none;
+}
+
+/* ─── Reduced Motion ──────────────────────────────────────────────────────── */
+
+@media (prefers-reduced-motion: reduce) {
+  .collaboration-cursor-caret,
+  .collaboration-cursor-label {
+    transition-duration: 0.01ms !important;
+  }
+}
