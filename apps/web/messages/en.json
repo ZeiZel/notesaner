@@ -1,0 +1,222 @@
+{
+  "common": {
+    "appName": "Notesaner",
+    "loading": "Loading Notesaner\u2026",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "confirm": "Confirm",
+    "retry": "Retry",
+    "search": "Search",
+    "submit": "Submit",
+    "yes": "Yes",
+    "no": "No",
+    "ok": "OK",
+    "done": "Done",
+    "home": "Home",
+    "settings": "Settings",
+    "noFileOpen": "No file open",
+    "skipToMainContent": "Skip to main content",
+    "goHome": "Go home",
+    "reloadApplication": "Reload application",
+    "newNote": "New note",
+    "quickActions": "Quick Actions",
+    "saving": "Saving\u2026",
+    "counts": {
+      "notes": "{count, plural, =0 {No notes} one {# note} other {# notes}}",
+      "members": "{count, plural, =0 {No members} one {# member} other {# members}}",
+      "plugins": "{count, plural, =0 {No plugins} one {# plugin} other {# plugins}}",
+      "files": "{count, plural, =0 {No files} one {# file} other {# files}}",
+      "items": "{count, plural, =0 {No items} one {# item} other {# items}}",
+      "results": "{count, plural, =0 {No results} one {# result} other {# results}}",
+      "changes": "{count, plural, =0 {No changes} one {# change} other {# changes}}",
+      "comments": "{count, plural, =0 {No comments} one {# comment} other {# comments}}"
+    }
+  },
+  "auth": {
+    "signIn": "Sign in",
+    "signOut": "Sign out",
+    "signingIn": "Signing in\u2026",
+    "createAccount": "Create account",
+    "creatingAccount": "Creating account\u2026",
+    "welcomeBack": "Welcome back. Enter your credentials to continue.",
+    "startWorkspace": "Start your Notesaner workspace today.",
+    "email": "Email",
+    "emailPlaceholder": "you@example.com",
+    "password": "Password",
+    "passwordPlaceholder": "\u2022\u2022\u2022\u2022\u2022\u2022\u2022\u2022",
+    "passwordMinLength": "Min. 8 characters",
+    "name": "Name",
+    "namePlaceholder": "Your name",
+    "forgotPassword": "Forgot password?",
+    "noAccount": "Don't have an account?",
+    "hasAccount": "Already have an account?",
+    "continueWithSSO": "Continue with SSO",
+    "orContinueWith": "or continue with",
+    "accountCreated": "Account created!",
+    "checkEmailVerify": "Check your email to verify your account.",
+    "validation": {
+      "emailRequired": "Please enter a valid email address.",
+      "passwordMinLength": "Password must be at least 8 characters.",
+      "nameMinLength": "Name must be at least 2 characters."
+    }
+  },
+  "editor": {
+    "undoRedo": {
+      "undo": "Undo",
+      "redo": "Redo"
+    },
+    "modes": {
+      "rich": "Rich text",
+      "source": "Source",
+      "preview": "Preview",
+      "livePreview": "Live preview"
+    },
+    "comments": {
+      "addComment": "Add comment",
+      "resolveComment": "Resolve comment",
+      "deleteComment": "Delete comment"
+    },
+    "versionHistory": {
+      "title": "Version history",
+      "restore": "Restore this version",
+      "compare": "Compare with current"
+    },
+    "sharing": {
+      "title": "Share",
+      "copyLink": "Copy link",
+      "linkCopied": "Link copied to clipboard",
+      "manageAccess": "Manage access"
+    },
+    "properties": {
+      "title": "Properties",
+      "addProperty": "Add property"
+    },
+    "diff": {
+      "title": "Diff viewer",
+      "additions": "{count, plural, one {# addition} other {# additions}}",
+      "deletions": "{count, plural, one {# deletion} other {# deletions}}"
+    }
+  },
+  "workspace": {
+    "title": "Workspace",
+    "myWorkspaces": "My workspaces",
+    "createWorkspace": "Create workspace",
+    "deleteWorkspace": "Delete workspace",
+    "workspaceSettings": "Workspace settings",
+    "fileExplorer": "File explorer",
+    "openFileExplorer": "Open file explorer",
+    "toggleRightSidebar": "Toggle right sidebar",
+    "searchNotes": "Search notes",
+    "searchNotesPlaceholder": "Search notes\u2026",
+    "typeToSearch": "Type to search across all notes.",
+    "layoutPresets": "Layout presets",
+    "snapLayoutPicker": "Snap layout picker",
+    "panels": {
+      "files": "Files panel",
+      "editor": "Editor",
+      "search": "Search panel",
+      "outline": "Outline panel",
+      "moreOptions": "More options",
+      "bookmarks": "Bookmarks",
+      "tags": "Tags",
+      "backlinks": "Backlinks",
+      "properties": "Properties",
+      "comments": "Comments"
+    },
+    "panelEmpty": {
+      "noTags": "No tags yet",
+      "openNoteOutline": "Open a note to see its outline",
+      "openNoteBacklinks": "Open a note to see backlinks",
+      "openNoteProperties": "Open a note to see properties",
+      "openNoteComments": "Open a note to see comments"
+    },
+    "mobile": {
+      "switchedTo": "Switched to {panel}",
+      "bookmarksDesc": "View saved notes",
+      "tagsDesc": "Browse by tag",
+      "graphViewDesc": "Visualize connections",
+      "settingsDesc": "App preferences",
+      "pluginsDesc": "Browse and manage plugins"
+    },
+    "dnd": {
+      "panelMoved": "{panel} panel moved to {side} sidebar"
+    },
+    "folders": {
+      "gettingStarted": "Getting Started",
+      "projects": "Projects",
+      "dailyNotes": "Daily Notes",
+      "archive": "Archive"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "tabs": {
+      "general": "General",
+      "members": "Members",
+      "plugins": "Plugins",
+      "appearance": "Appearance",
+      "publish": "Publish",
+      "dangerZone": "Danger zone"
+    },
+    "breadcrumb": {
+      "home": "Home",
+      "settings": "Settings"
+    },
+    "noPermission": "You do not have permission to access workspace settings."
+  },
+  "search": {
+    "placeholder": "Search\u2026",
+    "noResults": "No results found",
+    "noResultsFor": "No results found for \"{query}\"",
+    "resultsCount": "{count, plural, one {# result} other {# results}} for \"{query}\""
+  },
+  "notifications": {
+    "title": "Notifications",
+    "markAllRead": "Mark all as read",
+    "noNotifications": "No notifications",
+    "newNotification": "New notification"
+  },
+  "errors": {
+    "pageNotFound": "Page not found",
+    "pageNotFoundDescription": "The page you are looking for does not exist or may have been moved.",
+    "reportBrokenLink": "If you followed a link to get here, please {link}.",
+    "reportBrokenLinkText": "report the broken link",
+    "somethingWentWrong": "Something went wrong",
+    "unexpectedError": "An unexpected error occurred. Your workspace data is safe.",
+    "errorReference": "Error reference",
+    "errorDetails": "Error details (development only)",
+    "tryAgain": "Try again",
+    "reportIssue": "Report issue",
+    "criticalError": "Critical Error",
+    "criticalErrorDescription": "Notesaner encountered a critical error and could not load. Your data is safe on disk.",
+    "moduleError": "{module} encountered an error",
+    "moduleCrashDescription": "This section crashed but the rest of your workspace is still available.",
+    "reloadModule": "Reload {module}",
+    "offline": {
+      "title": "You are offline",
+      "description": "Notesaner requires an internet connection to sync your notes. Your local changes will be saved when you reconnect.",
+      "banner": "You are offline. Changes will sync when reconnected.",
+      "retryConnection": "Retry connection",
+      "checkNetwork": "Check your network connection and try again."
+    },
+    "api": {
+      "networkError": "Unable to connect to server. Please try again.",
+      "unauthorized": "Your session has expired. Please sign in again.",
+      "forbidden": "You do not have permission to perform this action.",
+      "notFound": "The requested resource was not found.",
+      "serverError": "An internal server error occurred. Please try again later.",
+      "rateLimited": "Too many requests. Please wait a moment and try again.",
+      "validationError": "The submitted data is invalid. Please check your input.",
+      "timeout": "The request timed out. Please try again.",
+      "conflict": "A conflict occurred. Someone else may have modified this resource.",
+      "invalidCredentials": "Invalid credentials. Please try again.",
+      "registrationFailed": "Registration failed. Please try again."
+    }
+  }
+}

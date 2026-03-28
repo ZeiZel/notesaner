@@ -1,7 +1,10 @@
 import type { Metadata, Viewport } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
+import { NextIntlClientProvider } from 'next-intl';
+import { getLocale, getMessages } from 'next-intl/server';
 import { Providers } from '@/app/providers';
 import { SkipNavigation } from '@/shared/ui/SkipNavigation';
+import { getLocaleDirection } from '@/shared/config/i18n';
 
 // Import global styles — design tokens + Tailwind CSS 4 utilities.
 import '@/app/styles/globals.css';
@@ -101,14 +104,20 @@ const THEME_FLASH_PREVENTION_SCRIPT = `
  * Sets up:
  * - Google Fonts (Inter Variable + JetBrains Mono)
  * - dark theme as default via data-theme attribute
- * - Global providers (QueryClient, Theme)
+ * - Global providers (QueryClient, Theme, i18n)
  * - Font CSS variables for use in tokens.css
  * - Flash-prevention script to apply persisted theme before first paint
+ * - RTL support via dir attribute derived from active locale
  */
-export default function RootLayout({ children }: RootLayoutProps) {
+export default async function RootLayout({ children }: RootLayoutProps) {
+  const locale = await getLocale();
+  const messages = await getMessages();
+  const dir = getLocaleDirection(locale);
+
   return (
     <html
-      lang="en"
+      lang={locale}
+      dir={dir}
       data-theme="dark"
       className={`${inter.variable} ${jetbrainsMono.variable}`}
       suppressHydrationWarning
@@ -118,8 +127,10 @@ export default function RootLayout({ children }: RootLayoutProps) {
         <script dangerouslySetInnerHTML={{ __html: THEME_FLASH_PREVENTION_SCRIPT }} />
       </head>
       <body>
-        <SkipNavigation />
-        <Providers>{children}</Providers>
+        <NextIntlClientProvider messages={messages}>
+          <SkipNavigation />
+          <Providers>{children}</Providers>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

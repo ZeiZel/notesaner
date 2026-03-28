@@ -8,3 +8,16 @@ export { getAntdTheme, getAntdDarkTheme, getAntdLightTheme } from './antd-theme'
 
 // Environment
 export { clientEnv, getServerEnv, isDevelopment, isProduction } from './env';
+
+// Internationalization
+export {
+  locales,
+  defaultLocale,
+  localeMetadata,
+  messageNamespaces,
+  getLocaleDirection,
+  isSupportedLocale,
+  type Locale,
+  type LocaleMetadata,
+  type MessageNamespace,
+} from './i18n';
