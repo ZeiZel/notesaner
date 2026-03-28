@@ -1,7 +1,12 @@
+// NOTE: UI configuration store, kept in Zustand for localStorage persistence.
+// All current fields (sidebar visibility, widths, panel layout, expanded folders)
+// are persisted so the user's workspace arrangement survives page reloads.
+// No transient-only UI state exists here — if hover/focus indicators are added
+// in the future, they should use local component state or React Context.
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { getDefaultPanelLayout } from '@/features/workspace/PanelRegistry';
-import type { SidebarSide } from '@/features/workspace/PanelRegistry';
+import { getDefaultPanelLayout } from '@/features/workspace/model/PanelRegistry';
+import type { SidebarSide } from '@/features/workspace/model/PanelRegistry';
 
 // ---------------------------------------------------------------------------
 // Types

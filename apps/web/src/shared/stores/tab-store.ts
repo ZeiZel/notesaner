@@ -1,3 +1,8 @@
+// NOTE: Business store — core workspace navigation state. Zustand kept because:
+//   - All fields (tabs, activeTabId) are persisted to localStorage so open tabs
+//     survive page reloads — a core user expectation for a note-taking app.
+//   - Tab management logic (close others, close to right, pin) is domain logic.
+//   - Location in shared/stores is appropriate since tabs are cross-feature.
 /**
  * tab-store.ts
  *

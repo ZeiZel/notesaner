@@ -21,7 +21,7 @@ import {
   selectProperty,
   selectCustomProperties,
   selectSpecialProperties,
-} from '../frontmatter-store';
+} from '../model/frontmatter.store';
 
 // ---------------------------------------------------------------------------
 // Helpers

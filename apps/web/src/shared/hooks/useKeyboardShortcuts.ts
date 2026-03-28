@@ -1,11 +1,7 @@
 'use client';
 
 import { useEffect, useCallback } from 'react';
-import {
-  getGlobalShortcuts,
-  matchesCombo,
-  type ShortcutId,
-} from '@/shared/lib/keyboard-shortcuts';
+import { getGlobalShortcuts, matchesCombo, type ShortcutId } from '@/shared/lib/keyboard-shortcuts';
 
 /**
  * Map of shortcut action IDs to their handler functions.
@@ -41,10 +37,7 @@ export type ShortcutHandlers = Partial<Record<ShortcutId, () => void>>;
  * @param enabled  - Set to false to temporarily disable all shortcuts (e.g.
  *                   while a modal is open that has its own key bindings).
  */
-export function useKeyboardShortcuts(
-  handlers: ShortcutHandlers,
-  enabled = true,
-): void {
+export function useKeyboardShortcuts(handlers: ShortcutHandlers, enabled = true): void {
   // Stable reference so the effect doesn't re-register on every render when
   // the caller passes an inline object literal.
   const stableHandlers = useCallback(() => handlers, [handlers]);
@@ -67,7 +60,7 @@ export function useKeyboardShortcuts(
 
       for (const shortcut of globalShortcuts) {
         if (matchesCombo(event, shortcut.combo)) {
-          const handler = currentHandlers[shortcut.id];
+          const handler = currentHandlers[shortcut.id as ShortcutId];
           if (handler !== undefined) {
             event.preventDefault();
             handler();

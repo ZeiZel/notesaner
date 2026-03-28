@@ -1,3 +1,8 @@
+// NOTE: Business store — user theme preferences persisted to localStorage.
+// These are user-configurable settings (accent color, font family, font size)
+// that must survive page reloads. Zustand persistence is required.
+// TODO: Consider merging with shared/lib/theme/theme-store.ts to reduce
+// indirection — both stores manage theme-related preferences.
 /**
  * theme-store.ts — Extended theme preferences store.
  *

@@ -20,7 +20,7 @@ import {
   serializeFrontmatter,
   buildMarkdown,
   type FrontmatterMap,
-} from '../frontmatter-parser';
+} from '../lib/frontmatter-parser';
 
 // ---------------------------------------------------------------------------
 // detectValueType

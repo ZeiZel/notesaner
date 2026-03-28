@@ -14,14 +14,14 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { usePluginBrowserStore, selectBrowserPluginOp } from '../plugin-browser-store';
-import type { RegistryPlugin } from '../plugin-registry-api';
+import { usePluginBrowserStore, selectBrowserPluginOp } from '../model/plugin-browser-store';
+import type { RegistryPlugin } from '../api/plugin-registry-api';
 
 // ---------------------------------------------------------------------------
 // Mock the API module
 // ---------------------------------------------------------------------------
 
-vi.mock('../plugin-registry-api', () => ({
+vi.mock('../api/plugin-registry-api', () => ({
   pluginRegistryApi: {
     search: vi.fn(),
     getDetail: vi.fn(),
@@ -31,7 +31,7 @@ vi.mock('../plugin-registry-api', () => ({
   },
 }));
 
-const { pluginRegistryApi } = await import('../plugin-registry-api');
+const { pluginRegistryApi } = await import('../api/plugin-registry-api');
 
 // ---------------------------------------------------------------------------
 // Helpers

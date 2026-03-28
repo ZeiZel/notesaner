@@ -13,7 +13,7 @@
  * @module shared/lib/a11y
  */
 
-import { useCallback, useEffect, useRef, useState, useId } from 'react';
+import { useCallback, useEffect, useRef, useState, useId, useSyncExternalStore } from 'react';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -218,29 +218,19 @@ export function useFocusTrap<T extends HTMLElement = HTMLElement>({
 /**
  * Returns true if the user has requested reduced motion via their OS settings.
  *
- * Uses the prefers-reduced-motion media query. Updates reactively when the
- * user changes their system preference.
+ * Uses useSyncExternalStore to subscribe to the prefers-reduced-motion media
+ * query — no useEffect needed for external browser API subscriptions.
  */
 export function useReducedMotion(): boolean {
-  const [prefersReduced, setPrefersReduced] = useState(() => {
-    if (typeof window === 'undefined') return false;
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-
-    const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
-
-    function handleChange(e: MediaQueryListEvent) {
-      setPrefersReduced(e.matches);
-    }
-
-    mql.addEventListener('change', handleChange);
-    return () => mql.removeEventListener('change', handleChange);
-  }, []);
-
-  return prefersReduced;
+  return useSyncExternalStore(
+    (callback) => {
+      const mql = window.matchMedia('(prefers-reduced-motion: reduce)');
+      mql.addEventListener('change', callback);
+      return () => mql.removeEventListener('change', callback);
+    },
+    () => window.matchMedia('(prefers-reduced-motion: reduce)').matches,
+    () => false, // Server snapshot: assume no reduced motion preference
+  );
 }
 
 // ---------------------------------------------------------------------------

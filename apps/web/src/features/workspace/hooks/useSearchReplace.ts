@@ -50,6 +50,10 @@ export interface ReplacePreview {
 
 // ---------------------------------------------------------------------------
 // Store
+// NOTE: Mixed store — search/replace business logic (API calls, match data)
+// + UI state (isOpen, isReplaceExpanded). Zustand kept because the hook exposes
+// a unified search/replace API that combines store state with async operations.
+// UI visibility fields (isOpen, isReplaceExpanded) are minor — not worth splitting.
 // ---------------------------------------------------------------------------
 
 interface SearchReplaceState {

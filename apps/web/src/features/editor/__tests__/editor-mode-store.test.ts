@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { useEditorModeStore } from '../editor-mode-store';
+import { useEditorModeStore } from '../model/editor-mode.store';
 
 /**
  * Tests for the editor-mode-store.

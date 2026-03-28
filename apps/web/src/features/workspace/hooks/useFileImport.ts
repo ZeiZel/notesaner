@@ -83,6 +83,10 @@ interface FileImportState {
 
 // ---------------------------------------------------------------------------
 // Store
+// NOTE: Business store — manages file upload lifecycle (validation, progress
+// tracking, API calls for note creation and image upload). Not persisted
+// (session-only). Zustand used because multiple concurrent uploads write
+// state independently.
 // ---------------------------------------------------------------------------
 
 export const useFileImportStore = create<FileImportState>()(

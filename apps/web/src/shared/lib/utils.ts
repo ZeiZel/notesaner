@@ -1,16 +1,7 @@
-import { clsx, type ClassValue } from 'clsx';
-import { twMerge } from 'tailwind-merge';
-
 /**
- * Combines class names using clsx and merges Tailwind classes with tailwind-merge.
- * This is the primary utility for conditional and merged Tailwind class names.
- *
- * @example
- * cn('px-4 py-2', condition && 'bg-primary', 'rounded-md')
+ * Re-exported from @notesaner/utils — the canonical source of truth for cn().
  */
-export function cn(...inputs: ClassValue[]): string {
-  return twMerge(clsx(inputs));
-}
+export { cn } from '@notesaner/utils';
 
 /**
  * Formats a date using the user's locale.
@@ -45,7 +36,8 @@ export function formatRelativeTime(date: Date | string | number): string {
 /**
  * Creates a debounced version of a function.
  */
-export function debounce<T extends (...args: unknown[]) => unknown>(
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function debounce<T extends (...args: any[]) => any>(
   fn: T,
   delay: number,
 ): (...args: Parameters<T>) => void {
@@ -89,8 +81,6 @@ const CURSOR_COLORS = [
 ] as const;
 
 export function getPresenceColor(userId: string): string {
-  const index = userId
-    .split('')
-    .reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  const index = userId.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
   return CURSOR_COLORS[index % CURSOR_COLORS.length] ?? CURSOR_COLORS[0];
 }

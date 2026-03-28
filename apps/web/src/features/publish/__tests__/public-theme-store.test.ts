@@ -16,7 +16,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { usePublicThemeStore, PUBLIC_THEME_STORAGE_KEY } from '../public-theme-store';
+import { usePublicThemeStore, PUBLIC_THEME_STORAGE_KEY } from '../model/public-theme-store';
 import {
   FONT_SIZE_MIN,
   FONT_SIZE_MAX,
@@ -24,7 +24,7 @@ import {
   MAX_WIDTH_MIN,
   MAX_WIDTH_MAX,
   MAX_WIDTH_DEFAULT,
-} from '../public-themes';
+} from '../model/public-themes';
 
 // ---------------------------------------------------------------------------
 // Helpers

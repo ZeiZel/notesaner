@@ -49,6 +49,10 @@ export interface QuickCaptureState {
 
 // ---------------------------------------------------------------------------
 // Store
+// NOTE: Mixed store — business state (defaultFolder, defaultMode are persisted
+// user preferences) + transient UI state (isOpen, content, title, isSaving).
+// Zustand kept for persist middleware (user preferences survive page reloads).
+// The transient fields are tightly coupled to the capture workflow.
 // ---------------------------------------------------------------------------
 
 export const useQuickCaptureStore = create<QuickCaptureState>()(

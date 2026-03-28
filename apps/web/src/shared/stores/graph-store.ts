@@ -1,3 +1,8 @@
+// NOTE: Mixed store — business filters + transient search state. Zustand kept because:
+//   - Persisted fields (savedPresets, linkDepth) require localStorage persistence.
+//   - Transient fields (searchQuery, highlightedNodeIds, all filter selections)
+//     are excluded from persistence via `partialize`. They are tightly coupled
+//     to the persisted filter presets and splitting would fragment the filter API.
 /**
  * graph-store — Zustand store for workspace-level graph filter and search state.
  *

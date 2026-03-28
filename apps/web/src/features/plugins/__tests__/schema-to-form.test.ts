@@ -15,7 +15,7 @@ import {
   validateSettings,
   errorsByKey,
   type FieldDescriptor,
-} from '../schema-to-form';
+} from '../lib/schema-to-form';
 
 // ---------------------------------------------------------------------------
 // schemaToFields

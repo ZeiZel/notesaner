@@ -18,7 +18,7 @@ import { preloadOnHover } from './lazy';
 // ---------------------------------------------------------------------------
 
 export const LazyLocalGraphPanel = dynamic(
-  () => import('@/features/workspace/panels/LocalGraphPanel').then((m) => m.LocalGraphPanel),
+  () => import('@/features/workspace/ui/LocalGraphPanel').then((m) => m.LocalGraphPanel),
   { ssr: false, loading: () => null },
 );
 
@@ -27,7 +27,7 @@ export const LazyLocalGraphPanel = dynamic(
 // ---------------------------------------------------------------------------
 
 export const LazySettingsDialog = dynamic(
-  () => import('@/features/settings/SettingsDialog').then((m) => m.SettingsDialog),
+  () => import('@/features/settings/ui/SettingsDialog').then((m) => m.SettingsDialog),
   { ssr: false, loading: () => null },
 );
 
@@ -36,7 +36,7 @@ export const LazySettingsDialog = dynamic(
 // ---------------------------------------------------------------------------
 
 export const LazyPluginBrowser = dynamic(
-  () => import('@/features/plugins/PluginBrowser').then((m) => m.PluginBrowser),
+  () => import('@/features/plugins/ui/PluginBrowser').then((m) => m.PluginBrowser),
   { ssr: false, loading: () => null },
 );
 
@@ -45,7 +45,7 @@ export const LazyPluginBrowser = dynamic(
 // ---------------------------------------------------------------------------
 
 export const LazyPluginSettingsPage = dynamic(
-  () => import('@/features/plugins/PluginSettingsPage').then((m) => m.PluginSettingsPage),
+  () => import('@/features/plugins/ui/PluginSettingsPage').then((m) => m.PluginSettingsPage),
   { ssr: false, loading: () => null },
 );
 
@@ -54,7 +54,7 @@ export const LazyPluginSettingsPage = dynamic(
 // ---------------------------------------------------------------------------
 
 export const LazyAuditLogViewer = dynamic(
-  () => import('@/features/admin/AuditLogViewer').then((m) => m.AuditLogViewer),
+  () => import('@/features/admin/ui/AuditLogViewer').then((m) => m.AuditLogViewer),
   { ssr: false, loading: () => null },
 );
 
@@ -63,22 +63,23 @@ export const LazyAuditLogViewer = dynamic(
 // ---------------------------------------------------------------------------
 
 export const LazyAnalyticsDashboard = dynamic(
-  () => import('@/features/publish/AnalyticsDashboard').then((m) => m.AnalyticsDashboard),
+  () => import('@/features/publish/ui/AnalyticsDashboard').then((m) => m.AnalyticsDashboard),
   { ssr: false, loading: () => null },
 );
 
 export const LazyDomainSettings = dynamic(
-  () => import('@/features/publish/DomainSettings').then((m) => m.DomainSettings),
+  () => import('@/features/publish/ui/DomainSettings').then((m) => m.DomainSettings),
   { ssr: false, loading: () => null },
 );
 
 export const LazyPublicThemeSettings = dynamic(
-  () => import('@/features/publish/PublicThemeSettings').then((m) => m.PublicThemeSettings),
+  () => import('@/features/publish/ui/PublicThemeSettings').then((m) => m.PublicThemeSettings),
   { ssr: false, loading: () => null },
 );
 
 export const LazyCommentModerationQueue = dynamic(
-  () => import('@/features/publish/CommentModerationQueue').then((m) => m.CommentModerationQueue),
+  () =>
+    import('@/features/publish/ui/CommentModerationQueue').then((m) => m.CommentModerationQueue),
   { ssr: false, loading: () => null },
 );
 
@@ -87,7 +88,7 @@ export const LazyCommentModerationQueue = dynamic(
 // ---------------------------------------------------------------------------
 
 export const LazyPropertiesPanel = dynamic(
-  () => import('@/features/workspace/panels/PropertiesPanel').then((m) => m.PropertiesPanel),
+  () => import('@/features/workspace/ui/PropertiesPanel').then((m) => m.PropertiesPanel),
   { ssr: false, loading: () => null },
 );
 
@@ -97,9 +98,7 @@ export const LazyPropertiesPanel = dynamic(
 
 export const LazyUnlinkedMentionsPanel = dynamic(
   () =>
-    import('@/features/workspace/panels/UnlinkedMentionsPanel').then(
-      (m) => m.UnlinkedMentionsPanel,
-    ),
+    import('@/features/workspace/ui/UnlinkedMentionsPanel').then((m) => m.UnlinkedMentionsPanel),
   { ssr: false, loading: () => null },
 );
 
@@ -108,7 +107,7 @@ export const LazyUnlinkedMentionsPanel = dynamic(
 // ---------------------------------------------------------------------------
 
 export const LazyCommandPaletteDialog = dynamic(
-  () => import('@/features/workspace/CommandPaletteDialog').then((m) => m.CommandPaletteDialog),
+  () => import('@/features/workspace/ui/CommandPaletteDialog').then((m) => m.CommandPaletteDialog),
   { ssr: false, loading: () => null },
 );
 
@@ -118,20 +117,20 @@ export const LazyCommandPaletteDialog = dynamic(
 
 export const preloadGraph = preloadOnHover(
   'graph-panel',
-  () => import('@/features/workspace/panels/LocalGraphPanel'),
+  () => import('@/features/workspace/ui/LocalGraphPanel'),
 );
 
 export const preloadSettings = preloadOnHover(
   'settings-dialog',
-  () => import('@/features/settings/SettingsDialog'),
+  () => import('@/features/settings/ui/SettingsDialog'),
 );
 
 export const preloadPluginBrowser = preloadOnHover(
   'plugin-browser',
-  () => import('@/features/plugins/PluginBrowser'),
+  () => import('@/features/plugins/ui/PluginBrowser'),
 );
 
 export const preloadAuditLog = preloadOnHover(
   'audit-log',
-  () => import('@/features/admin/AuditLogViewer'),
+  () => import('@/features/admin/ui/AuditLogViewer'),
 );

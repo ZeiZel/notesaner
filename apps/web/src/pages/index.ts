@@ -1,0 +1,11 @@
+export { LoginPage } from './login';
+export { RegisterPage } from './register';
+export { NoteEditorPage } from './note-editor';
+export { GraphPage } from './graph';
+export { PluginBrowserPage } from './plugin-browser';
+export { GeneralSettingsPage } from './settings-general';
+export { MembersSettingsPage } from './settings-members';
+export { AppearanceSettingsPage } from './settings-appearance';
+export { PluginsSettingsPage } from './settings-plugins';
+export { PublishSettingsPage } from './settings-publish';
+export { DangerZonePage } from './settings-danger';

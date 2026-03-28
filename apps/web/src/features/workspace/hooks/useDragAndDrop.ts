@@ -20,8 +20,8 @@
 import { useCallback, useRef, useState } from 'react';
 import { create } from 'zustand';
 import { devtools } from 'zustand/middleware';
-import type { TreeNode } from '@/shared/lib/VirtualTree';
-import type { FileNodeData } from '../FileExplorer';
+import type { TreeNode } from '@/shared/ui/VirtualTree';
+import type { FileNodeData } from '../ui/FileExplorer';
 import { useAuthStore } from '@/shared/stores/auth-store';
 import { useWorkspaceStore } from '@/shared/stores/workspace-store';
 
@@ -74,6 +74,9 @@ export interface MoveOperation {
 
 // ---------------------------------------------------------------------------
 // Drag state store
+// NOTE: Transient UI state (drag indicators). Not persisted. Zustand is kept
+// because the hook orchestrates API calls (file moves) that depend on
+// this drag state, making it tightly coupled to business operations.
 // ---------------------------------------------------------------------------
 
 interface DragAndDropState extends DragState {

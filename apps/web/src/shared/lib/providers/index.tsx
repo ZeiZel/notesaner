@@ -1,6 +1,7 @@
 'use client';
 
 import { type ReactNode } from 'react';
+import { AntdProvider } from '@/shared/config/antd-provider';
 import { QueryProvider } from './QueryProvider';
 import { ThemeProvider } from './ThemeProvider';
 
@@ -13,12 +14,15 @@ interface ProvidersProps {
  *
  * Order matters:
  * 1. ThemeProvider — applies data-theme attribute and CSS variables immediately
- * 2. QueryProvider — provides TanStack Query context (may depend on auth)
+ * 2. AntdProvider — reads resolved theme and applies Ant Design ConfigProvider
+ * 3. QueryProvider — provides TanStack Query context (may depend on auth)
  */
 export function Providers({ children }: ProvidersProps) {
   return (
     <ThemeProvider defaultTheme="dark">
-      <QueryProvider>{children}</QueryProvider>
+      <AntdProvider>
+        <QueryProvider>{children}</QueryProvider>
+      </AntdProvider>
     </ThemeProvider>
   );
 }

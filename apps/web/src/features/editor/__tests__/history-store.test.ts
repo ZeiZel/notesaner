@@ -24,7 +24,7 @@ import {
   selectFutureEntries,
   describeContentChange,
   describeFormatAction,
-} from '../history-store';
+} from '../model/history.store';
 
 // ---------------------------------------------------------------------------
 // Helpers

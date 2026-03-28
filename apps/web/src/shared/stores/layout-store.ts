@@ -1,7 +1,14 @@
+// NOTE: Mixed store — business + transient UI state. Zustand is kept because:
+//   - Persisted fields (currentLayout, activeLayoutId, savedLayouts) require
+//     localStorage persistence, which Zustand provides via the persist middleware.
+//   - Transient UI fields (isResizing, draggedPanelId, snapZoneActive,
+//     isSnapPickerOpen) are excluded from persistence via `partialize`.
+//     Splitting them into a separate React Context would add complexity
+//     without clear benefit — they are tightly coupled to the layout actions.
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import type { SavedLayout, SnapTemplateId } from '@/features/workspace/snap-layout-types';
-import { SNAP_TEMPLATES } from '@/features/workspace/snap-layout-types';
+import type { SavedLayout, SnapTemplateId } from '@/features/workspace/model/snap-layout-types';
+import { SNAP_TEMPLATES } from '@/features/workspace/model/snap-layout-types';
 
 type SnapZone =
   | 'left-half'

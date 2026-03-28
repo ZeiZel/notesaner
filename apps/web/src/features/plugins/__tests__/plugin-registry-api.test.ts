@@ -11,8 +11,8 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { pluginRegistryApi } from '../plugin-registry-api';
-import type { RegistrySearchResult, InstalledPluginResponse } from '../plugin-registry-api';
+import { pluginRegistryApi } from '../api/plugin-registry-api';
+import type { RegistrySearchResult, InstalledPluginResponse } from '../api/plugin-registry-api';
 
 // ---------------------------------------------------------------------------
 // Mock the shared API client

@@ -26,7 +26,7 @@ import {
   type WorkspaceMember,
   type PendingInvitation,
   type MemberRole,
-} from '../members-store';
+} from '../model/members-store';
 
 // ─── Mock the API client ───────────────────────────────────────────────────
 

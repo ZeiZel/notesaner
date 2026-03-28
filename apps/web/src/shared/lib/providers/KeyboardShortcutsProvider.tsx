@@ -1,3 +1,7 @@
+// TODO: Phase 3 — move KeyboardShortcutsProvider to src/app/providers/ or
+// src/widgets/workspace-shell/. It imports from features/ (workspace, editor)
+// which violates FSD's shared → features import rule. As a provider that
+// wires together multiple features, it belongs in the app or widgets layer.
 'use client';
 
 import { type ReactNode, useState } from 'react';
@@ -6,9 +10,9 @@ import { useSidebarStore } from '@/shared/stores/sidebar-store';
 import { useWorkspaceStore } from '@/shared/stores/workspace-store';
 import { useLayoutStore } from '@/shared/stores/layout-store';
 import { useKeyboardShortcuts } from '@/shared/hooks/useKeyboardShortcuts';
-import { CommandPaletteDialog } from '@/features/workspace/CommandPaletteDialog';
-import { useNavigationHistoryStore } from '@/features/workspace/navigation-history-store';
-import { useEditorModeStore } from '@/features/editor/editor-mode-store';
+import { CommandPaletteDialog } from '@/features/workspace/ui/CommandPaletteDialog';
+import { useNavigationHistoryStore } from '@/features/workspace/model/navigation-history-store';
+import { useEditorModeStore } from '@/features/editor';
 import { useTheme } from '@/shared/lib/providers/ThemeProvider';
 
 interface KeyboardShortcutsProviderProps {

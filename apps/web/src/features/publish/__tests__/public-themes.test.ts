@@ -31,7 +31,7 @@ import {
   MAX_WIDTH_MAX,
   MAX_WIDTH_DEFAULT,
   type PublicThemeColors,
-} from '../public-themes';
+} from '../model/public-themes';
 
 // ---------------------------------------------------------------------------
 // Helpers

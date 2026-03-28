@@ -1,0 +1,145 @@
+/**
+ * features/editor — public API barrel export.
+ *
+ * This is the only import path that pages/widgets should use for editor components.
+ * Internal implementation details (individual files in ui/, model/, lib/, hooks/)
+ * are encapsulated and should not be imported directly from outside this feature.
+ *
+ * FSD rule: only import from this index.ts in higher layers.
+ */
+
+// ---------------------------------------------------------------------------
+// UI Components
+// ---------------------------------------------------------------------------
+
+export { EditorModeToggle } from './ui/EditorModeToggle';
+export type { EditorModeToggleProps } from './ui/EditorModeToggle';
+
+export { EditorModeWrapper } from './ui/EditorModeWrapper';
+export type { EditorModeWrapperProps } from './ui/EditorModeWrapper';
+
+export { SourceModeEditor } from './ui/SourceModeEditor';
+export type { SourceModeEditorProps } from './ui/SourceModeEditor';
+
+export { LivePreviewEditor } from './ui/LivePreviewEditor';
+export type { LivePreviewEditorProps } from './ui/LivePreviewEditor';
+
+export { ReadingModeView } from './ui/ReadingModeView';
+export type { ReadingModeViewProps } from './ui/ReadingModeView';
+
+export { PropertyValueEditor } from './ui/PropertyValueEditor';
+export type { PropertyValueEditorProps } from './ui/PropertyValueEditor';
+
+export { TitleEditor, TagsEditor, AliasesEditor } from './ui/SpecialPropertyEditors';
+export type {
+  TitleEditorProps,
+  TagsEditorProps,
+  AliasesEditorProps,
+} from './ui/SpecialPropertyEditors';
+
+export { CommentSidebar } from './ui/CommentSidebar';
+export type { CommentSidebarProps } from './ui/CommentSidebar';
+
+export { CommentThread } from './ui/CommentThread';
+export type { CommentThreadProps } from './ui/CommentThread';
+
+export { DiffViewer, computeLineDiff } from './ui/DiffViewer';
+export type { DiffViewerProps, DiffChange, DiffViewMode } from './ui/DiffViewer';
+
+export { ExportDialog } from './ui/ExportDialog';
+export type { ExportDialogProps, ExportFormat, ExportMode } from './ui/ExportDialog';
+
+export { HistoryPanel } from './ui/HistoryPanel';
+export type { HistoryPanelProps } from './ui/HistoryPanel';
+
+export { InlineComment } from './ui/InlineComment';
+export type { InlineCommentProps } from './ui/InlineComment';
+
+export { PresenceAvatar } from './ui/PresenceAvatar';
+export type { PresenceAvatarProps } from './ui/PresenceAvatar';
+
+export { PresenceDot } from './ui/PresenceDot';
+export type { PresenceDotProps } from './ui/PresenceDot';
+
+export { PresenceIndicator } from './ui/PresenceIndicator';
+export type { PresenceIndicatorProps } from './ui/PresenceIndicator';
+
+export { ShareDialog } from './ui/ShareDialog';
+
+export { ShareLinkManager } from './ui/ShareLinkManager';
+
+export { UndoRedoToolbar } from './ui/UndoRedoToolbar';
+export type { UndoRedoToolbarProps } from './ui/UndoRedoToolbar';
+
+export { VersionHistory } from './ui/VersionHistory';
+export type { VersionHistoryProps } from './ui/VersionHistory';
+
+// ---------------------------------------------------------------------------
+// Model (stores, types, selectors)
+// ---------------------------------------------------------------------------
+
+export {
+  useEditorModeStore,
+  selectIsEditing,
+  selectIsSourceBased,
+  readingFontFamilyCss,
+  EDITOR_MODE_LABELS,
+} from './model/editor-mode.store';
+export type {
+  EditMode,
+  EditorMode,
+  ReadingFontFamily,
+  ReadingSettings,
+  EditorModeState,
+} from './model/editor-mode.store';
+
+export {
+  useFrontmatterStore,
+  selectProperty,
+  selectSortedProperties,
+  selectCustomProperties,
+  selectSpecialProperties,
+  SPECIAL_KEYS,
+} from './model/frontmatter.store';
+
+export {
+  useHistoryStore,
+  selectCanUndo,
+  selectCanRedo,
+  selectUndoEntry,
+  selectRedoEntry,
+  selectPastEntries,
+  selectFutureEntries,
+  describeContentChange,
+  describeFormatAction,
+} from './model/history.store';
+export type { HistoryActionType, HistoryEntry, HistoryState } from './model/history.store';
+
+// ---------------------------------------------------------------------------
+// Lib (parser, utilities)
+// ---------------------------------------------------------------------------
+
+export {
+  parseFrontmatter,
+  serializeFrontmatter,
+  buildMarkdown,
+  detectValueType,
+  coerceValue,
+  parseInlineArray,
+} from './lib/frontmatter-parser';
+export type {
+  FrontmatterValueType,
+  FrontmatterProperty,
+  FrontmatterMap,
+} from './lib/frontmatter-parser';
+
+// ---------------------------------------------------------------------------
+// Hooks
+// ---------------------------------------------------------------------------
+
+export {
+  useVersionHistory,
+  useVersionContent,
+  useRestoreVersion,
+  versionKeys,
+} from './hooks/useVersionHistory';

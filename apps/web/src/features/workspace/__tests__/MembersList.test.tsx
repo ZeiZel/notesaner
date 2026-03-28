@@ -32,8 +32,8 @@ import {
   canRemoveMember,
   type WorkspaceMember,
   type MemberRole,
-} from '../members-store';
-import { getRoleLabel } from '../RoleBadge';
+} from '../model/members-store';
+import { getRoleLabel } from '../ui/RoleBadge';
 
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
