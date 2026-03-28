@@ -13,10 +13,7 @@ import type { Config } from 'tailwindcss';
 const config: Config = {
   // Tailwind CSS 4 uses CSS-first configuration, but content paths
   // are still needed for the purge/tree-shaking step.
-  content: [
-    './src/**/*.{ts,tsx}',
-    '../../packages/ui/src/**/*.{ts,tsx}',
-  ],
+  content: ['./app/**/*.{ts,tsx}', './src/**/*.{ts,tsx}', '../../packages/ui/src/**/*.{ts,tsx}'],
   // Dark mode is controlled via data-theme attribute on <html>
   // (set to "dark" by default in root layout)
   darkMode: ['selector', '[data-theme="dark"]'],

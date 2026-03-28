@@ -1,163 +1,165 @@
-version: "2.0"
+version: '2.0'
 project:
-  name: "notesaner"
-  description: "Web-first Obsidian alternative with real-time collaboration, plugin system, Zettelkasten, and self-hosting support"
-  type: "monorepo"
-  license: "AGPL-3.0"
+  name: 'notesaner'
+  description: 'Web-first Obsidian alternative with real-time collaboration, plugin system, Zettelkasten, and self-hosting support'
+  type: 'monorepo'
+  license: 'AGPL-3.0'
 
 tech_stack:
-  language: "TypeScript"
-  runtime: "node"
-  package_manager: "pnpm"
-  monorepo: "nx"
+  language: 'TypeScript'
+  runtime: 'node'
+  package_manager: 'pnpm'
+  monorepo: 'nx'
 
   frontend:
-    framework: "Next.js 15 (App Router)"
-    ui_library: "shadcn/ui + Radix UI"
-    styling: "Tailwind CSS 4"
-    editor: "TipTap (ProseMirror)"
-    state: "Zustand + TanStack Query"
-    i18n: "next-intl"
-    graph: "D3.js / Force Graph"
-    dnd: "dnd-kit (window management)"
-    realtime: "Yjs + y-websocket"
+    framework: 'Next.js 15 (App Router)'
+    ui_library: 'Ant Design (primary) + custom wrappers'
+    styling: 'Tailwind CSS 4'
+    editor: 'TipTap (ProseMirror)'
+    state: 'Zustand (business logic) + React Context (UI state) + TanStack Query (server state)'
+    http_client: 'axios'
+    i18n: 'next-intl'
+    graph: 'D3.js / Force Graph'
+    dnd: 'dnd-kit (window management)'
+    realtime: 'Yjs + y-websocket'
+    architecture_note: 'FSD with app/ at project root for routing, src/ for FSD layers. See docs/artifacts/fsd-refactor-001/agent-directives.md'
 
   backend:
-    framework: "NestJS 11"
-    orm: "Prisma"
-    auth: "Passport.js + SAML + OIDC"
-    websocket: "Socket.IO / ws + Yjs"
-    search: "PostgreSQL FTS + MeiliSearch (optional)"
-    file_storage: "local filesystem"
-    queue: "BullMQ (ValKey)"
+    framework: 'NestJS 11'
+    orm: 'Prisma'
+    auth: 'Passport.js + SAML + OIDC'
+    websocket: 'Socket.IO / ws + Yjs'
+    search: 'PostgreSQL FTS + MeiliSearch (optional)'
+    file_storage: 'local filesystem'
+    queue: 'BullMQ (ValKey)'
 
   database:
-    primary: "PostgreSQL 17"
-    cache: "ValKey 8"
-    search: "PostgreSQL FTS (built-in)"
+    primary: 'PostgreSQL 17'
+    cache: 'ValKey 8'
+    search: 'PostgreSQL FTS (built-in)'
 
   devops:
-    containerization: "Docker + Docker Compose"
-    ci_cd: "GitHub Actions"
-    registry: "GitHub Container Registry (ghcr.io)"
+    containerization: 'Docker + Docker Compose'
+    ci_cd: 'GitHub Actions'
+    registry: 'GitHub Container Registry (ghcr.io)'
 
 architecture:
-  style: "monorepo"
+  style: 'monorepo'
   patterns:
-    - "Feature-Sliced Design (frontend)"
-    - "Clean Architecture (backend)"
-    - "Plugin Architecture (extensible)"
-    - "CQRS (notes sync)"
-    - "Event-Driven (real-time)"
+    - 'Feature-Sliced Design (frontend)'
+    - 'Clean Architecture (backend)'
+    - 'Plugin Architecture (extensible)'
+    - 'CQRS (notes sync)'
+    - 'Event-Driven (real-time)'
 
 domains:
-  - name: "notes"
-    entities: ["Note", "NoteVersion", "NoteLink", "Tag", "Attachment"]
-    bounded_context: "knowledge-management"
-  - name: "auth"
-    entities: ["User", "Session", "SAMLProvider", "OIDCProvider"]
-    bounded_context: "identity"
-  - name: "plugins"
-    entities: ["Plugin", "PluginManifest", "PluginSettings", "PluginRegistry"]
-    bounded_context: "extensibility"
-  - name: "collaboration"
-    entities: ["Room", "Cursor", "Presence", "Comment"]
-    bounded_context: "real-time"
-  - name: "publishing"
-    entities: ["PublishedNote", "PublicVault", "Theme"]
-    bounded_context: "content-delivery"
-  - name: "workspace"
-    entities: ["Workspace", "Layout", "Panel", "Tab"]
-    bounded_context: "ui-management"
+  - name: 'notes'
+    entities: ['Note', 'NoteVersion', 'NoteLink', 'Tag', 'Attachment']
+    bounded_context: 'knowledge-management'
+  - name: 'auth'
+    entities: ['User', 'Session', 'SAMLProvider', 'OIDCProvider']
+    bounded_context: 'identity'
+  - name: 'plugins'
+    entities: ['Plugin', 'PluginManifest', 'PluginSettings', 'PluginRegistry']
+    bounded_context: 'extensibility'
+  - name: 'collaboration'
+    entities: ['Room', 'Cursor', 'Presence', 'Comment']
+    bounded_context: 'real-time'
+  - name: 'publishing'
+    entities: ['PublishedNote', 'PublicVault', 'Theme']
+    bounded_context: 'content-delivery'
+  - name: 'workspace'
+    entities: ['Workspace', 'Layout', 'Panel', 'Tab']
+    bounded_context: 'ui-management'
 
 monorepo_structure:
   apps:
-    - name: "web"
-      path: "apps/web"
-      description: "Next.js web application"
-    - name: "server"
-      path: "apps/server"
-      description: "NestJS API server"
-    - name: "desktop"
-      path: "apps/desktop"
-      description: "Electron app (deferred)"
-      status: "planned"
+    - name: 'web'
+      path: 'apps/web'
+      description: 'Next.js web application'
+    - name: 'server'
+      path: 'apps/server'
+      description: 'NestJS API server'
+    - name: 'desktop'
+      path: 'apps/desktop'
+      description: 'Electron app (deferred)'
+      status: 'planned'
 
   libs:
-    - name: "contracts"
-      path: "libs/contracts"
-      description: "Shared TypeScript types, API contracts, DTOs"
-    - name: "constants"
-      path: "libs/constants"
-      description: "Shared constants and enums"
-    - name: "utils"
-      path: "libs/utils"
-      description: "Shared utility functions"
-    - name: "editor-core"
-      path: "libs/editor-core"
-      description: "TipTap editor configuration and extensions"
-    - name: "sync-engine"
-      path: "libs/sync-engine"
-      description: "Yjs CRDT sync logic (shared between client/server)"
-    - name: "markdown"
-      path: "libs/markdown"
-      description: "Markdown parser/renderer, Zettelkasten link resolution"
-    - name: "plugin-sdk"
-      path: "libs/plugin-sdk"
-      description: "Plugin development SDK and types"
+    - name: 'contracts'
+      path: 'libs/contracts'
+      description: 'Shared TypeScript types, API contracts, DTOs'
+    - name: 'constants'
+      path: 'libs/constants'
+      description: 'Shared constants and enums'
+    - name: 'utils'
+      path: 'libs/utils'
+      description: 'Shared utility functions'
+    - name: 'editor-core'
+      path: 'libs/editor-core'
+      description: 'TipTap editor configuration and extensions'
+    - name: 'sync-engine'
+      path: 'libs/sync-engine'
+      description: 'Yjs CRDT sync logic (shared between client/server)'
+    - name: 'markdown'
+      path: 'libs/markdown'
+      description: 'Markdown parser/renderer, Zettelkasten link resolution'
+    - name: 'plugin-sdk'
+      path: 'libs/plugin-sdk'
+      description: 'Plugin development SDK and types'
 
   packages:
-    - name: "ui"
-      path: "packages/ui"
-      description: "Shared UI components (shadcn/ui based)"
-    - name: "plugin-excalidraw"
-      path: "packages/plugin-excalidraw"
-      description: "Excalidraw whiteboard plugin"
-    - name: "plugin-kanban"
-      path: "packages/plugin-kanban"
-      description: "Kanban board plugin"
-    - name: "plugin-calendar"
-      path: "packages/plugin-calendar"
-      description: "Calendar view plugin"
-    - name: "plugin-database"
-      path: "packages/plugin-database"
-      description: "Advanced databases (Notion-like tables)"
-    - name: "plugin-graph"
-      path: "packages/plugin-graph"
-      description: "Knowledge graph visualization"
-    - name: "plugin-slides"
-      path: "packages/plugin-slides"
-      description: "Presentation mode from notes"
-    - name: "plugin-ai"
-      path: "packages/plugin-ai"
-      description: "AI assistant integration"
-    - name: "plugin-templates"
-      path: "packages/plugin-templates"
-      description: "Note templates system"
-    - name: "plugin-backlinks"
-      path: "packages/plugin-backlinks"
-      description: "Backlinks panel and unlinked mentions"
-    - name: "plugin-daily-notes"
-      path: "packages/plugin-daily-notes"
-      description: "Daily/periodic notes"
-    - name: "plugin-pdf-export"
-      path: "packages/plugin-pdf-export"
-      description: "PDF/DOCX export"
+    - name: 'ui'
+      path: 'packages/ui'
+      description: 'Shared UI components (shadcn/ui based)'
+    - name: 'plugin-excalidraw'
+      path: 'packages/plugin-excalidraw'
+      description: 'Excalidraw whiteboard plugin'
+    - name: 'plugin-kanban'
+      path: 'packages/plugin-kanban'
+      description: 'Kanban board plugin'
+    - name: 'plugin-calendar'
+      path: 'packages/plugin-calendar'
+      description: 'Calendar view plugin'
+    - name: 'plugin-database'
+      path: 'packages/plugin-database'
+      description: 'Advanced databases (Notion-like tables)'
+    - name: 'plugin-graph'
+      path: 'packages/plugin-graph'
+      description: 'Knowledge graph visualization'
+    - name: 'plugin-slides'
+      path: 'packages/plugin-slides'
+      description: 'Presentation mode from notes'
+    - name: 'plugin-ai'
+      path: 'packages/plugin-ai'
+      description: 'AI assistant integration'
+    - name: 'plugin-templates'
+      path: 'packages/plugin-templates'
+      description: 'Note templates system'
+    - name: 'plugin-backlinks'
+      path: 'packages/plugin-backlinks'
+      description: 'Backlinks panel and unlinked mentions'
+    - name: 'plugin-daily-notes'
+      path: 'packages/plugin-daily-notes'
+      description: 'Daily/periodic notes'
+    - name: 'plugin-pdf-export'
+      path: 'packages/plugin-pdf-export'
+      description: 'PDF/DOCX export'
 
 context:
-  strategy: "repomix"
+  strategy: 'repomix'
   repomix_token_estimate: 0
   rag:
     indexed: false
-    collection: "notesaner-codebase"
+    collection: 'notesaner-codebase'
     last_indexed: null
     indexed_files_count: 0
 
 tooling:
-  package_manager: "pnpm"
+  package_manager: 'pnpm'
   beads:
     enabled: true
-    workspace: ".beads"
+    workspace: '.beads'
   gastown:
     enabled: false
   spec_kit:
@@ -174,6 +176,6 @@ quality_gates:
     threshold: 95
 
 agent_preferences:
-  code_style: "concise"
-  review_strictness: "strict"
+  code_style: 'concise'
+  review_strictness: 'strict'
   auto_fix: true

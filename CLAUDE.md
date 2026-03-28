@@ -6,7 +6,7 @@ Web-first Obsidian alternative. NX monorepo with pnpm.
 
 ## Tech Stack
 
-- **Frontend**: Next.js 15 (App Router), React 19, TipTap, shadcn/ui, Tailwind CSS 4, Zustand, TanStack Query, Yjs
+- **Frontend**: Next.js 15 (App Router), React 19, TipTap, Ant Design, Tailwind CSS 4, Zustand, TanStack Query, axios, Yjs
 - **Backend**: NestJS 11, Prisma 6, PostgreSQL 17, ValKey 8
 - **Monorepo**: NX 22, pnpm 10
 - **Testing**: Vitest, Playwright
@@ -57,6 +57,17 @@ pnpm nx lint <project>     # Lint project
 pnpm nx affected -t test   # Test only changed projects
 pnpm nx graph              # Visualize dependency graph
 ```
+
+## Frontend Directives (MANDATORY)
+
+> Full spec: `docs/artifacts/fsd-refactor-001/agent-directives.md`
+
+- **Zustand**: business logic ONLY. UI state uses `useState` + React Context
+- **Ant Design**: primary UI library. No raw HTML elements — use `Box` component
+- **axios**: HTTP client. No native `fetch`. Use query-factory for TanStack Query wrappers
+- **useEffect**: minimize. Use TanStack Query for fetching, Zustand for side effects
+- **FSD**: `app/` at project root (routing only), `src/` has FSD layers (app, pages, widgets, features, entities, shared)
+- **cn()**: single source wrapper for clsx + tailwind-merge in `shared/lib/cn.ts`
 
 ## Development Notes
 

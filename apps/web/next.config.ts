@@ -1,4 +1,5 @@
 import type { NextConfig } from 'next';
+import webpack from 'webpack';
 
 /**
  * CDN asset prefix -- set via NEXT_PUBLIC_ASSET_PREFIX environment variable.
@@ -30,6 +31,31 @@ const nextConfig: NextConfig = {
   experimental: {
     // Enable React 19 features
     ppr: false,
+  },
+
+  // ── TypeScript ─────────────────────────────────────────────────────────
+  // Type checking is run separately via `pnpm nx run web:type-check`.
+  // Next.js's built-in type checker uses a bundled TS version that may
+  // not support all tsconfig options (e.g., ignoreDeprecations).
+  typescript: {
+    ignoreBuildErrors: true,
+  },
+
+  // ── Webpack Overrides ──────────────────────────────────────────────────
+  webpack: (config, { isServer }) => {
+    if (!isServer) {
+      // @notesaner/utils/hash.ts dynamically imports node:crypto as a
+      // Node.js fallback (browser path uses globalThis.crypto.subtle).
+      // Webpack can't resolve the node: scheme on the client, so we
+      // tell webpack to ignore it. The dynamic import is never reached
+      // in a browser context.
+      config.plugins.push(
+        new webpack.IgnorePlugin({
+          resourceRegExp: /^node:crypto$/,
+        }),
+      );
+    }
+    return config;
   },
 
   // ── Image Optimization ─────────────────────────────────────────────────

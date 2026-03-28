@@ -56,6 +56,13 @@
         "lintFilePatterns": ["apps/web/**/*.{ts,tsx}"]
       }
     },
+    "e2e": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx playwright test --config=apps/web/playwright/e2e.config.ts",
+        "cwd": "."
+      }
+    },
     "type-check": {
       "executor": "nx:run-commands",
       "options": {

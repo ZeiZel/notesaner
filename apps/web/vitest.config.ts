@@ -13,6 +13,12 @@ export default defineConfig({
     root: __dirname,
     environment: 'node',
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: [
+      'src/__tests__/e2e/**',
+      'src/__tests__/accessibility/**',
+      'src/__tests__/performance/**',
+      'node_modules/**',
+    ],
     globals: false,
     coverage: {
       provider: 'v8',
