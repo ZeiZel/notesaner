@@ -265,6 +265,14 @@ export const KEYBOARD_SHORTCUTS = [
     scope: 'global',
     combo: { key: 'b', mod: true, shift: true },
   },
+  // --- Clipboard ---
+  {
+    id: 'copy-note-path',
+    label: 'Copy note path',
+    category: 'workspace',
+    scope: 'global',
+    combo: { key: 'c', mod: true, shift: true },
+  },
   // --- Shortcut cheatsheet ---
   {
     id: 'shortcut-cheatsheet',

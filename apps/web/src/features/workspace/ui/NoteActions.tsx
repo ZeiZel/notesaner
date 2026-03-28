@@ -19,6 +19,7 @@ import { FolderPickerDialog } from './FolderPickerDialog';
 import type { NoteDto } from '@notesaner/contracts';
 import { useFavoritesStore } from '@/shared/stores/favorites-store';
 import { useAuthStore } from '@/shared/stores/auth-store';
+import { useClipboard } from '@/shared/hooks/useClipboard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -50,14 +51,6 @@ function DuplicateIcon() {
   );
 }
 
-function CopyIcon() {
-  return (
-    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
-      <path d="M2 3.5A1.5 1.5 0 013.5 2h2.879a1.5 1.5 0 011.06.44l1.122 1.12A1.5 1.5 0 009.62 4H12.5A1.5 1.5 0 0114 5.5v7A1.5 1.5 0 0112.5 14h-9A1.5 1.5 0 012 12.5v-9z" />
-    </svg>
-  );
-}
-
 function MoveIcon() {
   return (
     <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
@@ -74,6 +67,32 @@ function StarIcon() {
   return (
     <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
       <path d="M8 1.25l1.75 3.55 3.92.57-2.84 2.77.67 3.9L8 10.18l-3.5 1.86.67-3.9L2.33 5.37l3.92-.57L8 1.25z" />
+    </svg>
+  );
+}
+
+function LinkIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+      <path d="M6.354 5.5H4a3 3 0 000 6h3a3 3 0 002.83-4H9.4a2 2 0 01-1.4.584H4a2 2 0 110-4h2.354a4.003 4.003 0 010-1.584zM9.646 10.5H12a3 3 0 000-6H9a3 3 0 00-2.83 4H6.6A2 2 0 018 7.416H12a2 2 0 110 4H9.646a4.003 4.003 0 010 1.084z" />
+    </svg>
+  );
+}
+
+function ClipboardIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+      <path d="M4 1.5H3a2 2 0 00-2 2V14a2 2 0 002 2h10a2 2 0 002-2V3.5a2 2 0 00-2-2h-1v1h1a1 1 0 011 1V14a1 1 0 01-1 1H3a1 1 0 01-1-1V3.5a1 1 0 011-1h1v-1z" />
+      <path d="M9.5 1a.5.5 0 01.5.5v1a.5.5 0 01-.5.5h-3a.5.5 0 01-.5-.5v-1a.5.5 0 01.5-.5h3zm-3-1A1.5 1.5 0 005 1.5v1A1.5 1.5 0 006.5 4h3A1.5 1.5 0 0011 2.5v-1A1.5 1.5 0 009.5 0h-3z" />
+    </svg>
+  );
+}
+
+function FileTextIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+      <path d="M5 4a.5.5 0 000 1h6a.5.5 0 000-1H5zm-.5 2.5A.5.5 0 015 6h6a.5.5 0 010 1H5a.5.5 0 01-.5-.5zM5 8a.5.5 0 000 1h3a.5.5 0 000-1H5z" />
+      <path d="M2 2a2 2 0 012-2h5.293A1 1 0 0110 .293L13.707 4a1 1 0 01.293.707V14a2 2 0 01-2 2H4a2 2 0 01-2-2V2zm7.5 1.5v-2l3 3h-2a1 1 0 01-1-1zM4 1a1 1 0 00-1 1v12a1 1 0 001 1h8a1 1 0 001-1V5.5H9.5A2.5 2.5 0 017 3V1H4z" />
     </svg>
   );
 }
@@ -145,6 +164,8 @@ export function NoteActions({
     },
   });
 
+  const { copyNoteAsLink, copyPath } = useClipboard();
+
   const isFavorite = useFavoritesStore((s) => s.favorites.some((f) => f.noteId === note.id));
   const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
   const syncFavoritesToServer = useFavoritesStore((s) => s.syncToServer);
@@ -161,6 +182,16 @@ export function NoteActions({
       syncFavoritesToServer(token);
     }
   }, [note, toggleFavorite, syncFavoritesToServer, token]);
+
+  const handleCopyLink = useCallback(() => {
+    setIsOpen(false);
+    void copyNoteAsLink(note.title);
+  }, [copyNoteAsLink, note.title]);
+
+  const handleCopyPath = useCallback(() => {
+    setIsOpen(false);
+    void copyPath(note.path);
+  }, [copyPath, note.path]);
 
   const handleDuplicate = useCallback(() => {
     setIsOpen(false);
@@ -252,13 +283,20 @@ export function NoteActions({
               />
               <div className="my-1 h-px bg-border" role="separator" />
               <MenuItem
+                icon={<LinkIcon />}
+                label="Copy link as [[Title]]"
+                onClick={handleCopyLink}
+              />
+              <MenuItem icon={<ClipboardIcon />} label="Copy note path" onClick={handleCopyPath} />
+              <div className="my-1 h-px bg-border" role="separator" />
+              <MenuItem
                 icon={<DuplicateIcon />}
                 label="Duplicate"
                 onClick={handleDuplicate}
                 disabled={isPending}
               />
               <MenuItem
-                icon={<CopyIcon />}
+                icon={<FileTextIcon />}
                 label="Copy to folder..."
                 onClick={handleCopyToFolder}
                 disabled={isPending}

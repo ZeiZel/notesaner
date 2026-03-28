@@ -14,6 +14,7 @@
 
 import { useState, useCallback } from 'react';
 import type { NoteShareDto, SharePermission } from '@/shared/api/sharing';
+import { copyText } from '@/shared/lib/clipboard';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -157,18 +158,8 @@ export function ShareLinkManager({
 
   const handleCopyLink = useCallback(async (share: NoteShareDto) => {
     const url = getShareUrl(share.token);
-    try {
-      await navigator.clipboard.writeText(url);
-      setCopiedId(share.id);
-      setTimeout(() => setCopiedId(null), 2000);
-    } catch {
-      // Fallback for browsers that don't support clipboard API
-      const textArea = document.createElement('textarea');
-      textArea.value = url;
-      document.body.appendChild(textArea);
-      textArea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textArea);
+    const success = await copyText(url);
+    if (success) {
       setCopiedId(share.id);
       setTimeout(() => setCopiedId(null), 2000);
     }

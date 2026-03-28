@@ -140,6 +140,8 @@ export {
 } from './lib/collaboration-cursor';
 export type { CollaborationUser, CollaborationCursorOptions } from './lib/collaboration-cursor';
 
+export { useNoteCssClass } from './lib/use-note-css-class';
+
 export { CommentMark, COMMENT_MARK_CSS } from './lib/comment-mark';
 export type { CommentMarkAttributes } from './lib/comment-mark';
 

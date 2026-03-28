@@ -62,7 +62,7 @@ export type {
 export { useSidebarStore } from './sidebar-store';
 export type { PanelConfig as SidebarPanelConfig } from './sidebar-store';
 export { useThemePreferencesStore } from './theme-store';
-export type { ThemePreferences } from './theme-store';
+export type { ThemePreferences, PersonalCssSnippet } from './theme-store';
 export {
   useRibbonStore,
   getActionDefinition,

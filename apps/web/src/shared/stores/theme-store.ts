@@ -25,6 +25,18 @@ import { devtools, persist } from 'zustand/middleware';
 // Types
 // ---------------------------------------------------------------------------
 
+/**
+ * A personal CSS snippet that the user can define in their appearance
+ * preferences. Distinct from workspace-level CSS snippets (those are
+ * stored server-side and managed via the workspace settings store).
+ */
+export interface PersonalCssSnippet {
+  id: string;
+  name: string;
+  css: string;
+  enabled: boolean;
+}
+
 export interface ThemePreferences {
   /**
    * Custom accent color hex (e.g. '#cba6f7').
@@ -48,6 +60,12 @@ export interface ThemePreferences {
    * When null, the default 16px root font size is used.
    */
   uiFontSize: number | null;
+
+  /**
+   * Personal CSS snippets. These are applied on top of workspace snippets.
+   * Persisted to localStorage, not to the server.
+   */
+  personalSnippets: PersonalCssSnippet[];
 }
 
 export interface ThemePreferencesState extends ThemePreferences {
@@ -55,6 +73,9 @@ export interface ThemePreferencesState extends ThemePreferences {
   setAccentColor: (color: string | null) => void;
   setUiFontFamily: (family: string | null, presetId: string) => void;
   setUiFontSize: (size: number | null) => void;
+  addPersonalSnippet: (snippet: PersonalCssSnippet) => void;
+  updatePersonalSnippet: (id: string, patch: Partial<Omit<PersonalCssSnippet, 'id'>>) => void;
+  removePersonalSnippet: (id: string) => void;
   resetPreferences: () => void;
 }
 
@@ -67,6 +88,7 @@ const DEFAULT_PREFERENCES: ThemePreferences = {
   uiFontFamily: null,
   uiFontPresetId: 'system',
   uiFontSize: null,
+  personalSnippets: [],
 };
 
 // ---------------------------------------------------------------------------
@@ -93,6 +115,35 @@ export const useThemePreferencesStore = create<ThemePreferencesState>()(
             'themePrefs/setUiFontSize',
           ),
 
+        addPersonalSnippet: (snippet) =>
+          set(
+            (state) => ({
+              personalSnippets: [...state.personalSnippets, snippet],
+            }),
+            false,
+            'themePrefs/addPersonalSnippet',
+          ),
+
+        updatePersonalSnippet: (id, patch) =>
+          set(
+            (state) => ({
+              personalSnippets: state.personalSnippets.map((s) =>
+                s.id === id ? { ...s, ...patch } : s,
+              ),
+            }),
+            false,
+            'themePrefs/updatePersonalSnippet',
+          ),
+
+        removePersonalSnippet: (id) =>
+          set(
+            (state) => ({
+              personalSnippets: state.personalSnippets.filter((s) => s.id !== id),
+            }),
+            false,
+            'themePrefs/removePersonalSnippet',
+          ),
+
         resetPreferences: () => set(DEFAULT_PREFERENCES, false, 'themePrefs/reset'),
       }),
       {
@@ -102,6 +153,7 @@ export const useThemePreferencesStore = create<ThemePreferencesState>()(
           uiFontFamily: state.uiFontFamily,
           uiFontPresetId: state.uiFontPresetId,
           uiFontSize: state.uiFontSize,
+          personalSnippets: state.personalSnippets,
         }),
       },
     ),

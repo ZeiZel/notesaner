@@ -14,10 +14,27 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useParams } from 'next/navigation';
-import { Card, Switch, Slider, Button, Typography, Input, Space, Empty } from 'antd';
-import { DeleteOutlined, PlusOutlined } from '@ant-design/icons';
+import {
+  Card,
+  Switch,
+  Slider,
+  Button,
+  Typography,
+  Input,
+  Space,
+  Empty,
+  Alert,
+  Tooltip,
+} from 'antd';
+import {
+  DeleteOutlined,
+  PlusOutlined,
+  WarningOutlined,
+  InfoCircleOutlined,
+} from '@ant-design/icons';
 import { Box } from '@/shared/ui';
 import { useAuthStore } from '@/shared/stores/auth-store';
+import { isCssSafe } from '@/shared/lib/css-sanitizer';
 import { useWorkspaceSettingsStore } from '../model/workspace-settings-store';
 import type { CssSnippet, SidebarDefaults } from '@/shared/api/workspace-settings';
 
@@ -183,7 +200,10 @@ export function AppearanceSettings() {
               type="secondary"
               style={{ display: 'block', fontSize: 12, marginTop: 2 }}
             >
-              Custom CSS applied to all members of this workspace.
+              Custom CSS applied to all members of this workspace.{' '}
+              <Tooltip title="Use Notesaner --ns-* tokens or Obsidian CSS variables (e.g. --background-primary). Both are supported.">
+                <InfoCircleOutlined style={{ cursor: 'help' }} />
+              </Tooltip>
             </Typography.Text>
           </Box>
           <Button size="small" icon={<PlusOutlined />} onClick={handleAddSnippet}>
@@ -201,43 +221,78 @@ export function AppearanceSettings() {
           </Card>
         ) : (
           <Space direction="vertical" size="middle" style={{ width: '100%' }}>
-            {snippets.map((snippet) => (
-              <Card key={snippet.id} size="small">
-                <Box className="flex items-center gap-3" style={{ marginBottom: 12 }}>
-                  <Switch
-                    size="small"
-                    checked={snippet.enabled}
-                    onChange={(enabled) => handleUpdateSnippet(snippet.id, { enabled })}
-                    aria-label={`${snippet.enabled ? 'Disable' : 'Enable'} ${snippet.name}`}
+            {snippets.map((snippet) => {
+              const safe = isCssSafe(snippet.css);
+              return (
+                <Card key={snippet.id} size="small">
+                  <Box className="flex items-center gap-3" style={{ marginBottom: 12 }}>
+                    <Switch
+                      size="small"
+                      checked={snippet.enabled}
+                      onChange={(enabled) => handleUpdateSnippet(snippet.id, { enabled })}
+                      aria-label={`${snippet.enabled ? 'Disable' : 'Enable'} ${snippet.name}`}
+                    />
+                    <Input
+                      aria-label="Snippet name"
+                      value={snippet.name}
+                      onChange={(e) => handleUpdateSnippet(snippet.id, { name: e.target.value })}
+                      size="small"
+                      style={{ flex: 1 }}
+                    />
+                    <Button
+                      type="text"
+                      danger
+                      size="small"
+                      icon={<DeleteOutlined />}
+                      onClick={() => handleRemoveSnippet(snippet.id)}
+                      title="Remove snippet"
+                    />
+                  </Box>
+                  {!safe && (
+                    <Alert
+                      type="warning"
+                      showIcon
+                      icon={<WarningOutlined />}
+                      message="Contains blocked constructs (@import, url()) that will be sanitized on apply."
+                      style={{ marginBottom: 8, fontSize: 12 }}
+                    />
+                  )}
+                  <Input.TextArea
+                    aria-label={`CSS for ${snippet.name}`}
+                    value={snippet.css}
+                    onChange={(e) => handleUpdateSnippet(snippet.id, { css: e.target.value })}
+                    rows={4}
+                    placeholder={`/* Custom CSS — use --ns-* tokens or Obsidian variables */\n.my-note {\n  --ns-color-background: #1a1b26;\n}`}
+                    style={{ fontFamily: 'monospace', fontSize: 12 }}
                   />
-                  <Input
-                    aria-label="Snippet name"
-                    value={snippet.name}
-                    onChange={(e) => handleUpdateSnippet(snippet.id, { name: e.target.value })}
-                    size="small"
-                    style={{ flex: 1 }}
-                  />
-                  <Button
-                    type="text"
-                    danger
-                    size="small"
-                    icon={<DeleteOutlined />}
-                    onClick={() => handleRemoveSnippet(snippet.id)}
-                    title="Remove snippet"
-                  />
-                </Box>
-                <Input.TextArea
-                  aria-label={`CSS for ${snippet.name}`}
-                  value={snippet.css}
-                  onChange={(e) => handleUpdateSnippet(snippet.id, { css: e.target.value })}
-                  rows={4}
-                  placeholder="/* Custom CSS */"
-                  style={{ fontFamily: 'monospace', fontSize: 12 }}
-                />
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </Space>
         )}
+      </Box>
+
+      {/* Per-note CSS class hint */}
+      <Box as="section">
+        <Alert
+          type="info"
+          showIcon
+          icon={<InfoCircleOutlined />}
+          message="Per-note custom CSS"
+          description={
+            <Typography.Text type="secondary" style={{ fontSize: 12 }}>
+              Add{' '}
+              <Typography.Text code style={{ fontSize: 12 }}>
+                cssClass: my-class
+              </Typography.Text>{' '}
+              to a note&apos;s frontmatter to apply a custom CSS class to its editor container. Then
+              target it in your CSS snippet:{' '}
+              <Typography.Text code style={{ fontSize: 12 }}>
+                {'.my-class { --ns-color-background: #2a2a3a; }'}
+              </Typography.Text>
+            </Typography.Text>
+          }
+        />
       </Box>
 
       {/* Sidebar defaults */}

@@ -20,6 +20,48 @@ import type { CodeBlockEnhancedAttrs } from '../extensions/code-block-enhanced';
 import { COMMON_LANGUAGES, resolveLanguage } from '../extensions/code-block-enhanced';
 
 // ---------------------------------------------------------------------------
+// Clipboard helper (self-contained — libs cannot import from apps)
+// ---------------------------------------------------------------------------
+
+/**
+ * Copies code block content to the clipboard with a fallback for older browsers.
+ * Normalizes line endings and trims trailing whitespace.
+ */
+async function copyCodeBlockText(code: string): Promise<boolean> {
+  const normalized = code.replace(/\r\n/g, '\n').trimEnd();
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(normalized);
+      return true;
+    }
+    return fallbackCopyText(normalized);
+  } catch {
+    return fallbackCopyText(normalized);
+  }
+}
+
+function fallbackCopyText(text: string): boolean {
+  if (typeof document === 'undefined') return false;
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.left = '-9999px';
+  textarea.style.top = '-9999px';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  let success = false;
+  try {
+    success = document.execCommand('copy');
+  } catch {
+    success = false;
+  }
+  document.body.removeChild(textarea);
+  return success;
+}
+
+// ---------------------------------------------------------------------------
 // Lowlight lazy loader
 // ---------------------------------------------------------------------------
 
@@ -279,28 +321,18 @@ export function CodeBlockView({ node, updateAttributes, editor }: ReactNodeViewP
 
   const handleCopy = useCallback(async () => {
     try {
-      await navigator.clipboard.writeText(code);
-      setCopyState('copied');
-      if (copyTimeoutRef.current) {
-        clearTimeout(copyTimeoutRef.current);
+      const success = await copyCodeBlockText(code);
+      if (success) {
+        setCopyState('copied');
+        if (copyTimeoutRef.current) {
+          clearTimeout(copyTimeoutRef.current);
+        }
+        copyTimeoutRef.current = setTimeout(() => {
+          setCopyState('idle');
+        }, 2000);
       }
-      copyTimeoutRef.current = setTimeout(() => {
-        setCopyState('idle');
-      }, 2000);
     } catch {
-      // Fallback for older browsers
-      const textarea = document.createElement('textarea');
-      textarea.value = code;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      setCopyState('copied');
-      copyTimeoutRef.current = setTimeout(() => {
-        setCopyState('idle');
-      }, 2000);
+      // Swallow: copyCodeBlockText handles fallback internally
     }
   }, [code]);
 

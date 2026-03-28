@@ -10,6 +10,8 @@ import { useTheme } from '@/shared/lib/providers/ThemeProvider';
 import { useFavoritesStore } from '@/shared/stores/favorites-store';
 import { useNoteStateStore } from '@/shared/stores/note-state-store';
 import { useAuthStore } from '@/shared/stores/auth-store';
+import { useClipboard } from '@/shared/hooks/useClipboard';
+import { serializeFrontmatter } from '@/features/editor';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -200,6 +202,23 @@ function IconClock() {
   );
 }
 
+function IconClipboard() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-4 w-4"
+    >
+      <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+      <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+    </svg>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Recent commands helpers
 // ---------------------------------------------------------------------------
@@ -285,6 +304,7 @@ export function CommandPaletteDialog({
   const toggleLeftSidebar = useSidebarStore((s) => s.toggleLeftSidebar);
   const toggleRightSidebar = useSidebarStore((s) => s.toggleRightSidebar);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const { copyNoteAsLink, copyMarkdown, copyFrontmatter, copyPath, copyBlockRef } = useClipboard();
 
   // Recent command IDs — loaded once when the dialog opens.
   // useEffect is valid here: reading from localStorage (external store) on open.
@@ -462,6 +482,86 @@ export function CommandPaletteDialog({
         },
       },
 
+      // --- Clipboard ---
+      {
+        id: 'cmd-copy-note-link',
+        label: 'Copy note link as [[Title]]',
+        description: 'Copy the current note as a wiki link to clipboard',
+        group: 'File Operations',
+        keywords: ['copy', 'link', 'wiki', 'clipboard', 'reference'],
+        icon: <IconClipboard />,
+        action: () => {
+          const { activeNote } = useNoteStateStore.getState();
+          if (!activeNote) return;
+          void copyNoteAsLink(activeNote.title);
+        },
+      },
+      {
+        id: 'cmd-copy-note-path',
+        label: 'Copy note path',
+        description: 'Copy the file path of the current note',
+        group: 'File Operations',
+        shortcutId: 'copy-note-path',
+        keywords: ['copy', 'path', 'file', 'clipboard'],
+        icon: <IconClipboard />,
+        action: () => {
+          const { activeNote } = useNoteStateStore.getState();
+          if (!activeNote) return;
+          void copyPath(activeNote.path);
+        },
+      },
+      {
+        id: 'cmd-copy-markdown',
+        label: 'Copy note as Markdown',
+        description: 'Copy the full note content as Markdown text',
+        group: 'File Operations',
+        keywords: ['copy', 'markdown', 'content', 'clipboard', 'text'],
+        icon: <IconClipboard />,
+        action: () => {
+          // TODO(sprint-3): fetch note content and copy as markdown
+          // For now, this is a placeholder that copies the note title
+          const { activeNote } = useNoteStateStore.getState();
+          if (!activeNote) return;
+          void copyMarkdown(`# ${activeNote.title}\n`);
+        },
+      },
+      {
+        id: 'cmd-copy-frontmatter',
+        label: 'Copy frontmatter as YAML',
+        description: 'Copy the note frontmatter properties as YAML',
+        group: 'File Operations',
+        keywords: ['copy', 'frontmatter', 'yaml', 'metadata', 'properties'],
+        icon: <IconClipboard />,
+        action: () => {
+          const { activeNote } = useNoteStateStore.getState();
+          if (!activeNote || !activeNote.frontmatter) return;
+          // Build a FrontmatterMap from the note's frontmatter record
+          const fmMap = new Map<
+            string,
+            {
+              key: string;
+              value: string | number | boolean | string[];
+              type: 'string' | 'number' | 'boolean' | 'date' | 'array';
+            }
+          >();
+          for (const [key, value] of Object.entries(activeNote.frontmatter)) {
+            if (Array.isArray(value)) {
+              fmMap.set(key, { key, value: value.map(String), type: 'array' });
+            } else if (typeof value === 'boolean') {
+              fmMap.set(key, { key, value, type: 'boolean' });
+            } else if (typeof value === 'number') {
+              fmMap.set(key, { key, value, type: 'number' });
+            } else {
+              fmMap.set(key, { key, value: String(value ?? ''), type: 'string' });
+            }
+          }
+          const yaml = serializeFrontmatter(fmMap);
+          if (yaml) {
+            void copyFrontmatter(yaml);
+          }
+        },
+      },
+
       // --- Editor ---
       {
         id: 'cmd-toggle-source-preview',
@@ -528,7 +628,17 @@ export function CommandPaletteDialog({
         },
       },
     ],
-    [activeWorkspaceId, isDark, onOpenSearch, onOpenQuickSwitcher],
+    [
+      activeWorkspaceId,
+      isDark,
+      onOpenSearch,
+      onOpenQuickSwitcher,
+      copyNoteAsLink,
+      copyPath,
+      copyMarkdown,
+      copyFrontmatter,
+      copyBlockRef,
+    ],
   );
 
   // ---------------------------------------------------------------------------

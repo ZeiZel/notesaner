@@ -247,7 +247,15 @@ export function selectSortedProperties(properties: FrontmatterMap): FrontmatterP
 }
 
 /** Returns custom properties (everything except special keys). */
-export const SPECIAL_KEYS = new Set(['title', 'tags', 'aliases', 'date', 'description']);
+export const SPECIAL_KEYS = new Set([
+  'title',
+  'tags',
+  'aliases',
+  'date',
+  'description',
+  'cssClass',
+  'cssclass',
+]);
 
 export function selectCustomProperties(properties: FrontmatterMap): FrontmatterProperty[] {
   return Array.from(properties.values()).filter((p) => !SPECIAL_KEYS.has(p.key));

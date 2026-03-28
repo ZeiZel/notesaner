@@ -12,7 +12,12 @@
  * a placeholder string and managed by the editor-mode-store thereafter.
  */
 
-import { useEditorModeStore, EditorModeToggle, EditorModeWrapper } from '@/features/editor';
+import {
+  useEditorModeStore,
+  EditorModeToggle,
+  EditorModeWrapper,
+  useNoteCssClass,
+} from '@/features/editor';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
 
 // ---------------------------------------------------------------------------
@@ -81,6 +86,10 @@ export function NoteEditorPage({
   const markdown = useEditorModeStore((s) => s.markdown);
   const setMarkdown = useEditorModeStore((s) => s.setMarkdown);
 
+  // Derive CSS class from frontmatter `cssClass` / `cssclass` property.
+  // Applied to the editor container for per-note styling.
+  const noteCssClass = useNoteCssClass();
+
   // Hydrate the markdown store with demo content if empty.
   // This is a derived decision, not an effect — it happens synchronously
   // on the first render where markdown is empty.
@@ -93,7 +102,7 @@ export function NoteEditorPage({
   const isReading = mode === 'reading';
 
   return (
-    <div className="flex h-full flex-col">
+    <div className={`flex h-full flex-col${noteCssClass ? ` ${noteCssClass}` : ''}`}>
       {/* Breadcrumb toolbar — hidden in reading mode (ReadingModeView has its own) */}
       {!isReading && (
         <div className="flex h-11 items-center justify-between border-b border-border px-4">
