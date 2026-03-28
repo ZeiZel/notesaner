@@ -14,6 +14,7 @@
 //     patterns that are disallowed in production code (any, non-null, etc.).
 
 import tseslint from 'typescript-eslint';
+
 import nxPlugin from '@nx/eslint-plugin';
 
 /** @type {import('eslint').Linter.Config[]} */
@@ -98,9 +99,9 @@ export default tseslint.config(
               onlyDependOnLibsWithTags: ['scope:lib', 'scope:shared'],
             },
             {
-              // shared packages (packages/*) may only depend on each other
+              // shared packages (packages/*) may depend on each other and on shared libs
               sourceTag: 'scope:shared',
-              onlyDependOnLibsWithTags: ['scope:shared'],
+              onlyDependOnLibsWithTags: ['scope:shared', 'scope:lib'],
             },
           ],
         },
