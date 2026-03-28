@@ -31,8 +31,8 @@ const EditorSettings = lazy(() =>
 const ThemeSettingsTab = lazy(() =>
   import('./ThemeSettingsTab').then((m) => ({ default: m.ThemeSettingsTab })),
 );
-const KeybindingSettings = lazy(() =>
-  import('./KeybindingSettings').then((m) => ({ default: m.KeybindingSettings })),
+const KeybindingsSettings = lazy(() =>
+  import('./KeybindingsSettings').then((m) => ({ default: m.KeybindingsSettings })),
 );
 const PluginSettings = lazy(() =>
   import('./PluginSettings').then((m) => ({ default: m.PluginSettings })),
@@ -42,6 +42,9 @@ const WorkspaceSettings = lazy(() =>
 );
 const MemberManagement = lazy(() =>
   import('./MemberManagement').then((m) => ({ default: m.MemberManagement })),
+);
+const NotificationSettings = lazy(() =>
+  import('@/features/notifications').then((m) => ({ default: m.NotificationSettings })),
 );
 
 // ---------------------------------------------------------------------------
@@ -53,6 +56,7 @@ type SettingsTab =
   | 'editor'
   | 'theme'
   | 'keybindings'
+  | 'notifications'
   | 'plugins'
   | 'workspace'
   | 'members';
@@ -62,6 +66,7 @@ const TAB_TITLES: Record<SettingsTab, string> = {
   editor: 'Editor',
   theme: 'Appearance',
   keybindings: 'Keybindings',
+  notifications: 'Notifications',
   plugins: 'Plugins',
   workspace: 'Workspace',
   members: 'Members',
@@ -102,6 +107,7 @@ export function SettingsDialog({
         { key: 'editor', label: 'Editor' },
         { key: 'theme', label: 'Appearance' },
         { key: 'keybindings', label: 'Keybindings' },
+        { key: 'notifications', label: 'Notifications' },
         { key: 'plugins', label: 'Plugins' },
       ],
     },
@@ -132,7 +138,9 @@ export function SettingsDialog({
       case 'theme':
         return <ThemeSettingsTab />;
       case 'keybindings':
-        return <KeybindingSettings />;
+        return <KeybindingsSettings />;
+      case 'notifications':
+        return <NotificationSettings />;
       case 'plugins':
         return <PluginSettings />;
       case 'workspace':

@@ -30,8 +30,8 @@ const ProfileSettings = lazy(() =>
 const ThemeSettingsTab = lazy(() =>
   import('./ThemeSettingsTab').then((m) => ({ default: m.ThemeSettingsTab })),
 );
-const KeybindingSettings = lazy(() =>
-  import('./KeybindingSettings').then((m) => ({ default: m.KeybindingSettings })),
+const KeybindingsSettings = lazy(() =>
+  import('./KeybindingsSettings').then((m) => ({ default: m.KeybindingsSettings })),
 );
 const PluginSettings = lazy(() =>
   import('./PluginSettings').then((m) => ({ default: m.PluginSettings })),
@@ -233,7 +233,7 @@ export function PreferencesLayout({
       case 'theme':
         return <ThemeSettingsTab />;
       case 'keybindings':
-        return <KeybindingSettings />;
+        return <KeybindingsSettings />;
       case 'plugins':
         return <PluginSettings />;
     }

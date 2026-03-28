@@ -12,28 +12,34 @@ datasource db {
 // ==========================================
 
 model User {
-  id              String  @id @default(uuid())
-  email           String  @unique
+  id              String   @id @default(uuid())
+  email           String   @unique
   passwordHash    String? // null for SSO-only users
   displayName     String
   avatarUrl       String?
-  isActive        Boolean @default(true)
-  isEmailVerified Boolean @default(false)
-  isSuperAdmin    Boolean @default(false)
+  isActive        Boolean  @default(true)
+  isEmailVerified Boolean  @default(false)
+  isSuperAdmin    Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
   sessions                Session[]
   memberships             WorkspaceMember[]
-  createdNotes            Note[]        @relation("CreatedBy")
-  editedNotes             Note[]        @relation("LastEditedBy")
+  createdNotes            Note[]                      @relation("CreatedBy")
+  editedNotes             Note[]                      @relation("LastEditedBy")
   noteVersions            NoteVersion[]
   comments                Comment[]
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
-  sharedNotes             NoteShare[]   @relation("SharedByUser")
-  receivedShares          NoteShare[]   @relation("SharedWithUser")
+  sharedNotes             NoteShare[]                 @relation("SharedByUser")
+  receivedShares          NoteShare[]                 @relation("SharedWithUser")
   apiKeys                 ApiKey[]
+  preferences             UserPreference[]
+  notifications           Notification[]
+  notificationPreferences NotificationPreference[]
+  notificationDigest      NotificationDigestSchedule?
+  activityLogs            ActivityLog[]
+  noteFollows             NoteFollow[]
 
   @@map("users")
 }
@@ -53,13 +59,13 @@ model Session {
 }
 
 model PasswordResetToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique // SHA-256 hash of the actual token
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // SHA-256 hash of the actual token
   expiresAt DateTime
   usedAt    DateTime? // set when the token is consumed
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@index([expiresAt])
@@ -67,13 +73,13 @@ model PasswordResetToken {
 }
 
 model EmailVerificationToken {
-  id        String   @id @default(uuid())
+  id        String    @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String   @unique // SHA-256 hash of the actual token
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique // SHA-256 hash of the actual token
   expiresAt DateTime
   usedAt    DateTime? // set when the token is consumed
-  createdAt DateTime @default(now())
+  createdAt DateTime  @default(now())
 
   @@index([userId])
   @@index([expiresAt])
@@ -81,15 +87,15 @@ model EmailVerificationToken {
 }
 
 model AuthProvider {
-  id          String        @id @default(uuid())
+  id          String           @id @default(uuid())
   workspaceId String?
-  workspace   Workspace?    @relation(fields: [workspaceId], references: [id])
+  workspace   Workspace?       @relation(fields: [workspaceId], references: [id])
   type        AuthProviderType
   name        String
-  config      Json          // SAML/OIDC configuration
-  isEnabled   Boolean       @default(true)
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  config      Json // SAML/OIDC configuration
+  isEnabled   Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
 
   @@map("auth_providers")
 }
@@ -101,21 +107,38 @@ enum AuthProviderType {
 }
 
 // ==========================================
+// USER PREFERENCES
+// ==========================================
+
+model UserPreference {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  key       String // namespaced key, e.g. "theme.mode", "editor.fontSize"
+  value     Json // arbitrary JSON value (max 64KB enforced at application level)
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, key])
+  @@index([userId])
+  @@map("user_preferences")
+}
+
+// ==========================================
 // API KEYS (user-scoped, for programmatic access)
 // ==========================================
 
 model ApiKey {
-  id         String       @id @default(uuid())
+  id         String        @id @default(uuid())
   userId     String
-  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name       String       // human-readable label (e.g. "CI Pipeline")
-  keyHash    String       @unique // SHA-256 hash of the full key
-  prefix     String       // first 8 characters of the key for identification
+  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String // human-readable label (e.g. "CI Pipeline")
+  keyHash    String        @unique // SHA-256 hash of the full key
+  prefix     String // first 8 characters of the key for identification
   scopes     ApiKeyScope[] // granted scopes
-  expiresAt  DateTime?    // null = never expires
+  expiresAt  DateTime? // null = never expires
   lastUsedAt DateTime?
-  revokedAt  DateTime?    // soft-delete: set when key is revoked
-  createdAt  DateTime     @default(now())
+  revokedAt  DateTime? // soft-delete: set when key is revoked
+  createdAt  DateTime      @default(now())
 
   @@index([userId])
   @@index([keyHash])
@@ -133,14 +156,14 @@ enum ApiKeyScope {
 // ==========================================
 
 model Workspace {
-  id          String  @id @default(uuid())
+  id          String   @id @default(uuid())
   name        String
-  slug        String  @unique
+  slug        String   @unique
   description String?
-  storagePath String  // filesystem path for notes
-  isPublic    Boolean @default(false) // public vault
-  publicSlug  String? @unique         // URL for public access
-  settings    Json    @default("{}")
+  storagePath String // filesystem path for notes
+  isPublic    Boolean  @default(false) // public vault
+  publicSlug  String?  @unique // URL for public access
+  settings    Json     @default("{}")
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
@@ -150,6 +173,7 @@ model Workspace {
   authProviders AuthProvider[]
   plugins       InstalledPlugin[]
   layouts       Layout[]
+  activityLogs  ActivityLog[]
 
   @@map("workspaces")
 }
@@ -182,9 +206,9 @@ model Note {
   id             String    @id @default(uuid())
   workspaceId    String
   workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  path           String    // relative path in vault (e.g. "folder/note.md")
+  path           String // relative path in vault (e.g. "folder/note.md")
   title          String
-  contentHash    String?   // SHA-256 for change detection
+  contentHash    String? // SHA-256 for change detection
   wordCount      Int       @default(0)
   frontmatter    Json      @default("{}")
   isPublished    Boolean   @default(false)
@@ -223,9 +247,9 @@ model NoteLink {
   targetNoteId String
   targetNote   Note     @relation("TargetNote", fields: [targetNoteId], references: [id], onDelete: Cascade)
   linkType     LinkType
-  blockId      String?  // block reference ID (e.g. "abc123" from ^abc123)
-  context      String?  // surrounding text for preview
-  position     Json?    // { line, col } in source
+  blockId      String? // block reference ID (e.g. "abc123" from ^abc123)
+  context      String? // surrounding text for preview
+  position     Json? // { line, col } in source
 
   @@unique([sourceNoteId, targetNoteId, linkType, blockId])
   @@index([sourceNoteId])
@@ -235,9 +259,9 @@ model NoteLink {
 }
 
 enum LinkType {
-  WIKI      // [[link]]
-  MARKDOWN  // [text](url)
-  EMBED     // ![[embed]]
+  WIKI // [[link]]
+  MARKDOWN // [text](url)
+  EMBED // ![[embed]]
   BLOCK_REF // [[note#^block]]
 }
 
@@ -246,8 +270,8 @@ model NoteVersion {
   noteId      String
   note        Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   version     Int
-  content     String   // full content snapshot
-  diff        String?  // diff from previous
+  content     String // full content snapshot
+  diff        String? // diff from previous
   message     String?
   createdAt   DateTime @default(now())
   createdById String
@@ -288,8 +312,8 @@ model Attachment {
   note      Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
   filename  String
   mimeType  String
-  size      Int      // bytes
-  path      String   // storage path
+  size      Int // bytes
+  path      String // storage path
   createdAt DateTime @default(now())
 
   @@index([noteId])
@@ -306,12 +330,12 @@ model NoteShare {
   note           Note            @relation(fields: [noteId], references: [id], onDelete: Cascade)
   sharedBy       String
   sharedByUser   User            @relation("SharedByUser", fields: [sharedBy], references: [id])
-  sharedWith     String?         // nullable for link-based shares (null = anyone with the link)
+  sharedWith     String? // nullable for link-based shares (null = anyone with the link)
   sharedWithUser User?           @relation("SharedWithUser", fields: [sharedWith], references: [id])
   permission     SharePermission
   token          String          @unique // unique share token for link-based access
-  passwordHash   String?         // optional password protection for link shares
-  expiresAt      DateTime?       // null = never expires
+  passwordHash   String? // optional password protection for link shares
+  expiresAt      DateTime? // null = never expires
   accessCount    Int             @default(0)
   lastAccessedAt DateTime?
   createdAt      DateTime        @default(now())
@@ -336,19 +360,19 @@ enum SharePermission {
 // ==========================================
 
 model Comment {
-  id         String   @id @default(uuid())
+  id         String    @id @default(uuid())
   noteId     String
-  note       Note     @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  note       Note      @relation(fields: [noteId], references: [id], onDelete: Cascade)
   userId     String
-  user       User     @relation(fields: [userId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
   content    String
-  position   Json?    // text position the comment refers to
-  isResolved Boolean  @default(false)
-  parentId   String?  // for threaded replies
-  parent     Comment? @relation("CommentReplies", fields: [parentId], references: [id])
+  position   Json? // text position the comment refers to
+  isResolved Boolean   @default(false)
+  parentId   String? // for threaded replies
+  parent     Comment?  @relation("CommentReplies", fields: [parentId], references: [id])
   replies    Comment[] @relation("CommentReplies")
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   @@index([noteId])
   @@map("comments")
@@ -364,7 +388,7 @@ model Layout {
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   userId      String
   name        String
-  config      Json      // panel arrangement, sizes, open tabs
+  config      Json // panel arrangement, sizes, open tabs
   isDefault   Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -380,11 +404,11 @@ model InstalledPlugin {
   id          String    @id @default(uuid())
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  pluginId    String    // from manifest
+  pluginId    String // from manifest
   name        String
   version     String
-  repository  String    // GitHub URL
-  manifest    Json      // full manifest
+  repository  String // GitHub URL
+  manifest    Json // full manifest
   isEnabled   Boolean   @default(true)
   settings    Json      @default("{}") // user settings
   installedAt DateTime  @default(now())
@@ -395,26 +419,94 @@ model InstalledPlugin {
 }
 
 // ==========================================
+// NOTIFICATIONS
+// ==========================================
+
+enum NotificationType {
+  COMMENT_MENTION
+  NOTE_SHARED
+  WORKSPACE_INVITE
+  SYSTEM_ANNOUNCEMENT
+}
+
+enum NotificationChannel {
+  IN_APP
+  EMAIL
+  BOTH
+  NONE
+}
+
+enum DigestFrequency {
+  DAILY
+  WEEKLY
+  NONE
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  title     String
+  body      String
+  isRead    Boolean          @default(false)
+  noteId    String? // optional reference to a related note
+  metadata  Json             @default("{}")
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isRead])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+model NotificationPreference {
+  id        String              @id @default(uuid())
+  userId    String
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  channel   NotificationChannel @default(BOTH)
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+
+  @@unique([userId, type])
+  @@map("notification_preferences")
+}
+
+model NotificationDigestSchedule {
+  id         String          @id @default(uuid())
+  userId     String          @unique
+  user       User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  frequency  DigestFrequency @default(DAILY)
+  lastSentAt DateTime?
+  createdAt  DateTime        @default(now())
+  updatedAt  DateTime        @updatedAt
+
+  @@map("notification_digest_schedules")
+}
+
+// ==========================================
 // BACKUP & DISASTER RECOVERY
 // ==========================================
 
 model BackupLog {
-  id            String       @id @default(uuid())
-  type          BackupType
-  status        BackupStatus
-  category      BackupCategory @default(DAILY)
-  filename      String       // name of the backup archive
-  destination   String       // "local:/path" or "s3://bucket/key"
-  sizeBytes     BigInt       @default(0)
-  durationMs    Int          @default(0)
-  checksum      String?      // SHA-256 of the encrypted archive
-  error         String?      // error message if failed
-  triggeredBy   String       @default("scheduler") // "scheduler" | "manual" | "restore-test"
-  metadata      Json         @default("{}") // pg_dump version, workspace count, etc.
-  startedAt     DateTime     @default(now())
-  completedAt   DateTime?
-  verifiedAt    DateTime?    // last restore-test verification timestamp
-  expiresAt     DateTime?    // when retention policy will delete this backup
+  id          String         @id @default(uuid())
+  type        BackupType
+  status      BackupStatus
+  category    BackupCategory @default(DAILY)
+  filename    String // name of the backup archive
+  destination String // "local:/path" or "s3://bucket/key"
+  sizeBytes   BigInt         @default(0)
+  durationMs  Int            @default(0)
+  checksum    String? // SHA-256 of the encrypted archive
+  error       String? // error message if failed
+  triggeredBy String         @default("scheduler") // "scheduler" | "manual" | "restore-test"
+  metadata    Json           @default("{}") // pg_dump version, workspace count, etc.
+  startedAt   DateTime       @default(now())
+  completedAt DateTime?
+  verifiedAt  DateTime? // last restore-test verification timestamp
+  expiresAt   DateTime? // when retention policy will delete this backup
 
   @@index([type, status])
   @@index([category])
@@ -442,4 +534,50 @@ enum BackupCategory {
   WEEKLY
   MONTHLY
   MANUAL
+}
+
+// ==========================================
+// ACTIVITY LOG
+// ==========================================
+
+enum ActivityType {
+  NOTE_CREATED
+  NOTE_EDITED
+  NOTE_DELETED
+  NOTE_RENAMED
+  NOTE_MOVED
+  NOTE_COMMENTED
+  NOTE_SHARED
+}
+
+model ActivityLog {
+  id          String       @id @default(uuid())
+  workspaceId String
+  workspace   Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  noteId      String?
+  type        ActivityType
+  metadata    Json         @default("{}")
+  createdAt   DateTime     @default(now())
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, type])
+  @@index([workspaceId, userId])
+  @@index([noteId])
+  @@index([createdAt])
+  @@map("activity_logs")
+}
+
+model NoteFollow {
+  id        String   @id @default(uuid())
+  noteId    String
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([noteId, userId])
+  @@index([noteId])
+  @@index([userId])
+  @@map("note_follows")
 }

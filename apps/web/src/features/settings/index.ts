@@ -11,6 +11,7 @@ export { ProfileSettings } from './ui/ProfileSettings';
 export { EditorSettings } from './ui/EditorSettings';
 export { ThemeSettingsTab } from './ui/ThemeSettingsTab';
 export { KeybindingSettings } from './ui/KeybindingSettings';
+export { KeybindingsSettings } from './ui/KeybindingsSettings';
 export { PluginSettings } from './ui/PluginSettings';
 export { WorkspaceSettings } from './ui/WorkspaceSettings';
 export { MemberManagement } from './ui/MemberManagement';
