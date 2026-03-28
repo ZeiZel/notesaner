@@ -18,6 +18,10 @@
     "prisma-migrate": "prisma migrate dev --schema=./prisma/schema.prisma",
     "prisma-push": "prisma db push --schema=./prisma/schema.prisma",
     "prisma-studio": "prisma studio --schema=./prisma/schema.prisma",
+    "prisma-seed": "prisma db seed",
+    "migrate:safe": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/migrate-safe.ts",
+    "migrate:safe:dry-run": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/migrate-safe.ts --dry-run",
+    "migrate:check": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/check-migrations.ts",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -66,6 +70,9 @@
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.0",
     "zod": "^3.23.0"
+  },
+  "prisma": {
+    "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "devDependencies": {
     "@nestjs/cli": "^11.0.0",

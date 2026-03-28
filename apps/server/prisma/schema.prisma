@@ -31,6 +31,9 @@ model User {
   comments                Comment[]
   passwordResetTokens     PasswordResetToken[]
   emailVerificationTokens EmailVerificationToken[]
+  sharedNotes             NoteShare[]   @relation("SharedByUser")
+  receivedShares          NoteShare[]   @relation("SharedWithUser")
+  apiKeys                 ApiKey[]
 
   @@map("users")
 }
@@ -95,6 +98,34 @@ enum AuthProviderType {
   SAML
   OIDC
   LOCAL
+}
+
+// ==========================================
+// API KEYS (user-scoped, for programmatic access)
+// ==========================================
+
+model ApiKey {
+  id         String       @id @default(uuid())
+  userId     String
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name       String       // human-readable label (e.g. "CI Pipeline")
+  keyHash    String       @unique // SHA-256 hash of the full key
+  prefix     String       // first 8 characters of the key for identification
+  scopes     ApiKeyScope[] // granted scopes
+  expiresAt  DateTime?    // null = never expires
+  lastUsedAt DateTime?
+  revokedAt  DateTime?    // soft-delete: set when key is revoked
+  createdAt  DateTime     @default(now())
+
+  @@index([userId])
+  @@index([keyHash])
+  @@map("user_api_keys")
+}
+
+enum ApiKeyScope {
+  READ
+  WRITE
+  ADMIN
 }
 
 // ==========================================
@@ -172,6 +203,7 @@ model Note {
   versions      NoteVersion[]
   attachments   Attachment[]
   comments      Comment[]
+  shares        NoteShare[]
 
   // Full-text search vector is managed via raw SQL migration (not modeled here)
   // to avoid Unsupported("tsvector") in schema
@@ -262,6 +294,41 @@ model Attachment {
 
   @@index([noteId])
   @@map("attachments")
+}
+
+// ==========================================
+// NOTE SHARING
+// ==========================================
+
+model NoteShare {
+  id             String          @id @default(uuid())
+  noteId         String
+  note           Note            @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  sharedBy       String
+  sharedByUser   User            @relation("SharedByUser", fields: [sharedBy], references: [id])
+  sharedWith     String?         // nullable for link-based shares (null = anyone with the link)
+  sharedWithUser User?           @relation("SharedWithUser", fields: [sharedWith], references: [id])
+  permission     SharePermission
+  token          String          @unique // unique share token for link-based access
+  passwordHash   String?         // optional password protection for link shares
+  expiresAt      DateTime?       // null = never expires
+  accessCount    Int             @default(0)
+  lastAccessedAt DateTime?
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  @@index([noteId])
+  @@index([sharedBy])
+  @@index([sharedWith])
+  @@index([token])
+  @@index([expiresAt])
+  @@map("note_shares")
+}
+
+enum SharePermission {
+  VIEW
+  COMMENT
+  EDIT
 }
 
 // ==========================================

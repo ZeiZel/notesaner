@@ -48,7 +48,19 @@ export default tseslint.config(
       parserOptions: {
         // Point at the workspace tsconfig so type-aware lint rules work.
         // Each project's own tsconfig extends tsconfig.base.json.
-        projectService: true,
+        projectService: {
+          allowDefaultProject: [
+            'apps/server/prisma/seed.ts',
+            'apps/server/prisma/fixtures/index.ts',
+            'apps/server/prisma/fixtures/notes.ts',
+            'apps/server/prisma/fixtures/users.ts',
+            'apps/server/prisma/fixtures/workspaces.ts',
+            'apps/server/prisma/migrations/migration-utils.ts',
+            'apps/server/scripts/check-migrations.ts',
+            'apps/server/scripts/migrate-safe.ts',
+            'scripts/benchmark.ts',
+          ],
+        },
         tsconfigRootDir: import.meta.dirname,
       },
     },
@@ -121,6 +133,22 @@ export default tseslint.config(
     files: ['apps/**/*.ts', 'apps/**/*.tsx'],
     rules: {
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+    },
+  },
+
+  // ── Seed and script files ────────────────────────────────────────────────
+  // Database seed scripts, Prisma fixtures, and migration scripts are CLI tools
+  // that run directly — console output is their primary output mechanism.
+  {
+    files: [
+      'apps/server/prisma/seed.ts',
+      'apps/server/prisma/fixtures/*.ts',
+      'apps/server/prisma/migrations/*.ts',
+      'apps/server/scripts/*.ts',
+      'scripts/*.ts',
+    ],
+    rules: {
+      'no-console': 'off',
     },
   },
 
