@@ -1,0 +1,491 @@
+/**
+ * published-note.css
+ *
+ * Styles for the PublishedNote component and server-rendered markdown.
+ *
+ * Uses CSS custom properties from the public theme system (--pub-*)
+ * with sensible fallbacks to the app-level design tokens (--ns-*).
+ * This allows the component to work both inside the public vault
+ * theme provider and in preview contexts.
+ */
+
+/* ─── Layout ─────────────────────────────────────────────────────────── */
+
+.published-note-layout {
+  display: flex;
+  gap: 2rem;
+  max-width: var(--pub-content-max-width, 960px);
+  margin: 0 auto;
+}
+
+.published-note-article {
+  flex: 1;
+  min-width: 0;
+  max-width: var(--pub-content-max-width, 740px);
+}
+
+.published-note-sidebar {
+  display: none;
+  position: sticky;
+  top: 5rem;
+  align-self: flex-start;
+  flex-shrink: 0;
+  width: 220px;
+  max-height: calc(100vh - 6rem);
+  overflow-y: auto;
+}
+
+@media (min-width: 1140px) {
+  .published-note-sidebar {
+    display: block;
+  }
+}
+
+/* ─── Breadcrumb ─────────────────────────────────────────────────────── */
+
+.published-note-breadcrumb {
+  margin-bottom: 1rem;
+}
+
+.published-note-breadcrumb ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--pub-color-fg-muted, #6c757d);
+}
+
+.published-note-breadcrumb li::before {
+  content: '/';
+  margin-right: 0.25rem;
+  opacity: 0.5;
+}
+
+.published-note-breadcrumb li:first-child::before {
+  content: none;
+}
+
+.published-note-breadcrumb a {
+  color: var(--pub-color-accent, #1971c2);
+  text-decoration: none;
+}
+
+.published-note-breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.published-note-breadcrumb [aria-current='page'] span {
+  color: var(--pub-color-fg, #212529);
+}
+
+/* ─── Header ─────────────────────────────────────────────────────────── */
+
+.published-note-header {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid var(--pub-color-border-subtle, #e9ecef);
+}
+
+.published-note-title {
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--pub-color-fg-heading, #0d0f10);
+  margin: 0 0 0.5rem;
+  letter-spacing: -0.02em;
+}
+
+@media (min-width: 640px) {
+  .published-note-title {
+    font-size: 2.5rem;
+  }
+}
+
+/* ─── Meta ───────────────────────────────────────────────────────────── */
+
+.published-note-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--pub-color-fg-muted, #6c757d);
+}
+
+.published-note-meta-sep {
+  user-select: none;
+}
+
+/* ─── Table of Contents ──────────────────────────────────────────────── */
+
+.published-note-toc {
+  font-size: 0.8125rem;
+}
+
+.published-note-toc-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--pub-color-fg-muted, #6c757d);
+  margin: 0 0 0.75rem;
+}
+
+.published-note-toc-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.published-note-toc-item {
+  margin-bottom: 0.25rem;
+}
+
+.published-note-toc-link {
+  display: block;
+  padding: 0.125rem 0;
+  color: var(--pub-color-fg-muted, #6c757d);
+  text-decoration: none;
+  line-height: 1.4;
+  transition: color 0.15s;
+  border-left: 2px solid transparent;
+  padding-left: 0.5rem;
+}
+
+.published-note-toc-link:hover {
+  color: var(--pub-color-accent, #1971c2);
+  border-left-color: var(--pub-color-accent, #1971c2);
+}
+
+/* Mobile TOC */
+.published-note-toc-mobile {
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--pub-color-border-subtle, #e9ecef);
+  border-radius: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: var(--pub-color-bg-surface, #f8f9fa);
+}
+
+.published-note-toc-mobile summary {
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--pub-color-fg, #212529);
+  user-select: none;
+}
+
+.published-note-toc-mobile .published-note-toc {
+  margin-top: 0.75rem;
+}
+
+@media (min-width: 1140px) {
+  .published-note-toc-mobile {
+    display: none;
+  }
+}
+
+/* ─── Content typography ─────────────────────────────────────────────── */
+
+.published-note-content {
+  font-family: var(--pub-font-family, system-ui, -apple-system, sans-serif);
+  font-size: var(--pub-font-size-base, 1rem);
+  line-height: 1.75;
+  color: var(--pub-color-fg, #212529);
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.published-note-content > * + * {
+  margin-top: 1.25em;
+}
+
+/* Headings */
+.published-note-content h1,
+.published-note-content h2,
+.published-note-content h3,
+.published-note-content h4,
+.published-note-content h5,
+.published-note-content h6 {
+  color: var(--pub-color-fg-heading, #0d0f10);
+  font-weight: 600;
+  line-height: 1.3;
+  margin-top: 2em;
+  margin-bottom: 0.5em;
+  position: relative;
+}
+
+.published-note-content h1 {
+  font-size: 1.75em;
+}
+.published-note-content h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--pub-color-border-subtle, #e9ecef);
+  padding-bottom: 0.25em;
+}
+.published-note-content h3 {
+  font-size: 1.25em;
+}
+.published-note-content h4 {
+  font-size: 1.1em;
+}
+.published-note-content h5 {
+  font-size: 1em;
+}
+.published-note-content h6 {
+  font-size: 0.9em;
+  color: var(--pub-color-fg-muted, #6c757d);
+}
+
+/* Heading anchors */
+.heading-anchor {
+  position: absolute;
+  left: -1.5em;
+  top: 0;
+  color: var(--pub-color-accent, #1971c2);
+  text-decoration: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  font-weight: 400;
+}
+
+.published-note-content h1:hover .heading-anchor,
+.published-note-content h2:hover .heading-anchor,
+.published-note-content h3:hover .heading-anchor,
+.published-note-content h4:hover .heading-anchor,
+.published-note-content h5:hover .heading-anchor,
+.published-note-content h6:hover .heading-anchor,
+.heading-anchor:focus-visible {
+  opacity: 1;
+}
+
+/* Links */
+.published-note-content a {
+  color: var(--pub-color-accent, #1971c2);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+  transition: color 0.15s;
+}
+
+.published-note-content a:hover {
+  color: var(--pub-color-accent-hover, #1864ab);
+}
+
+.published-note-content a:visited {
+  color: var(--pub-color-accent-visited, #6741d9);
+}
+
+.published-note-content a.wiki-link {
+  text-decoration-style: dashed;
+}
+
+/* Paragraphs */
+.published-note-content p {
+  margin: 0;
+}
+
+/* Strong / em */
+.published-note-content strong {
+  font-weight: 600;
+}
+
+/* Blockquote */
+.published-note-content blockquote {
+  margin: 0;
+  padding: 0.5em 1em;
+  border-left: 4px solid var(--pub-color-border, #dee2e6);
+  background: var(--pub-color-bg-blockquote, #f8f9fa);
+  color: var(--pub-color-fg-blockquote, #495057);
+}
+
+.published-note-content blockquote > * + * {
+  margin-top: 0.75em;
+}
+
+/* Callouts */
+.published-note-content .callout {
+  margin: 0;
+  padding: 1em;
+  border-radius: 0.5rem;
+  border-left: 4px solid;
+}
+
+.published-note-content .callout-note {
+  background: var(--pub-color-note-bg, #e7f5ff);
+  border-color: #339af0;
+}
+.published-note-content .callout-info {
+  background: var(--pub-color-note-bg, #e7f5ff);
+  border-color: #339af0;
+}
+.published-note-content .callout-tip {
+  background: var(--pub-color-tip-bg, #ebfbee);
+  border-color: #51cf66;
+}
+.published-note-content .callout-warning {
+  background: var(--pub-color-warning-bg, #fff9db);
+  border-color: #ffd43b;
+}
+.published-note-content .callout-caution {
+  background: var(--pub-color-caution-bg, #fff5f5);
+  border-color: #ff6b6b;
+}
+.published-note-content .callout-danger {
+  background: var(--pub-color-caution-bg, #fff5f5);
+  border-color: #ff6b6b;
+}
+
+.published-note-content .callout-title {
+  font-weight: 600;
+  font-size: 0.9em;
+  margin-bottom: 0.5em;
+}
+
+.published-note-content .callout-content > * + * {
+  margin-top: 0.75em;
+}
+
+/* Lists */
+.published-note-content ul,
+.published-note-content ol {
+  padding-left: 1.5em;
+  margin: 0;
+}
+
+.published-note-content li {
+  margin-bottom: 0.25em;
+}
+
+.published-note-content li > p {
+  margin: 0;
+}
+
+/* Task lists */
+.published-note-content .task-list {
+  list-style: none;
+  padding-left: 0;
+}
+
+.published-note-content .task-list-item {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5em;
+}
+
+.published-note-content .task-list-item input[type='checkbox'] {
+  margin: 0;
+  pointer-events: none;
+  accent-color: var(--pub-color-accent, #1971c2);
+}
+
+/* Code */
+.published-note-content code {
+  font-family: 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', monospace;
+  font-size: 0.875em;
+  padding: 0.15em 0.35em;
+  border-radius: 0.25rem;
+  background: var(--pub-color-bg-code, #f1f3f5);
+  color: var(--pub-color-fg-code, #d63384);
+}
+
+.published-note-content pre {
+  margin: 0;
+  padding: 1em;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  background: var(--pub-color-bg-code, #f1f3f5);
+  line-height: 1.5;
+}
+
+.published-note-content pre code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--pub-color-fg, #212529);
+  font-size: 0.85em;
+}
+
+/* Code block wrapper */
+.published-note-content .code-block-wrapper {
+  position: relative;
+  margin: 0;
+}
+
+.published-note-content .code-block-lang {
+  position: absolute;
+  top: 0.5em;
+  right: 0.75em;
+  font-size: 0.7em;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--pub-color-fg-muted, #6c757d);
+  font-family: system-ui, sans-serif;
+  user-select: none;
+}
+
+/* Tables */
+.published-note-content .table-wrapper {
+  overflow-x: auto;
+  margin: 0;
+}
+
+.published-note-content table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9em;
+}
+
+.published-note-content th {
+  background: var(--pub-color-table-header-bg, #f1f3f5);
+  font-weight: 600;
+  text-align: left;
+  padding: 0.5em 0.75em;
+  border: 1px solid var(--pub-color-border, #dee2e6);
+}
+
+.published-note-content td {
+  padding: 0.5em 0.75em;
+  border: 1px solid var(--pub-color-border, #dee2e6);
+}
+
+.published-note-content tbody tr:nth-child(even) {
+  background: var(--pub-color-table-stripe, #f8f9fa);
+}
+
+/* Horizontal rule */
+.published-note-content hr {
+  border: none;
+  border-top: 1px solid var(--pub-color-border-subtle, #e9ecef);
+  margin: 2em 0;
+}
+
+/* Images */
+.published-note-content .published-note-img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0.5rem;
+  display: block;
+  margin: 0 auto;
+}
+
+/* Mark / highlight */
+.published-note-content mark {
+  background: var(--pub-color-selection-bg, #1971c2);
+  color: var(--pub-color-selection-fg, #ffffff);
+  padding: 0.1em 0.2em;
+  border-radius: 0.15em;
+}
+
+/* Strikethrough */
+.published-note-content del {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Selection */
+.published-note-content ::selection {
+  background: var(--pub-color-selection-bg, #1971c2);
+  color: var(--pub-color-selection-fg, #ffffff);
+}
