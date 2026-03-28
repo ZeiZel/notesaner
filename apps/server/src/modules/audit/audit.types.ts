@@ -61,6 +61,10 @@ export enum AuditAction {
   PLUGIN_DISABLED = 'plugin.disabled',
   PLUGIN_SETTINGS_CHANGED = 'plugin.settings_changed',
 
+  // Sync / Conflict resolution
+  SYNC_MERGED = 'sync.merged',
+  SYNC_FRONTMATTER_CONFLICT = 'sync.frontmatter_conflict',
+
   // Admin / GDPR
   AUDIT_LOG_EXPORTED = 'audit.log_exported',
   AUDIT_RETENTION_CHANGED = 'audit.retention_changed',

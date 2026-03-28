@@ -1,3 +1,32 @@
-// Yjs CRDT sync engine
-// Will contain: SyncProvider, OfflineStore, ConflictResolver, Awareness protocol
-export const SYNC_ENGINE_VERSION = '0.0.0';
+/**
+ * @notesaner/sync-engine
+ *
+ * Yjs CRDT sync engine library.
+ * Contains: SyncProvider, OfflineStore, ConflictResolver, Awareness protocol.
+ *
+ * This is the shared library used by both the server (NestJS) and client (Next.js)
+ * for Yjs document management and conflict resolution utilities.
+ */
+
+export const SYNC_ENGINE_VERSION = '0.1.0';
+
+// Re-export conflict resolution types for consumers
+export type {
+  TimestampedField,
+  TimestampedFrontmatter,
+  FrontmatterResolutionResult,
+  ConflictLogEntry,
+  FrontmatterFieldConflict,
+  ReconnectPayload,
+  ReconnectResponse,
+  ServerDocumentState,
+} from './types';
+
+export { ConflictMergeType } from './types';
+
+// Re-export utility functions
+export {
+  createTimestampedField,
+  toTimestampedFrontmatter,
+  fromTimestampedFrontmatter,
+} from './frontmatter-utils';
