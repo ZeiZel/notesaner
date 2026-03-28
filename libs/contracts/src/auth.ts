@@ -4,6 +4,7 @@ export interface UserDto {
   displayName: string;
   avatarUrl: string | null;
   isActive: boolean;
+  isEmailVerified: boolean;
   isSuperAdmin: boolean;
   createdAt: string;
 }
@@ -64,3 +65,40 @@ export interface OIDCConfig {
 }
 
 export type WorkspaceRole = 'OWNER' | 'ADMIN' | 'EDITOR' | 'VIEWER';
+
+// ── Password Reset ─────────────────────────────────────────────────────────
+
+export interface ForgotPasswordRequest {
+  email: string;
+}
+
+export interface ForgotPasswordResponse {
+  message: string;
+}
+
+export interface ValidateResetTokenResponse {
+  valid: boolean;
+}
+
+export interface ResetPasswordRequest {
+  token: string;
+  password: string;
+}
+
+export interface ResetPasswordResponse {
+  message: string;
+}
+
+// ── Email Verification ─────────────────────────────────────────────────────
+
+export interface VerifyEmailResponse {
+  message: string;
+}
+
+export interface ResendVerificationRequest {
+  email: string;
+}
+
+export interface ResendVerificationResponse {
+  message: string;
+}

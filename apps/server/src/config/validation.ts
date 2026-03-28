@@ -26,13 +26,72 @@ const envSchema = z.object({
 
   // Auth
   ALLOW_REGISTRATION: z.string().default('true'),
+  REQUIRE_EMAIL_VERIFICATION: z.string().default('true'),
   TOTP_APP_NAME: z.string().default('Notesaner'),
+
+  // Frontend URL (for email links)
+  FRONTEND_URL: z.string().url().default('http://localhost:3000'),
 
   // Logging
   LOG_LEVEL: z.enum(['trace', 'debug', 'info', 'warn', 'error', 'fatal']).default('info'),
 
   // GitHub
   GITHUB_TOKEN: z.string().optional(),
+
+  // OpenTelemetry
+  OTEL_ENABLED: z.enum(['true', 'false']).default('true'),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().default('http://localhost:4318'),
+  OTEL_SERVICE_NAME: z.string().default('notesaner-server'),
+
+  // ── Rate Limiting ──────────────────────────────────────────────────────────
+  RATE_LIMIT_GLOBAL: z.coerce.number().int().positive().default(100),
+  RATE_LIMIT_GLOBAL_TTL: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_AUTH: z.coerce.number().int().positive().default(5),
+  RATE_LIMIT_AUTH_TTL: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_SEARCH: z.coerce.number().int().positive().default(30),
+  RATE_LIMIT_SEARCH_TTL: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_UPLOAD: z.coerce.number().int().positive().default(10),
+  RATE_LIMIT_UPLOAD_TTL: z.coerce.number().int().positive().default(60),
+  RATE_LIMIT_WS_MAX_CONNECTIONS: z.coerce.number().int().positive().default(5),
+  ACCOUNT_LOCKOUT_MAX_ATTEMPTS: z.coerce.number().int().positive().default(10),
+  ACCOUNT_LOCKOUT_DURATION: z.coerce.number().int().positive().default(1800),
+  ACCOUNT_LOCKOUT_WINDOW: z.coerce.number().int().positive().default(3600),
+
+  // ── Security Headers ───────────────────────────────────────────────────────
+  SECURITY_CSP: z.string().default(''),
+  SECURITY_CSP_REPORT_ONLY: z.string().default('false'),
+  SECURITY_HSTS_MAX_AGE: z.coerce.number().int().min(0).default(31536000),
+  SECURITY_PERMISSIONS_POLICY: z.string().default(''),
+  SECURITY_CSRF_ENABLED: z.string().default('true'),
+  SECURITY_CSRF_COOKIE_NAME: z.string().default('_csrf'),
+  SECURITY_CSRF_HEADER_NAME: z.string().default('x-csrf-token'),
+
+  // ValKey URL
+  VALKEY_URL: z.string().optional(),
+
+  // ── Backup & Disaster Recovery ────────────────────────────────────────────
+  BACKUP_ENABLED: z.enum(['true', 'false']).default('false'),
+  BACKUP_LOCAL_PATH: z.string().default('/var/lib/notesaner/backups'),
+  BACKUP_ENCRYPTION_KEY: z
+    .string()
+    .default('')
+    .refine(
+      (val) => val === '' || /^[0-9a-fA-F]{64}$/.test(val),
+      'BACKUP_ENCRYPTION_KEY must be a 64-character hex string (256-bit key)',
+    ),
+  BACKUP_ALERT_EMAIL: z.string().email().optional().or(z.literal('')),
+  BACKUP_PG_DUMP_PATH: z.string().default('pg_dump'),
+  BACKUP_RETENTION_DAILY: z.coerce.number().int().positive().default(7),
+  BACKUP_RETENTION_WEEKLY: z.coerce.number().int().positive().default(4),
+  BACKUP_RETENTION_MONTHLY: z.coerce.number().int().positive().default(3),
+
+  // S3-compatible storage (optional — omit all to use local-only)
+  BACKUP_S3_ENDPOINT: z.string().url().optional().or(z.literal('')),
+  BACKUP_S3_REGION: z.string().default('us-east-1'),
+  BACKUP_S3_BUCKET: z.string().optional().or(z.literal('')),
+  BACKUP_S3_ACCESS_KEY_ID: z.string().optional().or(z.literal('')),
+  BACKUP_S3_SECRET_ACCESS_KEY: z.string().optional().or(z.literal('')),
+  BACKUP_S3_PREFIX: z.string().default('backups'),
 });
 
 export type EnvConfig = z.infer<typeof envSchema>;

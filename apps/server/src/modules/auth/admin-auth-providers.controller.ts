@@ -12,6 +12,19 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiCreatedResponse,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
@@ -26,6 +39,8 @@ import { AdminAuthProvidersService, AuthProviderRecord } from './admin-auth-prov
  *
  * Base path: /admin/auth-providers
  */
+@ApiTags('Admin - Auth Providers')
+@ApiBearerAuth('bearer')
 @Controller('admin/auth-providers')
 @UseGuards(JwtAuthGuard, SuperAdminGuard)
 export class AdminAuthProvidersController {
@@ -35,15 +50,24 @@ export class AdminAuthProvidersController {
   // GET /admin/auth-providers
   // ---------------------------------------------------------------------------
 
-  /**
-   * List all configured authentication providers.
-   *
-   * Optional query filters:
-   *   - workspaceId: filter by workspace
-   *   - type: SAML | OIDC | LOCAL
-   *   - isEnabled: true | false
-   */
   @Get()
+  @ApiOperation({ summary: 'List all configured authentication providers' })
+  @ApiQuery({ name: 'workspaceId', required: false, description: 'Filter by workspace ID' })
+  @ApiQuery({
+    name: 'type',
+    required: false,
+    enum: ['SAML', 'OIDC', 'LOCAL'],
+    description: 'Filter by provider type',
+  })
+  @ApiQuery({
+    name: 'isEnabled',
+    required: false,
+    type: Boolean,
+    description: 'Filter by enabled/disabled state',
+  })
+  @ApiOkResponse({ description: 'Returns list of authentication providers.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Requires super admin privileges.' })
   async listProviders(
     @Query() query: Record<string, string>,
     @CurrentUser() _admin: JwtPayload,
@@ -55,8 +79,13 @@ export class AdminAuthProvidersController {
   // GET /admin/auth-providers/:id
   // ---------------------------------------------------------------------------
 
-  /** Get a single auth provider by ID. */
   @Get(':id')
+  @ApiOperation({ summary: 'Get a single authentication provider by ID' })
+  @ApiParam({ name: 'id', description: 'Auth provider ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Returns the auth provider.' })
+  @ApiNotFoundResponse({ description: 'Auth provider not found.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Requires super admin privileges.' })
   async getProvider(
     @Param('id') id: string,
     @CurrentUser() _admin: JwtPayload,
@@ -68,15 +97,18 @@ export class AdminAuthProvidersController {
   // POST /admin/auth-providers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Create a new authentication provider.
-   *
-   * Body must match CreateAuthProviderDto:
-   *   - type: "SAML" — requires config.certificate, config.ssoUrl, config.entityId
-   *   - type: "OIDC" — requires config.issuer, config.clientId, config.clientSecret
-   */
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @ApiOperation({
+    summary: 'Create a new authentication provider',
+    description:
+      'Creates a SAML or OIDC authentication provider. ' +
+      'SAML requires certificate, ssoUrl, entityId in config. ' +
+      'OIDC requires issuer, clientId, clientSecret in config.',
+  })
+  @ApiCreatedResponse({ description: 'Auth provider created successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Requires super admin privileges.' })
   async createProvider(
     @Body() dto: unknown,
     @CurrentUser() admin: JwtPayload,
@@ -89,12 +121,16 @@ export class AdminAuthProvidersController {
   // PUT /admin/auth-providers/:id
   // ---------------------------------------------------------------------------
 
-  /**
-   * Update an existing authentication provider.
-   *
-   * The provider type cannot be changed. Partial updates are supported.
-   */
   @Put(':id')
+  @ApiOperation({
+    summary: 'Update an existing authentication provider',
+    description: 'The provider type cannot be changed. Partial updates are supported.',
+  })
+  @ApiParam({ name: 'id', description: 'Auth provider ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Auth provider updated successfully.' })
+  @ApiNotFoundResponse({ description: 'Auth provider not found.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Requires super admin privileges.' })
   async updateProvider(
     @Param('id') id: string,
     @Body() dto: unknown,
@@ -108,13 +144,15 @@ export class AdminAuthProvidersController {
   // DELETE /admin/auth-providers/:id
   // ---------------------------------------------------------------------------
 
-  /** Permanently remove an authentication provider. */
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  async deleteProvider(
-    @Param('id') id: string,
-    @CurrentUser() admin: JwtPayload,
-  ): Promise<void> {
+  @ApiOperation({ summary: 'Permanently remove an authentication provider' })
+  @ApiParam({ name: 'id', description: 'Auth provider ID (UUID)', type: String })
+  @ApiNoContentResponse({ description: 'Auth provider deleted.' })
+  @ApiNotFoundResponse({ description: 'Auth provider not found.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Requires super admin privileges.' })
+  async deleteProvider(@Param('id') id: string, @CurrentUser() admin: JwtPayload): Promise<void> {
     this.logAction('delete', admin.sub, { id });
     await this.service.deleteProvider(id);
   }
@@ -123,12 +161,16 @@ export class AdminAuthProvidersController {
   // PATCH /admin/auth-providers/:id/toggle
   // ---------------------------------------------------------------------------
 
-  /**
-   * Enable or disable an authentication provider.
-   *
-   * Body: { isEnabled: boolean }
-   */
   @Patch(':id/toggle')
+  @ApiOperation({
+    summary: 'Enable or disable an authentication provider',
+    description: 'Body: { isEnabled: boolean }',
+  })
+  @ApiParam({ name: 'id', description: 'Auth provider ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Auth provider toggled successfully.' })
+  @ApiNotFoundResponse({ description: 'Auth provider not found.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  @ApiForbiddenResponse({ description: 'Requires super admin privileges.' })
   async toggleProvider(
     @Param('id') id: string,
     @Body() dto: unknown,

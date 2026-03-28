@@ -4,13 +4,6 @@
  * Handles the two OIDC SP endpoints:
  *   GET /auth/oidc/:providerId          — initiate authorization code flow
  *   GET /auth/oidc/:providerId/callback — code exchange + token issuance
- *
- * Flow:
- *  1. Client calls GET /auth/oidc/:providerId (optionally with ?returnTo=/path)
- *  2. Server generates state, stores state + code_verifier in ValKey, redirects to IdP
- *  3. IdP redirects back to GET /auth/oidc/:providerId/callback with code + state
- *  4. Server validates state (CSRF), exchanges code for tokens, provisions user
- *  5. Server issues app JWT + refresh token, redirects frontend with access token in hash
  */
 
 import {
@@ -24,11 +17,20 @@ import {
   BadRequestException,
   ParseUUIDPipe,
 } from '@nestjs/common';
+import {
+  ApiBadRequestResponse,
+  ApiFoundResponse,
+  ApiOperation,
+  ApiParam,
+  ApiQuery,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
 import { OidcStrategy } from './strategies/oidc.strategy';
 import { AuthService } from './auth.service';
 
+@ApiTags('Auth - OIDC')
 @Public()
 @Controller('auth/oidc')
 export class OidcController {
@@ -42,11 +44,22 @@ export class OidcController {
    *
    * Initiates the OIDC authorization code flow. Generates state and optional
    * PKCE parameters, stores them in ValKey, then redirects to the IdP.
-   *
-   * Query params:
-   *   returnTo  — optional relative path to redirect to after login
    */
   @Get(':providerId')
+  @ApiOperation({
+    summary: 'Initiate OIDC authorization code flow',
+    description:
+      'Redirects the user to the configured OIDC provider for authentication. ' +
+      'Generates state and PKCE parameters stored server-side in ValKey.',
+  })
+  @ApiParam({ name: 'providerId', description: 'OIDC provider ID (UUID)', type: String })
+  @ApiQuery({
+    name: 'returnTo',
+    required: false,
+    description: 'Relative path to redirect to after successful login',
+    example: '/workspaces',
+  })
+  @ApiFoundResponse({ description: 'Redirects to the OIDC provider authorization URL.' })
   async initiateLogin(
     @Param('providerId', ParseUUIDPipe) providerId: string,
     @Query('returnTo') returnTo: string | undefined,
@@ -64,17 +77,18 @@ export class OidcController {
    * GET /auth/oidc/:providerId/callback
    *
    * OIDC redirect callback endpoint.
-   * The IdP redirects here after the user authenticates.
-   *
-   * Flow:
-   *  1. Validate state (CSRF) — stored in ValKey
-   *  2. Exchange authorization code for tokens (with PKCE if configured)
-   *  3. Extract user claims from ID token
-   *  4. Find or provision the user in our database
-   *  5. Issue JWT access token + refresh token
-   *  6. Redirect frontend with access token in URL fragment
    */
   @Get(':providerId/callback')
+  @ApiOperation({
+    summary: 'OIDC callback endpoint',
+    description:
+      'Called by the OIDC provider after user authentication. ' +
+      'Validates state, exchanges code for tokens, provisions user, ' +
+      'and redirects to the frontend with access token in URL fragment.',
+  })
+  @ApiParam({ name: 'providerId', description: 'OIDC provider ID (UUID)', type: String })
+  @ApiFoundResponse({ description: 'Redirects to frontend with access token.' })
+  @ApiBadRequestResponse({ description: 'OIDC provider returned an error.' })
   async handleCallback(
     @Param('providerId', ParseUUIDPipe) providerId: string,
     @Req() req: Request,
@@ -120,7 +134,7 @@ export class OidcController {
       path: '/api/auth',
     });
 
-    // Retrieve returnTo from auth result (passed through via state → strategy → service)
+    // Retrieve returnTo from auth result (passed through via state -> strategy -> service)
     const returnTo = authResult.returnTo ?? '/';
     const safeReturnTo = sanitizeReturnTo(returnTo);
     const frontendUrl = this.buildFrontendRedirectUrl(

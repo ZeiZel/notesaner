@@ -12,22 +12,25 @@ datasource db {
 // ==========================================
 
 model User {
-  id           String  @id @default(uuid())
-  email        String  @unique
-  passwordHash String? // null for SSO-only users
-  displayName  String
-  avatarUrl    String?
-  isActive     Boolean @default(true)
-  isSuperAdmin Boolean @default(false)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String  @id @default(uuid())
+  email           String  @unique
+  passwordHash    String? // null for SSO-only users
+  displayName     String
+  avatarUrl       String?
+  isActive        Boolean @default(true)
+  isEmailVerified Boolean @default(false)
+  isSuperAdmin    Boolean @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  sessions     Session[]
-  memberships  WorkspaceMember[]
-  createdNotes Note[]        @relation("CreatedBy")
-  editedNotes  Note[]        @relation("LastEditedBy")
-  noteVersions NoteVersion[]
-  comments     Comment[]
+  sessions                Session[]
+  memberships             WorkspaceMember[]
+  createdNotes            Note[]        @relation("CreatedBy")
+  editedNotes             Note[]        @relation("LastEditedBy")
+  noteVersions            NoteVersion[]
+  comments                Comment[]
+  passwordResetTokens     PasswordResetToken[]
+  emailVerificationTokens EmailVerificationToken[]
 
   @@map("users")
 }
@@ -44,6 +47,34 @@ model Session {
 
   @@index([userId])
   @@map("sessions")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique // SHA-256 hash of the actual token
+  expiresAt DateTime
+  usedAt    DateTime? // set when the token is consumed
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
+model EmailVerificationToken {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String   @unique // SHA-256 hash of the actual token
+  expiresAt DateTime
+  usedAt    DateTime? // set when the token is consumed
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
 }
 
 model AuthProvider {
@@ -160,12 +191,14 @@ model NoteLink {
   targetNoteId String
   targetNote   Note     @relation("TargetNote", fields: [targetNoteId], references: [id], onDelete: Cascade)
   linkType     LinkType
+  blockId      String?  // block reference ID (e.g. "abc123" from ^abc123)
   context      String?  // surrounding text for preview
   position     Json?    // { line, col } in source
 
-  @@unique([sourceNoteId, targetNoteId, linkType])
+  @@unique([sourceNoteId, targetNoteId, linkType, blockId])
   @@index([sourceNoteId])
   @@index([targetNoteId])
+  @@index([blockId])
   @@map("note_links")
 }
 
@@ -292,4 +325,54 @@ model InstalledPlugin {
 
   @@unique([workspaceId, pluginId])
   @@map("installed_plugins")
+}
+
+// ==========================================
+// BACKUP & DISASTER RECOVERY
+// ==========================================
+
+model BackupLog {
+  id            String       @id @default(uuid())
+  type          BackupType
+  status        BackupStatus
+  category      BackupCategory @default(DAILY)
+  filename      String       // name of the backup archive
+  destination   String       // "local:/path" or "s3://bucket/key"
+  sizeBytes     BigInt       @default(0)
+  durationMs    Int          @default(0)
+  checksum      String?      // SHA-256 of the encrypted archive
+  error         String?      // error message if failed
+  triggeredBy   String       @default("scheduler") // "scheduler" | "manual" | "restore-test"
+  metadata      Json         @default("{}") // pg_dump version, workspace count, etc.
+  startedAt     DateTime     @default(now())
+  completedAt   DateTime?
+  verifiedAt    DateTime?    // last restore-test verification timestamp
+  expiresAt     DateTime?    // when retention policy will delete this backup
+
+  @@index([type, status])
+  @@index([category])
+  @@index([startedAt])
+  @@index([expiresAt])
+  @@map("backup_logs")
+}
+
+enum BackupType {
+  DATABASE
+  FILESYSTEM
+  FULL // both database + filesystem
+}
+
+enum BackupStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+  VERIFIED
+  EXPIRED
+}
+
+enum BackupCategory {
+  DAILY
+  WEEKLY
+  MONTHLY
+  MANUAL
 }

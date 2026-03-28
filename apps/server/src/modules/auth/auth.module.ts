@@ -6,6 +6,8 @@ import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { AdminAuthProvidersController } from './admin-auth-providers.controller';
 import { AdminAuthProvidersService } from './admin-auth-providers.service';
+import { EmailModule } from '../email/email.module';
+import { ValkeyModule } from '../valkey/valkey.module';
 
 @Module({
   imports: [
@@ -18,6 +20,11 @@ import { AdminAuthProvidersService } from './admin-auth-providers.service';
       }),
       inject: [ConfigService],
     }),
+    // EmailModule provides EmailService for sending verification and reset emails.
+    EmailModule,
+    // ValkeyModule provides ValkeyService for rate limiting.
+    // It is @Global() so importing it here makes it available to all modules.
+    ValkeyModule,
   ],
   controllers: [AuthController, AdminAuthProvidersController],
   providers: [AuthService, AdminAuthProvidersService],

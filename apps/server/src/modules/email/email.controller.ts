@@ -8,6 +8,14 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
+import {
+  ApiBody,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { ConfigService } from '@nestjs/config';
 import { Public } from '../../common/decorators/public.decorator';
 import { EmailService } from './email.service';
@@ -16,15 +24,11 @@ import { renderTemplate } from './email-template-engine';
 import { SendEmailDto } from './dto/send-email.dto';
 
 /**
- * EmailController — development-only preview and test endpoints.
+ * EmailController -- development-only preview and test endpoints.
  *
  * All routes are guarded by a NODE_ENV check: in production they return 404.
- * This prevents accidental exposure of the SMTP test surface in production.
- *
- * Routes:
- *   GET  /dev/email/:template   — HTML preview of a template with sample data
- *   POST /dev/email/test        — Send a test email via the configured transport
  */
+@ApiTags('Dev - Email')
 @Public() // Dev endpoints are unauthenticated for convenience
 @Controller('dev/email')
 export class EmailController {
@@ -33,16 +37,28 @@ export class EmailController {
     private readonly config: ConfigService,
   ) {}
 
-  // ─── Preview ───────────────────────────────────────────────────────────────
+  // ---- Preview ----
 
-  /**
-   * Renders a template with placeholder sample data and returns the raw HTML.
-   * Useful for iterating on email design without sending anything.
-   *
-   * @example GET /dev/email/verification
-   */
   @Get(':template')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Preview an email template (dev only)',
+    description:
+      'Renders a template with sample data and returns raw HTML. Not available in production.',
+  })
+  @ApiParam({
+    name: 'template',
+    description: 'Template identifier',
+    enum: [
+      'verification',
+      'password-reset',
+      'workspace-invite',
+      'comment-mention',
+      'freshness-alert',
+    ],
+  })
+  @ApiOkResponse({ description: 'Rendered HTML of the template.' })
+  @ApiNotFoundResponse({ description: 'Template not found or running in production.' })
   previewTemplate(@Param('template') template: string): string {
     this.assertDevEnvironment();
     this.assertKnownTemplate(template);
@@ -56,30 +72,42 @@ export class EmailController {
     return html;
   }
 
-  /**
-   * Lists all registered template names.
-   *
-   * @example GET /dev/email
-   */
   @Get()
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'List available email templates (dev only)',
+    description: 'Lists all registered template names. Not available in production.',
+  })
+  @ApiOkResponse({
+    description: 'List of template names.',
+    schema: {
+      type: 'object',
+      properties: {
+        templates: {
+          type: 'array',
+          items: { type: 'string' },
+          example: ['verification', 'password-reset', 'workspace-invite'],
+        },
+      },
+    },
+  })
   listTemplates(): { templates: string[] } {
     this.assertDevEnvironment();
     return { templates: listEmailTemplates() };
   }
 
-  // ─── Test send ─────────────────────────────────────────────────────────────
+  // ---- Test send ----
 
-  /**
-   * Sends a test email using the currently configured transport.
-   * In development this logs to the console; in test it captures to memory.
-   *
-   * @example
-   * POST /dev/email/test
-   * { "to": "alice@example.com", "template": "verification", "variables": {} }
-   */
   @Post('test')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Send a test email (dev only)',
+    description:
+      'Sends a test email using the configured transport. In development mode, logs to console.',
+  })
+  @ApiBody({ type: SendEmailDto })
+  @ApiOkResponse({ description: 'Test email queued.' })
+  @ApiNotFoundResponse({ description: 'Template not found or running in production.' })
   async sendTestEmail(@Body() dto: SendEmailDto): Promise<{ message: string }> {
     this.assertDevEnvironment();
     this.assertKnownTemplate(dto.template);
@@ -93,7 +121,7 @@ export class EmailController {
     return { message: `Test email [${dto.template}] queued for ${dto.to}` };
   }
 
-  // ─── Private helpers ───────────────────────────────────────────────────────
+  // ---- Private helpers ----
 
   private assertDevEnvironment(): void {
     const nodeEnv = this.config.get<string>('nodeEnv', 'development');
@@ -112,12 +140,8 @@ export class EmailController {
   }
 }
 
-// ─── Sample data ──────────────────────────────────────────────────────────────
+// ---- Sample data ----
 
-/**
- * Returns sample template variables used for preview rendering.
- * Designed to produce a realistic-looking preview for each template.
- */
 function buildSampleVariables(template: EmailTemplateName): Record<string, unknown> {
   const base = {
     recipientEmail: 'preview@example.com',

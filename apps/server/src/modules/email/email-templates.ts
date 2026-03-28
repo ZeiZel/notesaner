@@ -14,7 +14,8 @@ export type EmailTemplateName =
   | 'password-reset'
   | 'workspace-invite'
   | 'comment-mention'
-  | 'freshness-alert';
+  | 'freshness-alert'
+  | 'backup-failure';
 
 export interface EmailTemplateDefinition {
   subject: string;
@@ -218,6 +219,48 @@ Open workspace: {{{workspaceUrl}}}
 You are receiving this because you have freshness alerts enabled for this workspace.
 
 — The Notesaner team
+`,
+  },
+
+  // ── Backup failure alert ──────────────────────────────────────────────────
+  'backup-failure': {
+    subject: 'Backup failed on {{serverHost}}',
+    html: wrapInLayout(`
+      <h1 style="color: #e53e3e;">Backup failure alert</h1>
+      <p>A backup job has failed and requires your attention.</p>
+      <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
+        <tr>
+          <td style="padding: 8px 12px; background: #f8f8f8; font-weight: 600; border: 1px solid #e8e8e8;">Job</td>
+          <td style="padding: 8px 12px; border: 1px solid #e8e8e8;">{{jobName}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 12px; background: #f8f8f8; font-weight: 600; border: 1px solid #e8e8e8;">Time</td>
+          <td style="padding: 8px 12px; border: 1px solid #e8e8e8;">{{timestamp}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 12px; background: #f8f8f8; font-weight: 600; border: 1px solid #e8e8e8;">Server</td>
+          <td style="padding: 8px 12px; border: 1px solid #e8e8e8;">{{serverHost}}</td>
+        </tr>
+        <tr>
+          <td style="padding: 8px 12px; background: #f8f8f8; font-weight: 600; border: 1px solid #e8e8e8;">Error</td>
+          <td style="padding: 8px 12px; border: 1px solid #e8e8e8; color: #e53e3e;">{{errorMessage}}</td>
+        </tr>
+      </table>
+      <p>Please investigate the issue and verify the backup system is functioning correctly.</p>
+      <hr class="divider" />
+      <p class="muted">This is an automated alert from the Notesaner backup system. Check your server logs for full details.</p>
+    `),
+    text: `Backup failure alert
+
+A backup job has failed on {{serverHost}}.
+
+Job: {{jobName}}
+Time: {{timestamp}}
+Error: {{errorMessage}}
+
+Please investigate the issue and verify the backup system is functioning correctly.
+
+— Notesaner Backup System
 `,
   },
 };
