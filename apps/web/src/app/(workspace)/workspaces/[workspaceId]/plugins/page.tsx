@@ -1,4 +1,7 @@
 import type { Metadata } from 'next';
+import { Suspense } from 'react';
+import { PluginBrowserSkeleton } from '@/shared/lib/skeletons';
+import { PluginBrowserPageClient } from './PluginBrowserPageClient';
 
 export const metadata: Metadata = {
   title: 'Plugin browser',
@@ -10,6 +13,9 @@ interface PluginBrowserPageProps {
 
 /**
  * Plugin marketplace/browser page.
+ *
+ * The PluginBrowser component (grid, modals, search, filters) is heavy.
+ * It is dynamically imported in the client wrapper to reduce initial JS.
  */
 export default async function PluginBrowserPage({ params }: PluginBrowserPageProps) {
   const { workspaceId } = await params;
@@ -23,18 +29,10 @@ export default async function PluginBrowserPage({ params }: PluginBrowserPagePro
         </p>
       </div>
 
-      <div className="flex flex-1 items-center justify-center p-8">
-        <div className="text-center">
-          <p className="text-sm text-foreground-secondary">
-            Plugin marketplace will render here.
-          </p>
-          <p className="mt-0.5 text-xs text-foreground-muted">
-            workspace: {workspaceId}
-          </p>
-          <p className="mt-1 text-xs text-foreground-muted">
-            (features/plugins/ui/PluginBrowser.tsx)
-          </p>
-        </div>
+      <div className="flex-1 overflow-hidden">
+        <Suspense fallback={<PluginBrowserSkeleton />}>
+          <PluginBrowserPageClient workspaceId={workspaceId} />
+        </Suspense>
       </div>
     </div>
   );
