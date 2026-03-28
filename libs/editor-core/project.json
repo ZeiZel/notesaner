@@ -7,5 +7,6 @@
     "type-check": {
       "command": "tsc --noEmit -p libs/editor-core/tsconfig.json"
     }
-  }
+  },
+  "tags": ["scope:lib"]
 }
