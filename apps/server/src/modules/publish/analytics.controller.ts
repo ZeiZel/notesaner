@@ -1,15 +1,7 @@
 /**
  * AnalyticsController
  *
- * Exposes two endpoints:
- *
- * 1. POST /p/:slug/:notePath/view  — Public pixel endpoint (no auth).
- *    Called by published-note pages to record a view. Returns a 1×1 transparent
- *    PNG so it can optionally be loaded as an <img src> tracking pixel.
- *    Rate-limited via the global ThrottlerGuard.
- *
- * 2. GET /workspaces/:workspaceId/analytics  — Authenticated analytics dashboard.
- *    Returns aggregated stats for the workspace owner.
+ * Public pixel endpoint and authenticated analytics dashboard.
  */
 
 import {
@@ -23,6 +15,14 @@ import {
   Req,
   Res,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import type { Request, Response } from 'express';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
@@ -30,12 +30,13 @@ import { AnalyticsService } from './analytics.service';
 import { AnalyticsQueryDto } from './dto/analytics-query.dto';
 import { PrismaService } from '../../prisma/prisma.service';
 
-/** 1×1 transparent PNG — minimal tracking pixel payload. */
+/** 1x1 transparent PNG -- minimal tracking pixel payload. */
 const TRACKING_PIXEL = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==',
   'base64',
 );
 
+@ApiTags('Analytics')
 @Controller()
 export class AnalyticsController {
   constructor(
@@ -43,27 +44,19 @@ export class AnalyticsController {
     private readonly prisma: PrismaService,
   ) {}
 
-  // ─── Public pixel endpoint ─────────────────────────────────────────────────
+  // ---- Public pixel endpoint ----
 
-  /**
-   * POST /p/:slug/*
-   *
-   * Records a page view for the published note identified by `slug` and the
-   * wildcard note path. No authentication required.
-   *
-   * The endpoint:
-   * - Returns a 1×1 transparent PNG (HTTP 200) so it can serve as a pixel
-   * - Resolves the workspace by publicSlug to obtain the workspaceId
-   * - Looks up the note by path to obtain the noteId
-   * - Fires-and-forgets the analytics write (errors do not affect the response)
-   *
-   * Privacy:
-   * - IP is read from X-Forwarded-For or socket remoteAddress
-   * - Visitor identity is SHA-256(ip + ua + daily-date) — no cookies, no PII stored
-   */
   @Public()
   @Post('p/:slug/*')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Record a page view (tracking pixel)',
+    description:
+      'Records a page view for a published note. Returns a 1x1 transparent PNG. ' +
+      'No authentication required. Visitor identity is hashed (no cookies, no PII stored).',
+  })
+  @ApiParam({ name: 'slug', description: 'Public vault slug', type: String })
+  @ApiOkResponse({ description: '1x1 transparent PNG tracking pixel.' })
   async recordView(
     @Param('slug') publicSlug: string,
     @Param() params: Record<string, string>,
@@ -72,14 +65,12 @@ export class AnalyticsController {
   ): Promise<void> {
     const notePath = params['0'] ?? '';
 
-    // Extract visitor IP — prefer forwarded header set by a trusted reverse proxy
     const forwarded = req.headers['x-forwarded-for'];
     const rawIp = Array.isArray(forwarded) ? forwarded[0] : forwarded?.split(',')[0]?.trim();
     const visitorIp = rawIp ?? req.socket.remoteAddress ?? 'unknown';
     const userAgent = req.headers['user-agent'] ?? '';
     const referrer = req.headers.referer ?? req.headers.referrer ?? null;
 
-    // Resolve workspace and note asynchronously — do not block the response
     setImmediate(() => {
       void this.resolveAndRecord(
         publicSlug,
@@ -90,7 +81,6 @@ export class AnalyticsController {
       );
     });
 
-    // Return tracking pixel immediately
     res
       .status(HttpStatus.OK)
       .setHeader('Content-Type', 'image/png')
@@ -99,18 +89,18 @@ export class AnalyticsController {
       .end(TRACKING_PIXEL);
   }
 
-  // ─── Authenticated analytics endpoint ─────────────────────────────────────
+  // ---- Authenticated analytics endpoints ----
 
-  /**
-   * GET /workspaces/:workspaceId/analytics
-   *
-   * Returns analytics summary for the authenticated workspace owner.
-   *
-   * Query params (all optional):
-   * - dateRange: '7d' | '30d' | '90d' | 'all'  (default '30d')
-   * - noteId: UUID to scope to a single note
-   */
   @Get('workspaces/:workspaceId/analytics')
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Get analytics summary',
+    description:
+      'Returns analytics summary for a workspace. Supports date range filtering and optional note-level scoping.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Analytics summary with total views, unique visitors, etc.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async getAnalytics(
     @Param('workspaceId') workspaceId: string,
     @Query() query: AnalyticsQueryDto,
@@ -119,13 +109,15 @@ export class AnalyticsController {
     return this.analyticsService.getAnalytics(workspaceId, query.dateRange ?? '30d', query.noteId);
   }
 
-  /**
-   * GET /workspaces/:workspaceId/analytics/daily
-   *
-   * Returns daily stats data points for chart rendering.
-   * Useful for a dedicated chart fetch without the full summary.
-   */
   @Get('workspaces/:workspaceId/analytics/daily')
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Get daily analytics data points',
+    description: 'Returns daily stats for chart rendering.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Daily data points.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async getDailyStats(
     @Param('workspaceId') workspaceId: string,
     @Query() query: AnalyticsQueryDto,
@@ -134,12 +126,15 @@ export class AnalyticsController {
     return this.analyticsService.getDailyStats(workspaceId, query.dateRange ?? '30d', query.noteId);
   }
 
-  /**
-   * GET /workspaces/:workspaceId/analytics/top-notes
-   *
-   * Returns top N notes by page views in the given date range.
-   */
   @Get('workspaces/:workspaceId/analytics/top-notes')
+  @ApiBearerAuth('bearer')
+  @ApiOperation({
+    summary: 'Get top notes by page views',
+    description: 'Returns the top 20 notes by page views in the given date range.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Top notes by views.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async getTopNotes(
     @Param('workspaceId') workspaceId: string,
     @Query() query: AnalyticsQueryDto,
@@ -148,14 +143,8 @@ export class AnalyticsController {
     return this.analyticsService.getTopNotes(workspaceId, 20, query.dateRange ?? '30d');
   }
 
-  // ─── Private helpers ───────────────────────────────────────────────────────
+  // ---- Private helpers ----
 
-  /**
-   * Resolve workspace + note IDs from the public slug and note path, then
-   * forward to AnalyticsService.recordPageView.
-   *
-   * All errors are swallowed — analytics must never break the public reader.
-   */
   private async resolveAndRecord(
     publicSlug: string,
     notePath: string,
@@ -197,7 +186,7 @@ export class AnalyticsController {
         referrer,
       );
     } catch {
-      // Silently discard — analytics errors must not surface to users
+      // Silently discard -- analytics errors must not surface to users
     }
   }
 }

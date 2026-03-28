@@ -13,6 +13,7 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum SortField {
   RELEVANCE = 'relevance',
@@ -32,24 +33,29 @@ export enum TagFilterMode {
 }
 
 export class SearchQueryDto {
-  /**
-   * Full-text search query string. Minimum 2 characters.
-   */
+  @ApiProperty({
+    description: 'Full-text search query string (min 2 chars)',
+    example: 'meeting notes',
+    minLength: 2,
+    maxLength: 500,
+  })
   @IsString()
   @MinLength(2, { message: 'q must be at least 2 characters' })
   @MaxLength(500, { message: 'q must not exceed 500 characters' })
   q!: string;
 
-  /**
-   * Opaque pagination cursor returned from the previous page response.
-   */
+  @ApiPropertyOptional({ description: 'Opaque pagination cursor from previous response' })
   @IsOptional()
   @IsString()
   cursor?: string;
 
-  /**
-   * Maximum number of results to return. Defaults to 20, maximum 100.
-   */
+  @ApiPropertyOptional({
+    description: 'Max results per page',
+    example: 20,
+    default: 20,
+    minimum: 1,
+    maximum: 100,
+  })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -57,12 +63,13 @@ export class SearchQueryDto {
   @Transform(({ value }: { value: unknown }) => (value !== undefined ? Number(value) : undefined))
   limit?: number;
 
-  // ─── Filters ─────────────────────────────────────────────────────────────
+  // ---- Filters ----
 
-  /**
-   * Filter by a single tag UUID. Supports multiple values when the query
-   * parameter is repeated: ?tagIds=uuid1&tagIds=uuid2
-   */
+  @ApiPropertyOptional({
+    description: 'Filter by tag UUIDs (repeat param for multiple)',
+    type: [String],
+    example: ['550e8400-e29b-41d4-a716-446655440000'],
+  })
   @IsOptional()
   @IsArray()
   @IsUUID('4', { each: true, message: 'Each tagId must be a valid UUID' })
@@ -72,61 +79,65 @@ export class SearchQueryDto {
   })
   tagIds?: string[];
 
-  /**
-   * Combine multiple tagIds with AND (note must have all tags) or OR
-   * (note must have at least one tag). Defaults to OR.
-   */
+  @ApiPropertyOptional({
+    description: 'Tag filter mode: AND (must have all tags) or OR (at least one)',
+    enum: TagFilterMode,
+    default: TagFilterMode.OR,
+  })
   @IsOptional()
   @IsEnum(TagFilterMode)
   tagMode?: TagFilterMode;
 
-  /**
-   * Filter notes by folder prefix (workspace-relative path, e.g. "projects").
-   * Returns all notes whose path starts with this folder.
-   */
+  @ApiPropertyOptional({
+    description: 'Filter by folder prefix path',
+    example: 'projects',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(1000, { message: 'folder path must not exceed 1000 characters' })
   folder?: string;
 
-  /**
-   * Return only notes created on or after this ISO 8601 date-time.
-   */
+  @ApiPropertyOptional({
+    description: 'Notes created on or after (ISO 8601)',
+    example: '2024-01-01T00:00:00Z',
+  })
   @IsOptional()
   @IsDateString({}, { message: 'createdAfter must be a valid ISO 8601 date-time string' })
   createdAfter?: string;
 
-  /**
-   * Return only notes created on or before this ISO 8601 date-time.
-   */
+  @ApiPropertyOptional({
+    description: 'Notes created on or before (ISO 8601)',
+    example: '2024-12-31T23:59:59Z',
+  })
   @IsOptional()
   @IsDateString({}, { message: 'createdBefore must be a valid ISO 8601 date-time string' })
   createdBefore?: string;
 
-  /**
-   * Return only notes updated on or after this ISO 8601 date-time.
-   */
+  @ApiPropertyOptional({
+    description: 'Notes updated on or after (ISO 8601)',
+    example: '2024-06-01T00:00:00Z',
+  })
   @IsOptional()
   @IsDateString({}, { message: 'updatedAfter must be a valid ISO 8601 date-time string' })
   updatedAfter?: string;
 
-  /**
-   * Return only notes updated on or before this ISO 8601 date-time.
-   */
+  @ApiPropertyOptional({
+    description: 'Notes updated on or before (ISO 8601)',
+    example: '2024-12-31T23:59:59Z',
+  })
   @IsOptional()
   @IsDateString({}, { message: 'updatedBefore must be a valid ISO 8601 date-time string' })
   updatedBefore?: string;
 
-  /**
-   * Filter notes by the UUID of the user who created them.
-   */
+  @ApiPropertyOptional({
+    description: 'Filter by note creator UUID',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @IsOptional()
   @IsUUID('4', { message: 'authorId must be a valid UUID' })
   authorId?: string;
 
-  /**
-   * Filter by published status.
-   */
+  @ApiPropertyOptional({ description: 'Filter by published status', example: true })
   @IsOptional()
   @IsBoolean()
   @Transform(({ value }: { value: unknown }) => {
@@ -136,9 +147,11 @@ export class SearchQueryDto {
   })
   isPublished?: boolean;
 
-  /**
-   * When true, include trashed notes in results. Defaults to false (exclude trash).
-   */
+  @ApiPropertyOptional({
+    description: 'Include trashed notes (default false)',
+    example: false,
+    default: false,
+  })
   @IsOptional()
   @IsBoolean()
   @Transform(({ value }: { value: unknown }) => {
@@ -148,20 +161,22 @@ export class SearchQueryDto {
   })
   isTrashed?: boolean;
 
-  // ─── Sorting ─────────────────────────────────────────────────────────────
+  // ---- Sorting ----
 
-  /**
-   * Field to sort by. Defaults to 'relevance' (FTS rank).
-   * When 'relevance' is selected and no FTS results are available the
-   * fallback is 'updatedAt DESC'.
-   */
+  @ApiPropertyOptional({
+    description: 'Sort field',
+    enum: SortField,
+    default: SortField.RELEVANCE,
+  })
   @IsOptional()
   @IsEnum(SortField)
   sortBy?: SortField;
 
-  /**
-   * Sort direction. Defaults to 'desc'.
-   */
+  @ApiPropertyOptional({
+    description: 'Sort direction',
+    enum: SortOrder,
+    default: SortOrder.DESC,
+  })
   @IsOptional()
   @IsEnum(SortOrder)
   sortOrder?: SortOrder;

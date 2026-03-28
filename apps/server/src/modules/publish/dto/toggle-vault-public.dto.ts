@@ -1,24 +1,23 @@
 import { IsBoolean, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * DTO for toggling workspace public visibility.
- *
- * When isPublic is true, publicSlug must be provided to establish the
- * public vault URL. When isPublic is false the vault is taken offline
- * but the publicSlug is preserved so re-enabling reuses the same URL.
  */
 export class ToggleVaultPublicDto {
-  /**
-   * Whether the workspace vault should be publicly accessible.
-   */
+  @ApiProperty({
+    description: 'Whether the workspace vault should be publicly accessible',
+    example: true,
+  })
   @IsBoolean({ message: 'isPublic must be a boolean' })
   isPublic!: boolean;
 
-  /**
-   * URL-safe public slug for the vault (e.g. "my-public-notes").
-   * Required when isPublic is true.
-   * Must be lowercase alphanumeric with hyphens, 2–63 characters.
-   */
+  @ApiPropertyOptional({
+    description: 'URL-safe public slug (required when isPublic=true)',
+    example: 'my-public-notes',
+    minLength: 2,
+    maxLength: 63,
+  })
   @IsOptional()
   @IsString()
   @MinLength(2, { message: 'publicSlug must be at least 2 characters' })

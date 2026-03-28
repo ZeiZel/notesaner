@@ -1,17 +1,17 @@
 import { IsEnum } from 'class-validator';
+import { ApiProperty } from '@nestjs/swagger';
 
 export type CommentModerationAction = 'approve' | 'reject';
 
 /**
- * DTO for moderating a reader comment — approve or reject it.
- * Sent by the note owner (authenticated) to the moderation endpoint.
+ * DTO for moderating a reader comment -- approve or reject it.
  */
 export class ModerateCommentDto {
-  /**
-   * Moderation decision.
-   *   - `approve`  — comment becomes publicly visible
-   *   - `reject`   — comment is soft-deleted (stored internally, not shown)
-   */
+  @ApiProperty({
+    description: 'Moderation decision: approve makes the comment public, reject hides it',
+    enum: ['approve', 'reject'],
+    example: 'approve',
+  })
   @IsEnum(['approve', 'reject'], {
     message: 'action must be "approve" or "reject"',
   })

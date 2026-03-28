@@ -1,34 +1,39 @@
 import { Body, Controller, Delete, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
 import { DomainService } from './domain.service';
 import { SetDomainDto } from './dto/custom-domain.dto';
 
 /**
- * DomainController — custom domain management for public vaults.
- *
- * All routes are authenticated (JwtAuthGuard applied globally).
- * The caller must be a member of the target workspace — workspace-level
- * permission enforcement is expected to be handled by a guard at the
- * router or module level (consistent with the rest of the publish module).
- *
- * Endpoints:
- *   POST   /workspaces/:id/domain          — set custom domain
- *   GET    /workspaces/:id/domain          — get domain config & status
- *   POST   /workspaces/:id/domain/verify   — trigger DNS verification
- *   DELETE /workspaces/:id/domain          — remove custom domain
+ * DomainController -- custom domain management for public vaults.
  */
+@ApiTags('Publish - Custom Domains')
+@ApiBearerAuth('bearer')
 @Controller('workspaces/:workspaceId/domain')
 export class DomainController {
   constructor(private readonly domainService: DomainService) {}
 
-  /**
-   * POST /workspaces/:workspaceId/domain
-   * Configure a custom domain for the workspace's public vault.
-   *
-   * Creates a new verification token and resets status to "unverified".
-   * Returns the full DomainStatusResponse including DNS instructions.
-   */
   @Post()
+  @ApiOperation({
+    summary: 'Set custom domain for public vault',
+    description:
+      'Configures a custom domain. Creates a verification token and resets status to "unverified". ' +
+      'Returns DNS instructions for verification.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiBody({ type: SetDomainDto })
+  @ApiOkResponse({ description: 'Domain configuration with DNS instructions.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async setDomain(
     @Param('workspaceId') workspaceId: string,
     @Body() dto: SetDomainDto,
@@ -37,11 +42,13 @@ export class DomainController {
     return this.domainService.setDomain(workspaceId, dto.domain);
   }
 
-  /**
-   * GET /workspaces/:workspaceId/domain
-   * Get the current custom domain configuration and verification status.
-   */
   @Get()
+  @ApiOperation({ summary: 'Get custom domain configuration and verification status' })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiOkResponse({
+    description: 'Domain config with status (unverified/pending/verified/failed).',
+  })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async getDomainConfig(
     @Param('workspaceId') workspaceId: string,
     @CurrentUser() _user: JwtPayload,
@@ -49,25 +56,27 @@ export class DomainController {
     return this.domainService.getDomainConfig(workspaceId);
   }
 
-  /**
-   * POST /workspaces/:workspaceId/domain/verify
-   * Trigger a DNS TXT-record verification attempt.
-   *
-   * Checks for the TXT record at _notesaner-verify.<domain> and updates
-   * the verification status accordingly (verified | failed).
-   */
   @Post('verify')
   @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Trigger DNS verification',
+    description:
+      'Checks for the TXT record at _notesaner-verify.<domain> and updates the verification status.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Verification result (verified or failed).' })
+  @ApiNotFoundResponse({ description: 'No domain configured.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async verifyDomain(@Param('workspaceId') workspaceId: string, @CurrentUser() _user: JwtPayload) {
     return this.domainService.verifyDomain(workspaceId);
   }
 
-  /**
-   * DELETE /workspaces/:workspaceId/domain
-   * Remove the custom domain from the workspace.
-   */
   @Delete()
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Remove custom domain' })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiNoContentResponse({ description: 'Custom domain removed.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async removeDomain(
     @Param('workspaceId') workspaceId: string,
     @CurrentUser() _user: JwtPayload,

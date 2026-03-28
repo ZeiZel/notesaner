@@ -8,9 +8,20 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiForbiddenResponse,
+  ApiNoContentResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { SearchRateLimit } from '../../common/decorators/throttle.decorator';
 import { SearchService } from './search.service';
 import { FuzzyQueryDto, SearchQueryDto, SuggestQueryDto } from './dto';
 
@@ -18,36 +29,26 @@ import { FuzzyQueryDto, SearchQueryDto, SuggestQueryDto } from './dto';
  * Search REST API.
  *
  * All routes are workspace-scoped: /workspaces/:workspaceId/search/...
- *
- * Minimum role required for all endpoints: VIEWER.
  */
+@ApiTags('Search')
+@ApiBearerAuth('bearer')
 @UseGuards(RolesGuard)
+@SearchRateLimit()
 @Controller('workspaces/:workspaceId/search')
 export class SearchController {
   constructor(private readonly searchService: SearchService) {}
 
-  /**
-   * GET /workspaces/:workspaceId/search
-   *
-   * Full-text search with optional filters and sorting.
-   *
-   * Query params:
-   *   q          — search query (required, min 2 chars)
-   *   tagIds     — array of tag UUIDs (repeat param for multiple)
-   *   tagMode    — AND | OR (default OR)
-   *   folder     — folder path prefix filter
-   *   createdAfter / createdBefore — ISO 8601 date range on createdAt
-   *   updatedAfter / updatedBefore — ISO 8601 date range on updatedAt
-   *   authorId   — UUID of the note creator
-   *   isPublished — boolean filter
-   *   isTrashed  — boolean filter (default false)
-   *   sortBy     — relevance | createdAt | updatedAt | title (default relevance)
-   *   sortOrder  — asc | desc (default desc)
-   *   limit      — max results per page (1–100, default 20)
-   *   cursor     — opaque pagination cursor
-   */
   @Roles('VIEWER', 'EDITOR', 'ADMIN', 'OWNER')
   @Get()
+  @ApiOperation({
+    summary: 'Full-text search notes',
+    description:
+      'Full-text search with optional filters (tags, folder, dates, author, published status) and sorting. Minimum role: VIEWER.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Paginated search results with relevance scores.' })
+  @ApiForbiddenResponse({ description: 'Insufficient role.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async search(
     @Param('workspaceId') workspaceId: string,
     @Query() query: SearchQueryDto,
@@ -56,45 +57,46 @@ export class SearchController {
     return this.searchService.search(workspaceId, query, user.sub);
   }
 
-  /**
-   * GET /workspaces/:workspaceId/search/suggest
-   *
-   * Typeahead suggestions from note titles using pg_trgm similarity.
-   */
   @Roles('VIEWER', 'EDITOR', 'ADMIN', 'OWNER')
   @Get('suggest')
-  async suggest(
-    @Param('workspaceId') workspaceId: string,
-    @Query() query: SuggestQueryDto,
-  ) {
+  @ApiOperation({
+    summary: 'Typeahead suggestions',
+    description: 'Returns note title suggestions using pg_trgm similarity. Minimum role: VIEWER.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Array of title suggestions.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  async suggest(@Param('workspaceId') workspaceId: string, @Query() query: SuggestQueryDto) {
     return this.searchService.suggest(workspaceId, query.prefix);
   }
 
-  /**
-   * GET /workspaces/:workspaceId/search/fuzzy
-   *
-   * Standalone fuzzy search using pg_trgm trigram similarity on note titles.
-   */
   @Roles('VIEWER', 'EDITOR', 'ADMIN', 'OWNER')
   @Get('fuzzy')
-  async fuzzy(
-    @Param('workspaceId') workspaceId: string,
-    @Query() query: FuzzyQueryDto,
-  ) {
+  @ApiOperation({
+    summary: 'Fuzzy search by note title',
+    description:
+      'Standalone fuzzy search using pg_trgm trigram similarity. Configurable threshold. Minimum role: VIEWER.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Fuzzy search results with similarity scores.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  async fuzzy(@Param('workspaceId') workspaceId: string, @Query() query: FuzzyQueryDto) {
     return this.searchService.fuzzySearch(workspaceId, query.q, {
       threshold: query.threshold,
       limit: query.limit,
     });
   }
 
-  /**
-   * GET /workspaces/:workspaceId/search/recent
-   *
-   * Returns the last 20 search queries performed by the authenticated user
-   * in this workspace, in most-recent-first order.
-   */
   @Roles('VIEWER', 'EDITOR', 'ADMIN', 'OWNER')
   @Get('recent')
+  @ApiOperation({
+    summary: 'Get recent search queries',
+    description:
+      'Returns the last 20 search queries performed by the authenticated user in this workspace.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Array of recent search strings.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async getRecentSearches(
     @Param('workspaceId') workspaceId: string,
     @CurrentUser() user: JwtPayload,
@@ -103,14 +105,16 @@ export class SearchController {
     return { data: searches };
   }
 
-  /**
-   * DELETE /workspaces/:workspaceId/search/recent
-   *
-   * Clears the authenticated user's recent search history for this workspace.
-   */
   @Roles('VIEWER', 'EDITOR', 'ADMIN', 'OWNER')
   @Delete('recent')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Clear recent search history',
+    description: "Clears the authenticated user's recent search history for this workspace.",
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiNoContentResponse({ description: 'Recent search history cleared.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async clearRecentSearches(
     @Param('workspaceId') workspaceId: string,
     @CurrentUser() user: JwtPayload,

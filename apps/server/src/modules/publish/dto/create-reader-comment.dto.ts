@@ -1,53 +1,53 @@
 import { IsEmail, IsOptional, IsString, IsUUID, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * DTO for creating a public reader comment on a published note.
- *
- * Comments may be left anonymously (no authorName / authorEmail required)
- * or with attribution. The honeypot field must be absent or empty — any value
- * indicates an automated submission and the request is rejected as spam.
  */
 export class CreateReaderCommentDto {
-  /**
-   * The comment body. Plain text, max 2 000 characters.
-   */
+  @ApiProperty({
+    description: 'Comment body (plain text, max 2000 characters)',
+    example: 'This is a great article! Very helpful.',
+    minLength: 1,
+    maxLength: 2000,
+  })
   @IsString({ message: 'content must be a string' })
   @MinLength(1, { message: 'comment cannot be empty' })
   @MaxLength(2000, { message: 'comment must not exceed 2 000 characters' })
   content!: string;
 
-  /**
-   * Display name for anonymous commenters. Optional.
-   * Authenticated readers may omit this.
-   */
+  @ApiPropertyOptional({
+    description: 'Display name for anonymous commenters',
+    example: 'Bob',
+    maxLength: 100,
+  })
   @IsOptional()
   @IsString()
   @MinLength(1)
   @MaxLength(100, { message: 'authorName must not exceed 100 characters' })
   authorName?: string;
 
-  /**
-   * Email address for anonymous commenters. Optional opt-in for reply
-   * notifications. Stored but not displayed publicly.
-   */
+  @ApiPropertyOptional({
+    description: 'Email for reply notifications (not displayed publicly)',
+    example: 'bob@example.com',
+  })
   @IsOptional()
   @IsEmail({}, { message: 'authorEmail must be a valid email address' })
   @MaxLength(255)
   authorEmail?: string;
 
-  /**
-   * Parent comment UUID for threaded replies. Only 1 level of nesting is
-   * supported — replies to replies are rejected.
-   */
+  @ApiPropertyOptional({
+    description: 'Parent comment UUID for threaded replies (max 1 level deep)',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @IsOptional()
   @IsUUID('4', { message: 'parentId must be a valid UUID' })
   parentId?: string;
 
-  /**
-   * Anti-spam honeypot field. Must be absent or empty string.
-   * Bots filling in hidden form fields trigger automatic rejection.
-   * Use CSS / `tabindex="-1"` to hide from human users.
-   */
+  @ApiPropertyOptional({
+    description: 'Anti-spam honeypot field. Must be absent or empty string.',
+    maxLength: 0,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(0, { message: 'honeypot field must remain empty' })

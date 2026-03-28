@@ -1,4 +1,5 @@
 import { IsArray, IsEnum, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * Permissions that can be granted to an API key.
@@ -14,11 +15,23 @@ export enum ApiKeyPermission {
 }
 
 export class CreateApiKeyDto {
+  @ApiProperty({
+    description: 'Human-readable name for the API key',
+    example: 'CI/CD Pipeline Key',
+    minLength: 1,
+    maxLength: 100,
+  })
   @IsString()
   @MinLength(1, { message: 'name must not be empty' })
   @MaxLength(100, { message: 'name must not exceed 100 characters' })
   name!: string;
 
+  @ApiPropertyOptional({
+    description: 'Permissions granted to this key',
+    type: [String],
+    enum: ApiKeyPermission,
+    example: ['notes:read', 'notes:write'],
+  })
   @IsOptional()
   @IsArray()
   @IsEnum(ApiKeyPermission, {

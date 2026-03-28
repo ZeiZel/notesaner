@@ -11,58 +11,76 @@ import {
   UseGuards,
   UseInterceptors,
 } from '@nestjs/common';
+import {
+  ApiBearerAuth,
+  ApiBody,
+  ApiConsumes,
+  ApiCreatedResponse,
+  ApiNoContentResponse,
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+  ApiUnauthorizedResponse,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { Response } from 'express';
 import { memoryStorage } from 'multer';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
+import { UploadRateLimit } from '../../common/decorators/throttle.decorator';
 import { AttachmentService } from './attachment.service';
 import type { AttachmentRecord } from './attachment.service';
 
 /**
- * AttachmentController handles multipart file uploads, serving, and deletion.
- *
- * Endpoints:
- *   POST   /workspaces/:workspaceId/notes/:noteId/attachments
- *   GET    /workspaces/:workspaceId/attachments
- *   GET    /workspaces/:workspaceId/notes/:noteId/attachments
- *   GET    /attachments/:attachmentId  (public streaming endpoint)
- *   DELETE /workspaces/:workspaceId/attachments/:attachmentId
+ * Workspace-scoped attachment routes -- require workspace membership.
  */
-
-/**
- * Workspace-scoped attachment routes — require workspace membership.
- */
+@ApiTags('Attachments')
+@ApiBearerAuth('bearer')
 @UseGuards(RolesGuard)
 @Controller('workspaces/:workspaceId')
 export class AttachmentController {
   constructor(private readonly attachmentService: AttachmentService) {}
 
-  /**
-   * POST /workspaces/:workspaceId/notes/:noteId/attachments
-   *
-   * Uploads a file and attaches it to the specified note.
-   * The file must be sent as multipart/form-data with the field name "file".
-   *
-   * Maximum size: configurable via UPLOAD_MAX_FILE_SIZE_MB (default 50 MB).
-   * Allowed types: images, PDF, text, and common office documents.
-   *
-   * Minimum role: EDITOR
-   */
   @Roles('EDITOR', 'ADMIN', 'OWNER')
+  @UploadRateLimit()
   @Post('notes/:noteId/attachments')
   @HttpCode(HttpStatus.CREATED)
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
       limits: {
-        // 50 MB hard cap — further enforcement is done in AttachmentService
-        // because the service has access to the configured limit.
         fileSize: 50 * 1024 * 1024,
         files: 1,
       },
     }),
   )
+  @ApiOperation({
+    summary: 'Upload a file attachment to a note',
+    description:
+      'Uploads a file (max 50 MB) and attaches it to the specified note. ' +
+      'Send as multipart/form-data with field name "file". Minimum role: EDITOR.',
+  })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        file: {
+          type: 'string',
+          format: 'binary',
+          description: 'File to upload (max 50 MB)',
+        },
+      },
+      required: ['file'],
+    },
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiParam({ name: 'noteId', description: 'Note ID (UUID)', type: String })
+  @ApiCreatedResponse({ description: 'Attachment uploaded successfully.' })
+  @ApiNotFoundResponse({ description: 'Note not found.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async upload(
     @Param('workspaceId') workspaceId: string,
     @Param('noteId') noteId: string,
@@ -71,16 +89,17 @@ export class AttachmentController {
     return this.attachmentService.upload(workspaceId, noteId, file);
   }
 
-  /**
-   * GET /workspaces/:workspaceId/notes/:noteId/attachments
-   *
-   * Returns a list of all attachment metadata records for the given note.
-   * The client should use the returned `id` values to build download URLs.
-   *
-   * Minimum role: VIEWER
-   */
   @Roles('VIEWER', 'EDITOR', 'ADMIN', 'OWNER')
   @Get('notes/:noteId/attachments')
+  @ApiOperation({
+    summary: 'List attachments for a note',
+    description:
+      'Returns all attachment metadata records for the given note. Minimum role: VIEWER.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiParam({ name: 'noteId', description: 'Note ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'List of attachment metadata.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async listByNote(
     @Param('workspaceId') workspaceId: string,
     @Param('noteId') noteId: string,
@@ -88,16 +107,19 @@ export class AttachmentController {
     return this.attachmentService.listByNote(workspaceId, noteId);
   }
 
-  /**
-   * DELETE /workspaces/:workspaceId/attachments/:attachmentId
-   *
-   * Permanently removes an attachment record and its file from disk.
-   *
-   * Minimum role: EDITOR
-   */
   @Roles('EDITOR', 'ADMIN', 'OWNER')
   @Delete('attachments/:attachmentId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({
+    summary: 'Delete an attachment',
+    description:
+      'Permanently removes an attachment record and its file from disk. Minimum role: EDITOR.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiParam({ name: 'attachmentId', description: 'Attachment ID (UUID)', type: String })
+  @ApiNoContentResponse({ description: 'Attachment deleted.' })
+  @ApiNotFoundResponse({ description: 'Attachment not found.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
   async delete(
     @Param('workspaceId') workspaceId: string,
     @Param('attachmentId') attachmentId: string,
@@ -107,31 +129,24 @@ export class AttachmentController {
 }
 
 /**
- * PublicAttachmentController — serves attachment files without workspace-scope
- * in the URL path. This keeps download URLs short and consistent.
- *
- * Route: GET /attachments/:attachmentId
- *
- * NOTE: This endpoint does NOT enforce workspace membership because note
- * attachments referenced in published notes must be accessible without auth.
- * Authorization for private notes is handled via the attachment record look-up:
- * the attachment can only be fetched if its ID is known, and IDs are opaque
- * UUIDs that are not guessable.
- *
- * For workspaces that require strict access control, a middleware layer or
- * signed URL approach (not in this sprint) should be added on top.
+ * Public attachment serving endpoint -- no workspace scope needed.
  */
+@ApiTags('Attachments')
 @Controller('attachments')
 export class PublicAttachmentController {
   constructor(private readonly attachmentService: AttachmentService) {}
 
-  /**
-   * GET /attachments/:attachmentId
-   *
-   * Streams the file with the correct Content-Type and Content-Disposition
-   * headers. Uses NestJS StreamableFile to avoid buffering in memory.
-   */
   @Get(':attachmentId')
+  @ApiOperation({
+    summary: 'Serve an attachment file',
+    description:
+      'Streams the file with correct Content-Type and Content-Disposition headers. ' +
+      'No authentication required (IDs are opaque UUIDs). ' +
+      'Used by published notes to reference embedded files.',
+  })
+  @ApiParam({ name: 'attachmentId', description: 'Attachment ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'File streamed with correct headers.' })
+  @ApiNotFoundResponse({ description: 'Attachment not found.' })
   async serve(
     @Param('attachmentId') attachmentId: string,
     @Res({ passthrough: true }) res: Response,

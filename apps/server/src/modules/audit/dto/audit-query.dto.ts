@@ -11,24 +11,27 @@ import {
   MinLength,
 } from 'class-validator';
 import { Transform } from 'class-transformer';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { AuditAction } from '../audit.types';
 
 /**
  * Query parameters for the paginated audit-log endpoint.
- * All filters are optional and combinable.
  */
 export class AuditQueryDto {
-  /**
-   * Filter entries by a specific user ID.
-   */
+  @ApiPropertyOptional({
+    description: 'Filter by user ID (UUID)',
+    example: '550e8400-e29b-41d4-a716-446655440000',
+  })
   @IsOptional()
   @IsUUID('4', { message: 'userId must be a valid UUID' })
   userId?: string;
 
-  /**
-   * Filter by one or more action types. Repeat the parameter for multiple:
-   *   ?actions=auth.login&actions=note.created
-   */
+  @ApiPropertyOptional({
+    description: 'Filter by action types (repeat for multiple)',
+    type: [String],
+    enum: AuditAction,
+    example: ['auth.login', 'note.created'],
+  })
   @IsOptional()
   @IsArray()
   @IsEnum(AuditAction, { each: true, message: 'Each action must be a valid AuditAction' })
@@ -38,38 +41,43 @@ export class AuditQueryDto {
   })
   actions?: AuditAction[];
 
-  /**
-   * Return only entries at or after this ISO 8601 date-time.
-   */
+  @ApiPropertyOptional({
+    description: 'Entries at or after this ISO 8601 date-time',
+    example: '2024-01-01T00:00:00Z',
+  })
   @IsOptional()
   @IsDateString({}, { message: 'from must be a valid ISO 8601 date-time string' })
   from?: string;
 
-  /**
-   * Return only entries at or before this ISO 8601 date-time.
-   */
+  @ApiPropertyOptional({
+    description: 'Entries at or before this ISO 8601 date-time',
+    example: '2024-12-31T23:59:59Z',
+  })
   @IsOptional()
   @IsDateString({}, { message: 'to must be a valid ISO 8601 date-time string' })
   to?: string;
 
-  /**
-   * Case-insensitive text to match against serialised metadata.
-   */
+  @ApiPropertyOptional({
+    description: 'Case-insensitive text match against serialised metadata',
+    example: 'login',
+  })
   @IsOptional()
   @IsString()
   @MinLength(1)
   search?: string;
 
-  /**
-   * Opaque cursor returned from the previous page. Pass to fetch the next page.
-   */
+  @ApiPropertyOptional({ description: 'Opaque cursor for pagination' })
   @IsOptional()
   @IsString()
   cursor?: string;
 
-  /**
-   * Maximum entries per page. Default 50, max 500.
-   */
+  @ApiPropertyOptional({
+    description: 'Max entries per page (1-500)',
+    example: 50,
+    default: 50,
+    minimum: 1,
+    maximum: 500,
+  })
   @IsOptional()
   @IsInt()
   @Min(1)
@@ -82,9 +90,12 @@ export class AuditQueryDto {
  * Body shape for updating the audit-log retention configuration.
  */
 export class AuditRetentionConfigDto {
-  /**
-   * Number of days to retain audit entries (30–365).
-   */
+  @ApiProperty({
+    description: 'Number of days to retain audit entries (30-365)',
+    example: 90,
+    minimum: 30,
+    maximum: 365,
+  })
   @IsInt({ message: 'retentionDays must be an integer' })
   @Min(30, { message: 'retentionDays must be at least 30' })
   @Max(365, { message: 'retentionDays must not exceed 365' })

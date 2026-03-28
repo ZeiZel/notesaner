@@ -1,58 +1,61 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
+import {
+  ApiNotFoundResponse,
+  ApiOkResponse,
+  ApiOperation,
+  ApiParam,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { PublicVaultService } from './public-vault.service';
 import { PublicVaultQueryDto } from './dto/public-vault-query.dto';
 
 /**
- * PublicVaultController — routes for publicly accessible vaults.
+ * PublicVaultController -- routes for publicly accessible vaults.
  *
- * All endpoints under /p/:slug are unauthenticated. Authentication is not
- * required because public vaults are intended for anonymous readers.
- * Individual notes are only accessible when the note has isPublished=true
- * and the workspace has isPublic=true.
- *
- * Route structure:
- *   GET /p/:slug                — vault home (metadata)
- *   GET /p/:slug/notes          — paginated list of published notes
- *   GET /p/:slug/notes/*path    — single published note (rendered as HTML)
+ * All endpoints under /p/:slug are unauthenticated.
  */
+@ApiTags('Public Vault')
 @Public()
 @Controller('p')
 export class PublicVaultController {
   constructor(private readonly publicVaultService: PublicVaultService) {}
 
-  /**
-   * GET /p/:slug
-   *
-   * Return vault metadata: name, description, and published note count.
-   * This is the vault "home" page endpoint.
-   */
   @Get(':slug')
+  @ApiOperation({
+    summary: 'Get public vault home',
+    description:
+      'Returns vault metadata: name, description, and published note count. No authentication required.',
+  })
+  @ApiParam({ name: 'slug', description: 'Public vault slug', type: String })
+  @ApiOkResponse({ description: 'Vault metadata.' })
+  @ApiNotFoundResponse({ description: 'Vault not found or not public.' })
   async getVaultHome(@Param('slug') slug: string) {
     return this.publicVaultService.getVaultIndex(slug);
   }
 
-  /**
-   * GET /p/:slug/notes
-   *
-   * Return a paginated list of published notes in the vault.
-   * Supports cursor-based pagination, sorting, and optional folder filtering.
-   */
   @Get(':slug/notes')
+  @ApiOperation({
+    summary: 'List published notes in vault',
+    description:
+      'Paginated list of published notes with cursor-based pagination, sorting, and optional folder filtering.',
+  })
+  @ApiParam({ name: 'slug', description: 'Public vault slug', type: String })
+  @ApiOkResponse({ description: 'Paginated list of published notes.' })
+  @ApiNotFoundResponse({ description: 'Vault not found or not public.' })
   async getPublishedNotes(@Param('slug') slug: string, @Query() query: PublicVaultQueryDto) {
     return this.publicVaultService.getPublishedNotes(slug, query);
   }
 
-  /**
-   * GET /p/:slug/*
-   *
-   * Serve a single published note identified by its path within the vault.
-   * The wildcard captures the full note path including any subdirectory
-   * segments (e.g. /p/my-vault/projects/note-name).
-   *
-   * Notes with isPublished=false are not accessible and return 404.
-   */
   @Get(':slug/*')
+  @ApiOperation({
+    summary: 'Get a published note by path',
+    description:
+      'Serves a single published note identified by its path. Notes with isPublished=false return 404.',
+  })
+  @ApiParam({ name: 'slug', description: 'Public vault slug', type: String })
+  @ApiOkResponse({ description: 'Published note content.' })
+  @ApiNotFoundResponse({ description: 'Note not found or not published.' })
   async getPublishedNote(@Param('slug') slug: string, @Param() params: Record<string, string>) {
     const notePath = params['0'] ?? '';
     return this.publicVaultService.getPublishedNote(slug, notePath);

@@ -1,34 +1,26 @@
 import { Transform } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
-/**
- * Sort field options for public note listings.
- */
 export type PublicNoteSortField = 'path' | 'title' | 'updatedAt';
-
-/**
- * Sort direction options.
- */
 export type SortDirection = 'asc' | 'desc';
 
 /**
  * Query parameters for listing published notes in a public vault.
- *
- * Supports cursor-based pagination and server-side sorting.
  */
 export class PublicVaultQueryDto {
-  /**
-   * Opaque pagination cursor returned by the previous page response.
-   * When omitted, the first page is returned.
-   */
+  @ApiPropertyOptional({ description: 'Opaque pagination cursor from previous page' })
   @IsOptional()
   @IsString()
   cursor?: string;
 
-  /**
-   * Maximum number of notes to return per page.
-   * Defaults to 20, capped at 100.
-   */
+  @ApiPropertyOptional({
+    description: 'Max notes per page (1-100)',
+    example: 20,
+    default: 20,
+    minimum: 1,
+    maximum: 100,
+  })
   @IsOptional()
   @IsInt()
   @Min(1, { message: 'limit must be at least 1' })
@@ -36,10 +28,11 @@ export class PublicVaultQueryDto {
   @Transform(({ value }: { value: unknown }) => (value !== undefined ? Number(value) : undefined))
   limit?: number;
 
-  /**
-   * Field to sort notes by.
-   * Accepts: "path" | "title" | "updatedAt". Defaults to "path".
-   */
+  @ApiPropertyOptional({
+    description: 'Sort field',
+    enum: ['path', 'title', 'updatedAt'],
+    default: 'path',
+  })
   @IsOptional()
   @IsString()
   @IsIn(['path', 'title', 'updatedAt'], {
@@ -47,18 +40,20 @@ export class PublicVaultQueryDto {
   })
   sortBy?: PublicNoteSortField;
 
-  /**
-   * Sort direction: "asc" (default) or "desc".
-   */
+  @ApiPropertyOptional({
+    description: 'Sort direction',
+    enum: ['asc', 'desc'],
+    default: 'asc',
+  })
   @IsOptional()
   @IsString()
   @IsIn(['asc', 'desc'], { message: 'sortDir must be "asc" or "desc"' })
   sortDir?: SortDirection;
 
-  /**
-   * Restrict listing to notes under a specific folder prefix.
-   * For example, "projects" returns only notes whose path begins with "projects/".
-   */
+  @ApiPropertyOptional({
+    description: 'Restrict to notes under a folder prefix',
+    example: 'projects',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(1000, { message: 'folder must not exceed 1000 characters' })
