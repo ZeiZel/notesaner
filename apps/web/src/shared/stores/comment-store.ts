@@ -104,6 +104,9 @@ interface CommentStoreState {
   /** Text range currently selected for a new comment. */
   composingRange: CommentTextRange | null;
 
+  /** Whether comment highlights are visible in the editor. */
+  highlightsVisible: boolean;
+
   /** Loading state for async operations. */
   isLoading: boolean;
 
@@ -151,6 +154,12 @@ interface CommentStoreState {
   /** Cancel composing mode. */
   cancelComposing: () => void;
 
+  /** Toggle comment highlight visibility in the editor. */
+  toggleHighlights: () => void;
+
+  /** Set comment highlight visibility explicitly. */
+  setHighlightsVisible: (visible: boolean) => void;
+
   /** Set loading state. */
   setLoading: (loading: boolean) => void;
 
@@ -173,6 +182,7 @@ export const useCommentStore = create<CommentStoreState>()(
       sidebarOpen: false,
       isComposing: false,
       composingRange: null,
+      highlightsVisible: true,
       isLoading: false,
 
       // Actions
@@ -325,6 +335,16 @@ export const useCommentStore = create<CommentStoreState>()(
       cancelComposing: () =>
         set({ isComposing: false, composingRange: null }, false, 'comments/cancelComposing'),
 
+      toggleHighlights: () =>
+        set(
+          (state) => ({ highlightsVisible: !state.highlightsVisible }),
+          false,
+          'comments/toggleHighlights',
+        ),
+
+      setHighlightsVisible: (highlightsVisible) =>
+        set({ highlightsVisible }, false, 'comments/setHighlightsVisible'),
+
       setLoading: (isLoading) => set({ isLoading }, false, 'comments/setLoading'),
 
       reset: () =>
@@ -337,6 +357,7 @@ export const useCommentStore = create<CommentStoreState>()(
             sidebarOpen: false,
             isComposing: false,
             composingRange: null,
+            highlightsVisible: true,
             isLoading: false,
           },
           false,
