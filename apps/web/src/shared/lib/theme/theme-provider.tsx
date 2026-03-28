@@ -139,7 +139,10 @@ interface ThemeProviderProps {
   defaultTheme?: ThemePreference;
 }
 
-export function ThemeProvider({ children, defaultTheme: _defaultTheme = 'dark' }: ThemeProviderProps) {
+export function ThemeProvider({
+  children,
+  defaultTheme: _defaultTheme = 'dark',
+}: ThemeProviderProps) {
   const preference = useThemeStore((s) => s.preference);
   const communityThemes = useThemeStore((s) => s.communityThemes);
   const customCss = useThemeStore((s) => s.customCss);
@@ -177,7 +180,9 @@ export function ThemeProvider({ children, defaultTheme: _defaultTheme = 'dark' }
   const prevThemeIdRef = useRef<string | null>(null);
   const isBuiltInTheme = (id: string) => ['dark', 'light'].includes(id);
 
-  // Apply theme to DOM whenever activeTheme changes
+  // Apply theme to DOM whenever activeTheme changes.
+  // Also triggers the smooth 200ms transition animation via
+  // the data-theme-transition attribute.
   useEffect(() => {
     const prevId = prevThemeIdRef.current;
     prevThemeIdRef.current = activeTheme.id;
@@ -186,6 +191,20 @@ export function ThemeProvider({ children, defaultTheme: _defaultTheme = 'dark' }
     // clear the inline CSS variables first so tokens.css takes over again.
     if (prevId !== null && !isBuiltInTheme(prevId) && isBuiltInTheme(activeTheme.id)) {
       clearInlineThemeVars();
+    }
+
+    // Enable smooth transition only when switching themes (not on initial load).
+    // The data-theme-transition attribute is picked up by the CSS rule in main.css
+    // which applies transition: 200ms to all color properties.
+    if (prevId !== null && prevId !== activeTheme.id) {
+      const html = document.documentElement;
+      html.setAttribute('data-theme-transition', '');
+
+      // Remove the transition attribute after the animation completes.
+      // setTimeout matches the 200ms transition duration in CSS.
+      setTimeout(() => {
+        html.removeAttribute('data-theme-transition');
+      }, 200);
     }
 
     applyThemeToDocument(activeTheme);
@@ -220,7 +239,15 @@ export function ThemeProvider({ children, defaultTheme: _defaultTheme = 'dark' }
       customCss,
       setCustomCss,
     }),
-    [preference, resolvedThemeId, activeTheme, availableThemes, setPreference, customCss, setCustomCss],
+    [
+      preference,
+      resolvedThemeId,
+      activeTheme,
+      availableThemes,
+      setPreference,
+      customCss,
+      setCustomCss,
+    ],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
