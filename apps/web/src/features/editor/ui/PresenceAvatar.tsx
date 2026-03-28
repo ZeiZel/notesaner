@@ -1,36 +1,70 @@
 'use client';
 
 /**
- * PresenceAvatar — individual avatar with name tooltip for presence indicators.
+ * PresenceAvatar -- individual avatar with rich tooltip for presence indicators.
  *
- * Renders either an image avatar or a colored initial circle, with a green
- * online status dot and a tooltip showing the user's display name.
+ * Uses Ant Design Avatar, Badge, and Tooltip for a polished UI.
+ * Shows: avatar image or colored initial, online/away/offline status badge,
+ * tooltip with name and optional cursor position description.
  *
  * Design decisions:
- *   - No useEffect — all visual state is derived from props.
- *   - Tooltip uses native `title` attribute for simplicity; can be upgraded
- *     to Radix Tooltip when the UI library is extended.
- *   - Online status dot is absolutely positioned at bottom-right.
- *   - Colors are deterministic per user (via getPresenceColor).
+ *   - No useEffect -- all visual state is derived from props.
+ *   - Uses Ant Design Avatar (no raw HTML for the circle).
+ *   - Badge for online/away/offline status dot.
+ *   - Tooltip for name + cursor position description.
  */
 
+import { Avatar, Badge, Tooltip } from 'antd';
 import { cn } from '@/shared/lib/utils';
-import type { PresenceUser } from '@/shared/hooks/usePresence';
+import type { PresenceStatus } from '@/shared/stores/presence-store';
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
+export interface PresenceAvatarUser {
+  /** Unique user ID. */
+  userId: string;
+  /** Display name shown in the tooltip. */
+  displayName: string;
+  /** URL to the user's avatar image. Null if no avatar is set. */
+  avatarUrl: string | null;
+  /** Deterministic presence color. */
+  color: string;
+  /** Presence status: online, away, or offline. */
+  status: PresenceStatus;
+  /** Cursor position description (e.g. "Line 42, Col 8"). Null if unknown. */
+  cursorDescription?: string | null;
+}
+
 export interface PresenceAvatarProps {
-  /** The presence user to render. */
-  user: PresenceUser;
+  /** The user to render. */
+  user: PresenceAvatarUser;
   /** Avatar size in pixels. Defaults to 28. */
   size?: number;
-  /** Whether to show the online status dot. Defaults to true. */
+  /** Whether to show the status badge. Defaults to true. */
   showStatus?: boolean;
+  /** Whether to show the tooltip. Defaults to true. */
+  showTooltip?: boolean;
   /** Additional CSS class names. */
   className?: string;
 }
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+const STATUS_COLORS: Record<PresenceStatus, string> = {
+  online: '#52c41a',
+  away: '#faad14',
+  offline: '#8c8c8c',
+};
+
+const STATUS_LABELS: Record<PresenceStatus, string> = {
+  online: 'Online',
+  away: 'Away',
+  offline: 'Offline',
+};
 
 // ---------------------------------------------------------------------------
 // Component
@@ -40,59 +74,89 @@ export function PresenceAvatar({
   user,
   size = 28,
   showStatus = true,
+  showTooltip = true,
   className,
 }: PresenceAvatarProps) {
   const initial = user.displayName.charAt(0).toUpperCase();
-  const statusDotSize = Math.max(6, Math.round(size * 0.28));
-  const fontSize = Math.max(10, Math.round(size * 0.4));
+  const statusColor = STATUS_COLORS[user.status];
 
-  return (
-    <div
-      className={cn('relative inline-flex shrink-0', className)}
-      style={{ width: size, height: size }}
-      title={user.displayName}
-      aria-label={`${user.displayName}${user.isOnline ? ' (online)' : ' (away)'}`}
-    >
-      {/* Avatar circle */}
-      {user.avatarUrl ? (
-        <img
-          src={user.avatarUrl}
-          alt={user.displayName}
-          className="rounded-full object-cover ring-2 ring-background"
-          style={{ width: size, height: size }}
-          loading="lazy"
-        />
-      ) : (
-        <div
-          className="flex items-center justify-center rounded-full font-semibold text-white ring-2 ring-background"
-          style={{
-            width: size,
-            height: size,
-            backgroundColor: user.color,
-            fontSize: `${fontSize}px`,
-            lineHeight: 1,
-          }}
-          aria-hidden="true"
-        >
-          {initial}
-        </div>
-      )}
-
-      {/* Online status dot */}
-      {showStatus && (
-        <span
-          className={cn(
-            'absolute bottom-0 right-0 rounded-full ring-2 ring-background',
-            user.isOnline ? 'bg-green-500' : 'bg-gray-400',
-          )}
-          style={{
-            width: statusDotSize,
-            height: statusDotSize,
-          }}
-          aria-hidden="true"
-        />
+  const tooltipContent = (
+    <div className="flex flex-col gap-0.5">
+      <span className="text-xs font-medium">{user.displayName}</span>
+      <span className="text-[10px] opacity-75">{STATUS_LABELS[user.status]}</span>
+      {user.cursorDescription && (
+        <span className="text-[10px] opacity-60">{user.cursorDescription}</span>
       )}
     </div>
+  );
+
+  const avatar = showStatus ? (
+    <Badge
+      dot
+      offset={[-2, size - 4]}
+      color={statusColor}
+      className={cn('inline-flex shrink-0', className)}
+    >
+      {user.avatarUrl ? (
+        <Avatar
+          src={user.avatarUrl}
+          alt={user.displayName}
+          size={size}
+          style={{
+            border: '2px solid var(--color-background, #fff)',
+          }}
+        />
+      ) : (
+        <Avatar
+          size={size}
+          style={{
+            backgroundColor: user.color,
+            color: '#1e1e2e',
+            fontSize: `${Math.max(10, Math.round(size * 0.4))}px`,
+            fontWeight: 600,
+            border: '2px solid var(--color-background, #fff)',
+          }}
+          alt={user.displayName}
+        >
+          {initial}
+        </Avatar>
+      )}
+    </Badge>
+  ) : (
+    <span className={cn('inline-flex shrink-0', className)}>
+      {user.avatarUrl ? (
+        <Avatar
+          src={user.avatarUrl}
+          alt={user.displayName}
+          size={size}
+          style={{
+            border: '2px solid var(--color-background, #fff)',
+          }}
+        />
+      ) : (
+        <Avatar
+          size={size}
+          style={{
+            backgroundColor: user.color,
+            color: '#1e1e2e',
+            fontSize: `${Math.max(10, Math.round(size * 0.4))}px`,
+            fontWeight: 600,
+            border: '2px solid var(--color-background, #fff)',
+          }}
+          alt={user.displayName}
+        >
+          {initial}
+        </Avatar>
+      )}
+    </span>
+  );
+
+  if (!showTooltip) return avatar;
+
+  return (
+    <Tooltip title={tooltipContent} placement="bottom" mouseEnterDelay={0.3}>
+      {avatar}
+    </Tooltip>
   );
 }
 

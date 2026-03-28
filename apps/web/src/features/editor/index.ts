@@ -56,10 +56,10 @@ export { InlineComment } from './ui/InlineComment';
 export type { InlineCommentProps } from './ui/InlineComment';
 
 export { PresenceAvatar } from './ui/PresenceAvatar';
-export type { PresenceAvatarProps } from './ui/PresenceAvatar';
+export type { PresenceAvatarProps, PresenceAvatarUser } from './ui/PresenceAvatar';
 
 export { PresenceDot } from './ui/PresenceDot';
-export type { PresenceDotProps } from './ui/PresenceDot';
+export type { PresenceDotProps, PresenceDotUser } from './ui/PresenceDot';
 
 export { PresenceIndicator } from './ui/PresenceIndicator';
 export type { PresenceIndicatorProps } from './ui/PresenceIndicator';
@@ -132,6 +132,16 @@ export type {
   FrontmatterProperty,
   FrontmatterMap,
 } from './lib/frontmatter-parser';
+
+export {
+  createCollaborationCursor,
+  createCursorActivityTracker,
+  cleanupCollaborationCursors,
+} from './lib/collaboration-cursor';
+export type { CollaborationUser, CollaborationCursorOptions } from './lib/collaboration-cursor';
+
+export { CommentMark, COMMENT_MARK_CSS } from './lib/comment-mark';
+export type { CommentMarkAttributes } from './lib/comment-mark';
 
 // ---------------------------------------------------------------------------
 // Hooks
