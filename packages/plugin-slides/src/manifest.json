@@ -1,0 +1,22 @@
+{
+  "id": "notesaner.slides",
+  "name": "Slides Presentation",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "Convert markdown notes into presentations. Split slides with horizontal rules, preview slides in a side panel, and present fullscreen with keyboard navigation and speaker notes.",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-slides",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage:notes-read",
+    "ui:register-view",
+    "ui:register-command",
+    "ui:show-modal",
+    "ui:show-notice"
+  ],
+  "tags": ["presentation", "slides", "markdown", "export"],
+  "entryPoints": {
+    "view": "dist/index.js",
+    "commands": "dist/index.js"
+  }
+}

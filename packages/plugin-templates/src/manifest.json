@@ -1,0 +1,22 @@
+{
+  "id": "notesaner.templates",
+  "name": "Templates",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "Create notes from templates with variable substitution. Includes 8 built-in templates and supports custom templates with {{variable}} syntax, conditional blocks, and per-folder defaults.",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-templates",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage:notes-read",
+    "storage:notes-write",
+    "ui:register-command",
+    "ui:register-modal",
+    "ui:show-notice"
+  ],
+  "tags": ["templates", "productivity", "notes", "journal"],
+  "entryPoints": {
+    "commands": "dist/index.js",
+    "modal": "dist/index.js"
+  }
+}

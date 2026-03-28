@@ -1,0 +1,75 @@
+{
+  "id": "notesaner.daily-notes",
+  "name": "Daily Notes",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "Auto-create and navigate date-based notes. Supports daily, weekly, and monthly periodic notes with configurable filename formats, templates, and a mini calendar sidebar panel. Hotkey: Cmd+Shift+D (open today's note).",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-daily-notes",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage:notes-read",
+    "storage:notes-write",
+    "ui:register-sidebar",
+    "ui:register-command",
+    "ui:show-notice"
+  ],
+  "tags": ["daily-notes", "periodic-notes", "calendar", "productivity", "journaling"],
+  "entryPoints": {
+    "sidebarPanel": "dist/index.js",
+    "settingsPage": "dist/index.js",
+    "commands": "dist/index.js"
+  },
+  "settings": {
+    "autoCreate": {
+      "type": "boolean",
+      "default": false,
+      "description": "Automatically open or create today's daily note on workspace startup."
+    },
+    "nameFormat": {
+      "type": "string",
+      "default": "YYYY-MM-DD",
+      "description": "Filename format for daily notes. Tokens: YYYY, YY, MM, DD, ddd, dddd."
+    },
+    "folder": {
+      "type": "string",
+      "default": "Daily Notes",
+      "description": "Folder for daily notes (relative to workspace root). Empty = root."
+    },
+    "templateId": {
+      "type": "string",
+      "default": "",
+      "description": "Path to a template note used when creating new daily notes."
+    },
+    "weeklyEnabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable weekly periodic notes."
+    },
+    "weeklyFormat": {
+      "type": "string",
+      "default": "YYYY-[W]ww",
+      "description": "Filename format for weekly notes. Default produces 2026-W12."
+    },
+    "weeklyFolder": {
+      "type": "string",
+      "default": "",
+      "description": "Folder for weekly notes. Falls back to the daily notes folder."
+    },
+    "monthlyEnabled": {
+      "type": "boolean",
+      "default": false,
+      "description": "Enable monthly periodic notes."
+    },
+    "monthlyFormat": {
+      "type": "string",
+      "default": "YYYY-MM",
+      "description": "Filename format for monthly notes. Default produces 2026-03."
+    },
+    "monthlyFolder": {
+      "type": "string",
+      "default": "",
+      "description": "Folder for monthly notes. Falls back to the daily notes folder."
+    }
+  }
+}
