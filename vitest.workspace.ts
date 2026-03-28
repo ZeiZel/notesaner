@@ -12,4 +12,6 @@ export default defineWorkspace([
   'libs/contracts/vitest.config.ts',
   // Server application
   'apps/server/vitest.config.ts',
+  // Web application
+  'apps/web/vitest.config.ts',
 ]);

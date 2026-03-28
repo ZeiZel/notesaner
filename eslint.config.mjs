@@ -49,6 +49,7 @@ export default tseslint.config(
         // Each project's own tsconfig extends tsconfig.base.json.
         projectService: {
           allowDefaultProject: [
+            'vitest.workspace.ts',
             'apps/server/prisma/seed.ts',
             'apps/server/prisma/fixtures/index.ts',
             'apps/server/prisma/fixtures/notes.ts',
