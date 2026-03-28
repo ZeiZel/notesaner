@@ -1,13 +1,19 @@
-import { Module } from '@nestjs/common';
+import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { NOTE_INDEX_QUEUE } from './jobs.constants';
+import { FRESHNESS_CHECK_QUEUE, NOTE_INDEX_QUEUE } from './jobs.constants';
 import { JobsService } from './jobs.service';
 import { JobsController } from './jobs.controller';
 import { NoteIndexingProcessor } from './processors/note-indexing.processor';
+import { FreshnessCheckProcessor } from './processors/freshness-check.processor';
+import { EmailModule } from '../email/email.module';
+import { NotesModule } from '../notes/notes.module';
 
 @Module({
   imports: [
+    EmailModule,
+    // Use forwardRef to break the circular dependency: NotesModule -> JobsModule -> NotesModule
+    forwardRef(() => NotesModule),
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
@@ -27,6 +33,13 @@ import { NoteIndexingProcessor } from './processors/note-indexing.processor';
         backoff: { type: 'exponential', delay: 5_000 },
       },
     }),
+    BullModule.registerQueue({
+      name: FRESHNESS_CHECK_QUEUE,
+      defaultJobOptions: {
+        attempts: 2,
+        backoff: { type: 'fixed', delay: 60_000 },
+      },
+    }),
   ],
   controllers: [JobsController],
   providers: [
@@ -34,7 +47,10 @@ import { NoteIndexingProcessor } from './processors/note-indexing.processor';
     {
       provide: NoteIndexingProcessor,
       useClass: NoteIndexingProcessor,
-      // BullMQ worker concurrency
+    },
+    {
+      provide: FreshnessCheckProcessor,
+      useClass: FreshnessCheckProcessor,
     },
   ],
   exports: [JobsService],

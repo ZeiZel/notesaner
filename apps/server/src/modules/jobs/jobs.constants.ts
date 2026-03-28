@@ -12,3 +12,14 @@ export const INDEX_DEBOUNCE_MS = 2_000;
 
 /** Maximum number of concurrent note-indexing workers. */
 export const NOTE_INDEX_CONCURRENCY = 4;
+
+// ─── Freshness check ────────────────────────────────────────────────────────
+
+/** BullMQ queue name for freshness check jobs. */
+export const FRESHNESS_CHECK_QUEUE = 'freshness-check';
+
+/** Job name for daily staleness check across all workspaces. */
+export const FRESHNESS_CHECK_JOB = 'freshness-daily-check';
+
+/** Cron expression for the daily freshness check (every day at 06:00 UTC). */
+export const FRESHNESS_CHECK_CRON = '0 6 * * *';

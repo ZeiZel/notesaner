@@ -1,13 +1,20 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import {
+  FRESHNESS_CHECK_CRON,
+  FRESHNESS_CHECK_JOB,
+  FRESHNESS_CHECK_QUEUE,
   INDEX_DEBOUNCE_MS,
   INDEX_NOTE_JOB,
   NOTE_INDEX_QUEUE,
   REINDEX_WORKSPACE_JOB,
 } from './jobs.constants';
-import type { IndexNoteJobData, ReindexWorkspaceJobData } from './jobs.types';
+import type {
+  FreshnessCheckJobData,
+  IndexNoteJobData,
+  ReindexWorkspaceJobData,
+} from './jobs.types';
 
 /**
  * Facade for enqueueing BullMQ jobs.
@@ -15,17 +22,47 @@ import type { IndexNoteJobData, ReindexWorkspaceJobData } from './jobs.types';
  * Provides:
  *   - scheduleNoteIndex: debounced per-note indexing (deduplicates via jobId)
  *   - scheduleWorkspaceReindex: batch reindex for all notes in a workspace
+ *   - scheduleFreshnessCheck: on-demand freshness check for a workspace
+ *   - Daily cron-based freshness check (registered on module init)
  */
 @Injectable()
-export class JobsService {
+export class JobsService implements OnModuleInit {
   private readonly logger = new Logger(JobsService.name);
 
   constructor(
     @InjectQueue(NOTE_INDEX_QUEUE)
-    private readonly noteIndexQueue: Queue<
-      IndexNoteJobData | ReindexWorkspaceJobData
-    >,
+    private readonly noteIndexQueue: Queue<IndexNoteJobData | ReindexWorkspaceJobData>,
+    @InjectQueue(FRESHNESS_CHECK_QUEUE)
+    private readonly freshnessCheckQueue: Queue<FreshnessCheckJobData>,
   ) {}
+
+  /**
+   * Register the daily cron-based freshness check as a repeatable BullMQ job.
+   * This runs once on application startup and is idempotent (BullMQ deduplicates
+   * repeatables with the same key).
+   */
+  async onModuleInit(): Promise<void> {
+    try {
+      await this.freshnessCheckQueue.upsertJobScheduler(
+        'freshness-daily-scheduler',
+        { pattern: FRESHNESS_CHECK_CRON },
+        {
+          name: FRESHNESS_CHECK_JOB,
+          data: {} as FreshnessCheckJobData,
+          opts: {
+            removeOnComplete: { count: 30 },
+            removeOnFail: { count: 20 },
+          },
+        },
+      );
+
+      this.logger.log(`Registered daily freshness check cron: ${FRESHNESS_CHECK_CRON}`);
+    } catch (err) {
+      this.logger.error(`Failed to register freshness check cron: ${String(err)}`);
+    }
+  }
+
+  // ─── Note indexing jobs ───────────────────────────────────────────────────
 
   /**
    * Schedule a debounced full-text-search index update for a single note.
@@ -38,11 +75,7 @@ export class JobsService {
    * @param workspaceId UUID of the owning workspace
    * @param filePath   Absolute path to the note's .md file on disk
    */
-  async scheduleNoteIndex(
-    noteId: string,
-    workspaceId: string,
-    filePath: string,
-  ): Promise<void> {
+  async scheduleNoteIndex(noteId: string, workspaceId: string, filePath: string): Promise<void> {
     const jobId = `index-note:${noteId}`;
     const data: IndexNoteJobData = { noteId, workspaceId, filePath };
 
@@ -65,9 +98,7 @@ export class JobsService {
       removeOnFail: { count: 50 },
     });
 
-    this.logger.debug(
-      `Scheduled index for note ${noteId} with ${INDEX_DEBOUNCE_MS}ms debounce`,
-    );
+    this.logger.debug(`Scheduled index for note ${noteId} with ${INDEX_DEBOUNCE_MS}ms debounce`);
   }
 
   /**
@@ -93,17 +124,53 @@ export class JobsService {
     return job.id ?? jobId;
   }
 
+  // ─── Freshness check jobs ──────────────────────────────────────────────────
+
+  /**
+   * Schedule an on-demand freshness check for a specific workspace.
+   * Useful for admin-triggered checks outside the daily cron schedule.
+   *
+   * @param workspaceId UUID of the workspace to check.
+   * @returns BullMQ job ID for status tracking.
+   */
+  async scheduleFreshnessCheck(workspaceId?: string): Promise<string> {
+    const jobId = `freshness-check:${workspaceId ?? 'all'}:${Date.now()}`;
+    const data: FreshnessCheckJobData = { workspaceId };
+
+    const job = await this.freshnessCheckQueue.add(FRESHNESS_CHECK_JOB, data, {
+      jobId,
+      attempts: 2,
+      backoff: { type: 'fixed', delay: 60_000 },
+      removeOnComplete: { count: 30 },
+      removeOnFail: { count: 20 },
+    });
+
+    this.logger.log(
+      `Scheduled freshness check${workspaceId ? ` for workspace ${workspaceId}` : ' (all workspaces)'}, job ${job.id}`,
+    );
+    return job.id ?? jobId;
+  }
+
+  // ─── Job status ───────────────────────────────────────────────────────────
+
   /**
    * Retrieve the current status of a job by its ID.
    * Returns null when the job cannot be found (already removed from queue).
    */
-  async getJobStatus(
-    jobId: string,
-  ): Promise<{ state: string; progress: unknown } | null> {
-    const job = await this.noteIndexQueue.getJob(jobId);
-    if (!job) return null;
+  async getJobStatus(jobId: string): Promise<{ state: string; progress: unknown } | null> {
+    // Check both queues for the job
+    const noteJob = await this.noteIndexQueue.getJob(jobId);
+    if (noteJob) {
+      const state = await noteJob.getState();
+      return { state, progress: noteJob.progress };
+    }
 
-    const state = await job.getState();
-    return { state, progress: job.progress };
+    const freshnessJob = await this.freshnessCheckQueue.getJob(jobId);
+    if (freshnessJob) {
+      const state = await freshnessJob.getState();
+      return { state, progress: freshnessJob.progress };
+    }
+
+    return null;
   }
 }

@@ -1,5 +1,6 @@
 import { IsInt, IsOptional, Max, Min } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * DTO for configuring the freshness thresholds on a workspace.
@@ -16,6 +17,13 @@ export class FreshnessConfigDto {
    * Must be between 1 and 365.
    * Defaults to 60.
    */
+  @ApiPropertyOptional({
+    description: 'Days until a note is considered "aging" (yellow)',
+    example: 60,
+    minimum: 1,
+    maximum: 365,
+    default: 60,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
@@ -28,6 +36,13 @@ export class FreshnessConfigDto {
    * Must be between 1 and 730.
    * Defaults to 90.
    */
+  @ApiPropertyOptional({
+    description: 'Days until a note is considered "stale" (red). Must be > freshnessThreshold.',
+    example: 90,
+    minimum: 1,
+    maximum: 730,
+    default: 90,
+  })
   @IsOptional()
   @Type(() => Number)
   @IsInt()
