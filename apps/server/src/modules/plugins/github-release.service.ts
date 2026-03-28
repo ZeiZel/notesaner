@@ -4,14 +4,16 @@ import {
   BadRequestException,
   NotFoundException,
   InternalServerErrorException,
+  ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import { createReadStream, createWriteStream } from 'node:fs';
-import { mkdir, readFile, rm, stat, readdir } from 'node:fs/promises';
+import { mkdir, readFile, rm, stat, readdir, rename, cp } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import { Readable } from 'node:stream';
+import { ValkeyService } from '../valkey/valkey.service';
 import type {
   GitHubRelease,
   GitHubReleaseAsset,
@@ -20,7 +22,7 @@ import type {
   PluginUpdateInfo,
 } from './plugin.types';
 
-// ── Constants ────────────────────────────────────────────────────────────────
+// -- Constants ----------------------------------------------------------------
 
 const GITHUB_API_BASE = 'https://api.github.com';
 const PLUGIN_MANIFEST_FILENAME = 'plugin.json';
@@ -28,7 +30,16 @@ const PLUGIN_CACHE_DIR_NAME = '.plugin-cache';
 const MAX_ZIP_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB safety limit
 const GITHUB_API_TIMEOUT_MS = 30_000;
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+/** ValKey cache TTL for GitHub release metadata: 1 hour */
+const RELEASE_CACHE_TTL_SECONDS = 3600;
+
+/** Maximum number of retry attempts for transient GitHub errors */
+const MAX_RETRIES = 3;
+
+/** Base delay in ms for exponential backoff (doubles on each retry) */
+const BACKOFF_BASE_MS = 1000;
+
+// -- Helpers ------------------------------------------------------------------
 
 /**
  * Extract semver from a GitHub tag name.
@@ -38,44 +49,73 @@ function extractVersion(tagName: string): string {
   return tagName.replace(/^v/, '');
 }
 
-// ── Service ──────────────────────────────────────────────────────────────────
+/**
+ * Build the ValKey cache key for a GitHub release lookup.
+ */
+function buildReleaseCacheKey(owner: string, repo: string, tag?: string): string {
+  const suffix = tag ? `:${tag}` : ':latest';
+  return `gh:release:${owner}:${repo}${suffix}`;
+}
+
+/**
+ * Sleep for the given number of milliseconds.
+ */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// -- Service ------------------------------------------------------------------
 
 @Injectable()
 export class GitHubReleaseService {
   private readonly logger = new Logger(GitHubReleaseService.name);
-  private readonly githubToken: string | undefined;
+  private readonly defaultGithubToken: string | undefined;
   private readonly storageRoot: string;
   private readonly cacheRoot: string;
 
-  constructor(private readonly config: ConfigService) {
-    this.githubToken = this.config.get<string>('github.token');
+  constructor(
+    private readonly config: ConfigService,
+    private readonly valkey: ValkeyService,
+  ) {
+    this.defaultGithubToken = this.config.get<string>('github.token');
     this.storageRoot = this.config.get<string>('storage.root', '/var/lib/notesaner/workspaces');
     this.cacheRoot = resolve(this.storageRoot, '..', PLUGIN_CACHE_DIR_NAME);
   }
 
-  // ── Public API ─────────────────────────────────────────────────────────────
+  // -- Public API -------------------------------------------------------------
 
   /**
-   * Install a plugin from a GitHub release.
+   * Install a plugin from a GitHub release into a workspace.
    *
    * 1. Fetch the specified release (or latest) from GitHub.
    * 2. Download the .zip asset.
-   * 3. Verify checksum (if provided).
-   * 4. Extract to the plugin cache directory.
+   * 3. Verify checksum (if provided in manifest or explicitly).
+   * 4. Extract to a staging directory first.
    * 5. Parse and validate the plugin manifest.
-   * 6. Return the install result.
+   * 6. Atomically move to the workspace plugin directory.
+   * 7. Rollback on any failure after partial extraction.
    */
   async installFromGitHub(
     repository: string,
-    version?: string,
-    expectedChecksum?: string,
+    workspaceId: string,
+    options?: {
+      version?: string;
+      expectedChecksum?: string;
+      githubToken?: string;
+    },
   ): Promise<PluginInstallResult> {
-    this.logger.log(`Installing plugin from ${repository}${version ? `@${version}` : ' (latest)'}`);
+    const { version, expectedChecksum, githubToken } = options ?? {};
+    const token = githubToken ?? this.defaultGithubToken;
 
-    // 1. Fetch release metadata
+    this.logger.log(
+      `Installing plugin from ${repository}${version ? `@${version}` : ' (latest)'} ` +
+        `into workspace ${workspaceId}`,
+    );
+
+    // 1. Fetch release metadata (with ValKey caching)
     const release = version
-      ? await this.fetchReleaseByTag(repository, version)
-      : await this.fetchLatestRelease(repository);
+      ? await this.fetchReleaseByTag(repository, version, token)
+      : await this.fetchLatestRelease(repository, token);
 
     if (!release.zipAsset) {
       throw new NotFoundException(
@@ -93,7 +133,7 @@ export class GitHubReleaseService {
     }
 
     // 3. Download .zip to cache
-    const zipPath = await this.downloadAsset(repository, release.version, release.zipAsset);
+    const zipPath = await this.downloadAsset(repository, release.version, release.zipAsset, token);
 
     // 4. Compute and verify checksum
     const checksum = await this.computeSha256(zipPath);
@@ -101,7 +141,6 @@ export class GitHubReleaseService {
 
     if (expectedChecksum) {
       if (checksum.toLowerCase() !== expectedChecksum.toLowerCase()) {
-        // Clean up the downloaded file on checksum mismatch
         await rm(zipPath, { force: true });
         throw new BadRequestException(
           `Checksum mismatch. Expected: ${expectedChecksum}, got: ${checksum}. ` +
@@ -112,11 +151,57 @@ export class GitHubReleaseService {
       this.logger.log(`Checksum verified for ${repository}@${release.version}`);
     }
 
-    // 5. Extract the archive
-    const installPath = await this.extractZip(repository, release.version, zipPath);
+    // 5. Extract to a staging directory (for rollback safety)
+    const stagingDir = await this.extractToStaging(repository, release.version, zipPath);
 
-    // 6. Parse manifest
-    const manifest = await this.parseManifest(installPath);
+    // 6. Parse manifest from staging
+    let manifest: PluginManifest;
+    try {
+      manifest = await this.parseManifest(stagingDir);
+    } catch (error) {
+      // Rollback: remove the staging directory
+      await rm(stagingDir, { recursive: true, force: true });
+      throw error;
+    }
+
+    // 7. Verify manifest checksum if present and no explicit checksum was provided
+    if (!expectedChecksum && manifest.checksum) {
+      // Re-download was already done; compare against manifest checksum
+      if (checksum.toLowerCase() !== manifest.checksum.toLowerCase()) {
+        await rm(stagingDir, { recursive: true, force: true });
+        throw new BadRequestException(
+          `Checksum from manifest does not match downloaded file. ` +
+            `Expected: ${manifest.checksum}, got: ${checksum}. ` +
+            'The extraction has been rolled back for security.',
+        );
+      }
+      checksumVerified = true;
+      this.logger.log(`Checksum verified from manifest for ${repository}@${release.version}`);
+    }
+
+    // 8. Move from staging to final workspace plugin directory
+    const installPath = this.getWorkspacePluginDir(workspaceId, manifest.id);
+    try {
+      // Remove existing installation if any
+      await rm(installPath, { recursive: true, force: true });
+      await mkdir(resolve(installPath, '..'), { recursive: true });
+
+      // Attempt an atomic rename (same filesystem) or fall back to copy+delete
+      try {
+        await rename(stagingDir, installPath);
+      } catch {
+        // Cross-device move: copy then clean up staging
+        await cp(stagingDir, installPath, { recursive: true });
+        await rm(stagingDir, { recursive: true, force: true });
+      }
+    } catch (error) {
+      // Rollback: clean up both staging and partial install
+      await rm(stagingDir, { recursive: true, force: true }).catch(() => {});
+      await rm(installPath, { recursive: true, force: true }).catch(() => {});
+      throw new InternalServerErrorException(
+        `Failed to install plugin to workspace: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
 
     this.logger.log(`Plugin ${manifest.id}@${manifest.version} installed to ${installPath}`);
 
@@ -136,9 +221,12 @@ export class GitHubReleaseService {
     pluginId: string,
     repository: string,
     currentVersion: string,
+    githubToken?: string,
   ): Promise<PluginUpdateInfo> {
+    const token = githubToken ?? this.defaultGithubToken;
+
     try {
-      const release = await this.fetchLatestRelease(repository);
+      const release = await this.fetchLatestRelease(repository, token);
 
       return {
         pluginId,
@@ -192,7 +280,7 @@ export class GitHubReleaseService {
    * Check if a cached version of a plugin exists on disk.
    */
   async isCached(repository: string, version: string): Promise<boolean> {
-    const dir = this.getInstallDir(repository, version);
+    const dir = this.getCacheInstallDir(repository, version);
     try {
       const stats = await stat(dir);
       return stats.isDirectory();
@@ -202,11 +290,18 @@ export class GitHubReleaseService {
   }
 
   /**
-   * Get the filesystem path where a plugin version is stored.
+   * Get the filesystem path where a plugin version is cached.
    */
-  getInstallDir(repository: string, version: string): string {
+  getCacheInstallDir(repository: string, version: string): string {
     const [owner, repo] = repository.split('/');
     return join(this.cacheRoot, owner ?? '', repo ?? '', version);
+  }
+
+  /**
+   * Get the filesystem path for a plugin in a workspace.
+   */
+  getWorkspacePluginDir(workspaceId: string, pluginId: string): string {
+    return join(this.storageRoot, workspaceId, 'plugins', pluginId);
   }
 
   /**
@@ -224,22 +319,79 @@ export class GitHubReleaseService {
     }
   }
 
-  // ── GitHub API ─────────────────────────────────────────────────────────────
+  /**
+   * Invalidate the ValKey cache for a repository's releases.
+   */
+  async invalidateCache(repository: string): Promise<void> {
+    const [owner, repo] = repository.split('/');
+    if (!owner || !repo) return;
+
+    const latestKey = buildReleaseCacheKey(owner, repo);
+    await this.valkey.del(latestKey);
+    this.logger.debug(`Invalidated release cache for ${repository}`);
+  }
+
+  // -- GitHub API -------------------------------------------------------------
 
   /**
    * Fetch the latest non-prerelease GitHub release for a repository.
+   * Results are cached in ValKey for 1 hour.
    */
-  async fetchLatestRelease(repository: string): Promise<GitHubRelease> {
+  async fetchLatestRelease(repository: string, token?: string): Promise<GitHubRelease> {
+    const [owner, repo] = repository.split('/');
+    if (!owner || !repo) {
+      throw new BadRequestException(
+        `Invalid repository format: "${repository}". Expected "owner/repo".`,
+      );
+    }
+
+    const effectiveToken = token ?? this.defaultGithubToken;
+    const cacheKey = buildReleaseCacheKey(owner, repo);
+
+    // Try ValKey cache first
+    const cached = await this.getCachedRelease(cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache hit for ${repository} latest release`);
+      return cached;
+    }
+
     const url = `${GITHUB_API_BASE}/repos/${repository}/releases/latest`;
-    const data = await this.githubApiGet(url);
-    return this.parseReleaseResponse(data);
+    const data = await this.githubApiGetWithRetry(url, effectiveToken);
+    const release = this.parseReleaseResponse(data);
+
+    // Cache the result
+    await this.cacheRelease(cacheKey, release);
+
+    return release;
   }
 
   /**
    * Fetch a specific GitHub release by tag.
    * Tries both "vX.Y.Z" and "X.Y.Z" tag formats.
+   * Results are cached in ValKey for 1 hour.
    */
-  async fetchReleaseByTag(repository: string, version: string): Promise<GitHubRelease> {
+  async fetchReleaseByTag(
+    repository: string,
+    version: string,
+    token?: string,
+  ): Promise<GitHubRelease> {
+    const [owner, repo] = repository.split('/');
+    if (!owner || !repo) {
+      throw new BadRequestException(
+        `Invalid repository format: "${repository}". Expected "owner/repo".`,
+      );
+    }
+
+    const effectiveToken = token ?? this.defaultGithubToken;
+    const cacheKey = buildReleaseCacheKey(owner, repo, version);
+
+    // Try ValKey cache first
+    const cached = await this.getCachedRelease(cacheKey);
+    if (cached) {
+      this.logger.debug(`Cache hit for ${repository}@${version}`);
+      return cached;
+    }
+
     const tagsToTry = version.startsWith('v')
       ? [version, version.slice(1)]
       : [`v${version}`, version];
@@ -247,10 +399,14 @@ export class GitHubReleaseService {
     for (const tag of tagsToTry) {
       try {
         const url = `${GITHUB_API_BASE}/repos/${repository}/releases/tags/${encodeURIComponent(tag)}`;
-        const data = await this.githubApiGet(url);
-        return this.parseReleaseResponse(data);
+        const data = await this.githubApiGetWithRetry(url, effectiveToken);
+        const release = this.parseReleaseResponse(data);
+
+        // Cache the result
+        await this.cacheRelease(cacheKey, release);
+
+        return release;
       } catch (error) {
-        // If it's a 404, try next tag format. Otherwise rethrow.
         if (error instanceof NotFoundException) {
           continue;
         }
@@ -264,7 +420,7 @@ export class GitHubReleaseService {
     );
   }
 
-  // ── Download and Extract ───────────────────────────────────────────────────
+  // -- Download and Extract ---------------------------------------------------
 
   /**
    * Download a release .zip asset to the local cache directory.
@@ -274,6 +430,7 @@ export class GitHubReleaseService {
     repository: string,
     version: string,
     asset: GitHubReleaseAsset,
+    token?: string,
   ): Promise<string> {
     const [owner, repo] = repository.split('/');
     const cacheDir = join(this.cacheRoot, owner ?? '', repo ?? '', version);
@@ -289,11 +446,11 @@ export class GitHubReleaseService {
       Accept: 'application/octet-stream',
       'User-Agent': 'Notesaner-Server/1.0',
     };
-    if (this.githubToken) {
-      headers['Authorization'] = `Bearer ${this.githubToken}`;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(asset.browserDownloadUrl, {
+    const response = await this.fetchWithRetry(asset.browserDownloadUrl, {
       headers,
       signal: AbortSignal.timeout(GITHUB_API_TIMEOUT_MS),
       redirect: 'follow',
@@ -321,13 +478,22 @@ export class GitHubReleaseService {
   }
 
   /**
-   * Extract a .zip file into the plugin installation directory.
-   * Uses Node.js built-in unzip via a child process for security
-   * (no third-party zip library needed).
+   * Extract a .zip file into a staging directory for validation.
+   * Returns the resolved path to the extracted plugin root.
+   *
+   * On failure, the staging directory is cleaned up (rollback).
    */
-  private async extractZip(repository: string, version: string, zipPath: string): Promise<string> {
-    const installDir = this.getInstallDir(repository, version);
-    await mkdir(installDir, { recursive: true });
+  private async extractToStaging(
+    _repository: string,
+    _version: string,
+    zipPath: string,
+  ): Promise<string> {
+    const stagingDir = join(
+      this.cacheRoot,
+      '.staging',
+      `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    );
+    await mkdir(stagingDir, { recursive: true });
 
     const { exec } = await import('node:child_process');
     const { promisify } = await import('node:util');
@@ -335,18 +501,19 @@ export class GitHubReleaseService {
 
     try {
       // Use system unzip; -o overwrites without prompting, -d sets target directory
-      await execAsync(`unzip -o -q "${zipPath}" -d "${installDir}"`, {
+      await execAsync(`unzip -o -q "${zipPath}" -d "${stagingDir}"`, {
         timeout: 60_000,
       });
     } catch (error) {
+      // Rollback: clean up the staging directory
+      await rm(stagingDir, { recursive: true, force: true });
       throw new InternalServerErrorException(
         `Failed to extract plugin archive: ${error instanceof Error ? error.message : String(error)}`,
       );
     }
 
-    // Some GitHub release zips contain a single top-level directory.
-    // If that's the case, use the nested directory as the install root.
-    const resolvedDir = await this.resolveExtractedRoot(installDir);
+    // Resolve nested directory structure (common GitHub zip pattern)
+    const resolvedDir = await this.resolveExtractedRoot(stagingDir);
 
     // Clean up the .zip file after successful extraction
     await rm(zipPath, { force: true });
@@ -385,23 +552,23 @@ export class GitHubReleaseService {
     return dir;
   }
 
-  // ── Checksum ───────────────────────────────────────────────────────────────
+  // -- Checksum ---------------------------------------------------------------
 
   /**
    * Compute SHA-256 hash of a file on disk.
    */
   private async computeSha256(filePath: string): Promise<string> {
-    return new Promise<string>((resolve, reject) => {
+    return new Promise<string>((resolveHash, reject) => {
       const hash = createHash('sha256');
       const stream = createReadStream(filePath);
 
       stream.on('data', (chunk: Buffer) => hash.update(chunk));
-      stream.on('end', () => resolve(hash.digest('hex')));
+      stream.on('end', () => resolveHash(hash.digest('hex')));
       stream.on('error', (err) => reject(err));
     });
   }
 
-  // ── Version Comparison ─────────────────────────────────────────────────────
+  // -- Version Comparison -----------------------------------------------------
 
   /**
    * Simple semver comparison: returns true if latest > current.
@@ -426,51 +593,201 @@ export class GitHubReleaseService {
     return false;
   }
 
-  // ── GitHub API Helpers ─────────────────────────────────────────────────────
+  // -- ValKey Caching ---------------------------------------------------------
 
-  private async githubApiGet(url: string): Promise<Record<string, unknown>> {
+  /**
+   * Retrieve a cached GitHub release from ValKey.
+   * Returns null on cache miss or parse failure.
+   */
+  private async getCachedRelease(cacheKey: string): Promise<GitHubRelease | null> {
+    try {
+      const raw = await this.valkey.get(cacheKey);
+      if (!raw) return null;
+      return JSON.parse(raw) as GitHubRelease;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Store a GitHub release in ValKey with the configured TTL.
+   */
+  private async cacheRelease(cacheKey: string, release: GitHubRelease): Promise<void> {
+    try {
+      await this.valkey.set(cacheKey, JSON.stringify(release), RELEASE_CACHE_TTL_SECONDS);
+    } catch (error) {
+      // Cache write failure is non-fatal; log and continue
+      this.logger.warn(
+        `Failed to cache release data: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
+
+  // -- GitHub API Helpers with Retry ------------------------------------------
+
+  /**
+   * Perform a GitHub API GET request with exponential backoff retry
+   * on transient errors (429 Too Many Requests, 503 Service Unavailable).
+   */
+  private async githubApiGetWithRetry(
+    url: string,
+    token?: string,
+  ): Promise<Record<string, unknown>> {
     const headers: Record<string, string> = {
       Accept: 'application/vnd.github+json',
       'User-Agent': 'Notesaner-Server/1.0',
       'X-GitHub-Api-Version': '2022-11-28',
     };
 
-    if (this.githubToken) {
-      headers['Authorization'] = `Bearer ${this.githubToken}`;
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const response = await fetch(url, {
-      headers,
-      signal: AbortSignal.timeout(GITHUB_API_TIMEOUT_MS),
-    });
+    let lastError: Error | undefined;
 
-    if (response.status === 404) {
-      throw new NotFoundException(
-        `GitHub resource not found: ${url}. Ensure the repository exists and has public releases.`,
-      );
-    }
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await fetch(url, {
+          headers,
+          signal: AbortSignal.timeout(GITHUB_API_TIMEOUT_MS),
+        });
 
-    if (response.status === 403) {
-      const rateLimitRemaining = response.headers.get('x-ratelimit-remaining');
-      if (rateLimitRemaining === '0') {
-        const resetTime = response.headers.get('x-ratelimit-reset');
-        throw new InternalServerErrorException(
-          `GitHub API rate limit exceeded. Resets at ${resetTime ? new Date(Number(resetTime) * 1000).toISOString() : 'unknown'}. ` +
-            'Configure GITHUB_TOKEN to increase the rate limit.',
-        );
+        // Handle rate limiting (429) — retry after the indicated delay
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('retry-after');
+          const waitMs = retryAfter
+            ? parseInt(retryAfter, 10) * 1000
+            : BACKOFF_BASE_MS * Math.pow(2, attempt);
+
+          if (attempt < MAX_RETRIES) {
+            this.logger.warn(
+              `GitHub API rate limited (429). Retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+            );
+            await sleep(Math.min(waitMs, 60_000)); // cap at 60s
+            continue;
+          }
+
+          throw new ServiceUnavailableException(
+            'GitHub API rate limit exceeded after retries. ' +
+              'Configure GITHUB_TOKEN to increase the rate limit (5000/hr vs 60/hr).',
+          );
+        }
+
+        // Handle 503 — transient server error, retry
+        if (response.status === 503) {
+          if (attempt < MAX_RETRIES) {
+            const waitMs = BACKOFF_BASE_MS * Math.pow(2, attempt);
+            this.logger.warn(
+              `GitHub API returned 503. Retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+            );
+            await sleep(waitMs);
+            continue;
+          }
+
+          throw new ServiceUnavailableException(
+            'GitHub API is temporarily unavailable (503). Please try again later.',
+          );
+        }
+
+        // 404 — resource not found, do not retry
+        if (response.status === 404) {
+          throw new NotFoundException(
+            `GitHub resource not found: ${url}. Ensure the repository exists and has public releases.`,
+          );
+        }
+
+        // 403 — could be rate limit exhausted or permission issue
+        if (response.status === 403) {
+          const rateLimitRemaining = response.headers.get('x-ratelimit-remaining');
+          if (rateLimitRemaining === '0') {
+            const resetTime = response.headers.get('x-ratelimit-reset');
+            throw new ServiceUnavailableException(
+              `GitHub API rate limit exhausted. Resets at ${resetTime ? new Date(Number(resetTime) * 1000).toISOString() : 'unknown'}. ` +
+                'Configure GITHUB_TOKEN to increase the rate limit.',
+            );
+          }
+          throw new InternalServerErrorException(
+            'GitHub API returned 403 Forbidden. Check GITHUB_TOKEN permissions.',
+          );
+        }
+
+        // Any other non-2xx status
+        if (!response.ok) {
+          throw new InternalServerErrorException(
+            `GitHub API error: HTTP ${response.status} ${response.statusText}`,
+          );
+        }
+
+        return (await response.json()) as Record<string, unknown>;
+      } catch (error) {
+        // If it is one of our NestJS exceptions, rethrow immediately
+        if (
+          error instanceof NotFoundException ||
+          error instanceof BadRequestException ||
+          error instanceof InternalServerErrorException ||
+          error instanceof ServiceUnavailableException
+        ) {
+          throw error;
+        }
+
+        // Network errors or timeouts — retry
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (attempt < MAX_RETRIES) {
+          const waitMs = BACKOFF_BASE_MS * Math.pow(2, attempt);
+          this.logger.warn(
+            `GitHub API request failed: ${lastError.message}. Retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+          );
+          await sleep(waitMs);
+          continue;
+        }
       }
-      throw new InternalServerErrorException(
-        'GitHub API returned 403 Forbidden. Check GITHUB_TOKEN permissions.',
-      );
     }
 
-    if (!response.ok) {
-      throw new InternalServerErrorException(
-        `GitHub API error: HTTP ${response.status} ${response.statusText}`,
-      );
+    throw new InternalServerErrorException(
+      `GitHub API request failed after ${MAX_RETRIES} retries: ${lastError?.message ?? 'unknown error'}`,
+    );
+  }
+
+  /**
+   * Fetch with retry for asset downloads (429/503/network errors).
+   */
+  private async fetchWithRetry(url: string, init: RequestInit): Promise<Response> {
+    let lastError: Error | undefined;
+
+    for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+      try {
+        const response = await fetch(url, init);
+
+        if (response.status === 429 || response.status === 503) {
+          if (attempt < MAX_RETRIES) {
+            const waitMs = BACKOFF_BASE_MS * Math.pow(2, attempt);
+            this.logger.warn(
+              `Download request returned ${response.status}. Retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+            );
+            await sleep(waitMs);
+            continue;
+          }
+        }
+
+        return response;
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+
+        if (attempt < MAX_RETRIES) {
+          const waitMs = BACKOFF_BASE_MS * Math.pow(2, attempt);
+          this.logger.warn(
+            `Download request failed: ${lastError.message}. Retrying in ${waitMs}ms (attempt ${attempt + 1}/${MAX_RETRIES})`,
+          );
+          await sleep(waitMs);
+          continue;
+        }
+      }
     }
 
-    return (await response.json()) as Record<string, unknown>;
+    throw new InternalServerErrorException(
+      `Download failed after ${MAX_RETRIES} retries: ${lastError?.message ?? 'unknown error'}`,
+    );
   }
 
   /**
@@ -487,7 +804,7 @@ export class GitHubReleaseService {
       contentType: String(a['content_type'] ?? ''),
     }));
 
-    // Find the .zip asset — prefer one named "plugin.zip" or fallback to
+    // Find the .zip asset -- prefer one named "plugin.zip" or fallback to
     // any .zip file.
     const zipAsset =
       parsedAssets.find((a) => a.name === 'plugin.zip') ??
@@ -506,11 +823,11 @@ export class GitHubReleaseService {
     };
   }
 
-  // ── Manifest Validation ────────────────────────────────────────────────────
+  // -- Manifest Validation ----------------------------------------------------
 
   /**
    * Validate the parsed manifest object and return a typed PluginManifest.
-   * This is a runtime check — the shape must match what plugins provide.
+   * This is a runtime check -- the shape must match what plugins provide.
    */
   private validateManifest(parsed: unknown): PluginManifest {
     if (!parsed || typeof parsed !== 'object') {
@@ -569,6 +886,7 @@ export class GitHubReleaseService {
       license: typeof obj['license'] === 'string' ? obj['license'] : undefined,
       icon: typeof obj['icon'] === 'string' ? obj['icon'] : undefined,
       keywords: Array.isArray(obj['keywords']) ? (obj['keywords'] as string[]) : undefined,
+      checksum: typeof obj['checksum'] === 'string' ? obj['checksum'] : undefined,
       configSchema:
         obj['configSchema'] && typeof obj['configSchema'] === 'object'
           ? (obj['configSchema'] as Record<string, unknown>)
