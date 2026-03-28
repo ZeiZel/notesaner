@@ -94,6 +94,11 @@ export default tseslint.config(
               onlyDependOnLibsWithTags: ['scope:lib', 'scope:shared'],
             },
             {
+              // web app can consume libs and shared packages
+              sourceTag: 'scope:web',
+              onlyDependOnLibsWithTags: ['scope:lib', 'scope:shared'],
+            },
+            {
               // libs can consume other libs and shared packages
               sourceTag: 'scope:lib',
               onlyDependOnLibsWithTags: ['scope:lib', 'scope:shared'],
