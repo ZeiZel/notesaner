@@ -1,0 +1,22 @@
+{
+  "id": "notesaner.calendar",
+  "name": "Calendar",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "Calendar view with month, week, and day layouts. Supports daily notes, note scheduling via frontmatter date, timeline view, recurring notes, tag color coding, and week number display.",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-calendar",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage:notes-read",
+    "storage:notes-write",
+    "ui:register-view",
+    "ui:register-command",
+    "ui:show-notice"
+  ],
+  "tags": ["calendar", "daily-notes", "schedule", "timeline", "productivity"],
+  "entryPoints": {
+    "view": "dist/index.js",
+    "commands": "dist/index.js"
+  }
+}

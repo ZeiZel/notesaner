@@ -1,0 +1,18 @@
+{
+  "name": "plugin-database",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/plugin-database/src",
+  "projectType": "library",
+  "tags": ["scope:shared"],
+  "targets": {
+    "type-check": {
+      "command": "tsc --noEmit -p packages/plugin-database/tsconfig.json"
+    },
+    "test": {
+      "executor": "@nx/vite:test",
+      "options": {
+        "configFile": "packages/plugin-database/vitest.config.ts"
+      }
+    }
+  }
+}

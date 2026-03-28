@@ -1,0 +1,26 @@
+{
+  "id": "notesaner.database",
+  "name": "Database",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "Notion-like database views for your notes. Table, board (kanban), gallery, and list views with column types, sort, filter, group-by, CSV import/export, formula engine, and inline embeds.",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-database",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage:notes-read",
+    "storage:notes-write",
+    "storage:local",
+    "ui:register-view",
+    "ui:register-command",
+    "ui:register-sidebar",
+    "ui:show-notice",
+    "editor:insert-block"
+  ],
+  "tags": ["database", "table", "kanban", "gallery", "notion", "spreadsheet", "filter", "sort"],
+  "entryPoints": {
+    "view": "dist/index.js",
+    "commands": "dist/index.js",
+    "editorExtension": "dist/index.js"
+  }
+}

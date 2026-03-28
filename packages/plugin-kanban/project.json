@@ -1,0 +1,19 @@
+{
+  "name": "plugin-kanban",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/plugin-kanban/src",
+  "projectType": "library",
+  "tags": ["scope:shared"],
+  "targets": {
+    "type-check": {
+      "command": "tsc --noEmit -p packages/plugin-kanban/tsconfig.json"
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm vitest run",
+        "cwd": "packages/plugin-kanban"
+      }
+    }
+  }
+}

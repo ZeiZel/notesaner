@@ -1,0 +1,23 @@
+{
+  "id": "notesaner.excalidraw",
+  "name": "Excalidraw",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "Embed Excalidraw whiteboards directly in notes. Create, save, and export drawings as .excalidraw JSON files with PNG/SVG export support. Supports full-screen whiteboard mode and resizable embeds.",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-excalidraw",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage:notes-read",
+    "storage:notes-write",
+    "ui:register-command",
+    "ui:register-view",
+    "ui:show-notice"
+  ],
+  "tags": ["excalidraw", "whiteboard", "drawing", "diagram", "sketch"],
+  "entryPoints": {
+    "editorExtension": "dist/index.js",
+    "commands": "dist/index.js",
+    "view": "dist/index.js"
+  }
+}

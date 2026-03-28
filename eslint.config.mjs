@@ -125,7 +125,7 @@ export default tseslint.config(
   {
     files: ['libs/**/*.ts', 'packages/**/*.ts'],
     rules: {
-      'no-console': 'error',
+      'no-console': ['error', { allow: ['warn', 'error'] }],
     },
   },
 

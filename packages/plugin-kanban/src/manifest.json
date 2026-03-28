@@ -1,0 +1,22 @@
+{
+  "id": "notesaner.kanban",
+  "name": "Kanban Board",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "Visualize notes as Kanban cards. Define columns in note frontmatter, drag cards between columns, and create new notes directly from the board.",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-kanban",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage:notes-read",
+    "storage:notes-write",
+    "ui:register-view",
+    "ui:register-command",
+    "ui:show-notice"
+  ],
+  "tags": ["kanban", "productivity", "project-management", "views"],
+  "entryPoints": {
+    "view": "dist/index.js",
+    "commands": "dist/index.js"
+  }
+}
