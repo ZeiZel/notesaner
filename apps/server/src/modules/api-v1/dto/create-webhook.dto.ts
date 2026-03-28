@@ -18,6 +18,8 @@ export enum WebhookEvent {
   NOTE_UPDATED = 'note.updated',
   NOTE_DELETED = 'note.deleted',
   NOTE_PUBLISHED = 'note.published',
+  MEMBER_JOINED = 'member.joined',
+  MEMBER_LEFT = 'member.left',
 }
 
 export class CreateWebhookDto {

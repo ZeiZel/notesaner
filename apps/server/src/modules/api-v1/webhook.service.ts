@@ -1,7 +1,8 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { createHash, createHmac, randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { JobsService } from '../jobs/jobs.service';
+import { WEBHOOK_MAX_PER_WORKSPACE } from '../jobs/jobs.constants';
 import { CreateWebhookDto, WebhookEvent } from './dto/create-webhook.dto';
 
 // ─── Shapes ───────────────────────────────────────────────────────────────────
@@ -11,12 +12,14 @@ export interface WebhookDto {
   workspaceId: string;
   url: string;
   events: WebhookEvent[];
+  isActive: boolean;
+  failureCount: number;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface WebhookWithSecret extends WebhookDto {
-  /** Raw secret — only present on creation */
+  /** Raw secret -- only present on creation */
   secret: string;
 }
 
@@ -26,6 +29,7 @@ export interface WebhookDeliveryDto {
   event: WebhookEvent;
   payload: Record<string, unknown>;
   statusCode: number | null;
+  responseTimeMs: number | null;
   success: boolean;
   attempts: number;
   deliveredAt: string | null;
@@ -41,6 +45,7 @@ interface WebhookRow {
   events: string[];
   secret_hash: string;
   is_active: boolean;
+  failure_count: number;
   created_at: Date;
   updated_at: Date;
 }
@@ -51,31 +56,21 @@ interface WebhookDeliveryRow {
   event: string;
   payload: unknown;
   status_code: number | null;
+  response_time_ms: number | null;
   success: boolean;
   attempts: number;
   delivered_at: Date | null;
   created_at: Date;
 }
 
-// ─── Constants ────────────────────────────────────────────────────────────────
-
-/** Maximum number of delivery attempts before permanently failing. */
-export const WEBHOOK_MAX_ATTEMPTS = 3;
-
 /**
- * Exponential back-off delays in milliseconds for retry scheduling.
- * Attempt 1: immediate, Attempt 2: 60s, Attempt 3: 300s
- */
-export const WEBHOOK_BACKOFF_DELAYS_MS = [0, 60_000, 300_000];
-
-/**
- * WebhookService — manages webhook subscriptions, HMAC signing, and delivery
+ * WebhookService -- manages webhook subscriptions, HMAC signing, and delivery
  * via the background job queue.
  *
  * Signature scheme:
- *   Body    = JSON.stringify({ event, triggeredAt, data })
+ *   Body    = JSON.stringify({ event, triggeredAt, data, workspaceId })
  *   Digest  = HMAC-SHA256(body, secretHash), hex-encoded
- *   Header  = X-Notesaner-Signature: sha256=<hex>
+ *   Header  = X-Webhook-Signature: sha256=<hex>
  *
  * The secretHash stored in the database is used as the HMAC key.
  * This means:
@@ -98,21 +93,35 @@ export class WebhookService {
 
   /**
    * Create a webhook subscription for the workspace.
-   * Returns the raw secret on creation — it is hashed before storage and
+   * Enforces a maximum of WEBHOOK_MAX_PER_WORKSPACE active webhooks.
+   * Returns the raw secret on creation -- it is hashed before storage and
    * never recoverable afterwards.
    */
   async create(workspaceId: string, dto: CreateWebhookDto): Promise<WebhookWithSecret> {
+    // Enforce max webhooks per workspace
+    const countRows = await this.prisma.$queryRaw<{ count: bigint }[]>`
+      SELECT COUNT(*)::bigint AS count FROM webhooks
+      WHERE workspace_id = ${workspaceId} AND is_active = true
+    `;
+
+    const currentCount = Number(countRows[0]?.count ?? 0);
+    if (currentCount >= WEBHOOK_MAX_PER_WORKSPACE) {
+      throw new BadRequestException(
+        `Maximum of ${WEBHOOK_MAX_PER_WORKSPACE} active webhooks per workspace reached`,
+      );
+    }
+
     const rawSecret = dto.secret ?? randomBytes(32).toString('hex');
     const secretHash = WebhookService.hashSecret(rawSecret);
 
     const rows = await this.prisma.$queryRaw<WebhookRow[]>`
       INSERT INTO webhooks (id, workspace_id, url, events, secret_hash)
       VALUES (gen_random_uuid(), ${workspaceId}, ${dto.url}, ${dto.events}, ${secretHash})
-      RETURNING id, workspace_id, url, events, secret_hash, is_active, created_at, updated_at
+      RETURNING id, workspace_id, url, events, secret_hash, is_active, failure_count, created_at, updated_at
     `;
 
     const record = rows[0];
-    this.logger.log(`Webhook created for workspace ${workspaceId}: ${record.id} → ${dto.url}`);
+    this.logger.log(`Webhook created for workspace ${workspaceId}: ${record.id} -> ${dto.url}`);
 
     return {
       ...this.mapRowToDto(record),
@@ -123,7 +132,7 @@ export class WebhookService {
   /** List all active webhooks for a workspace. */
   async list(workspaceId: string): Promise<WebhookDto[]> {
     const records = await this.prisma.$queryRaw<WebhookRow[]>`
-      SELECT id, workspace_id, url, events, secret_hash, is_active, created_at, updated_at
+      SELECT id, workspace_id, url, events, secret_hash, is_active, failure_count, created_at, updated_at
       FROM webhooks
       WHERE workspace_id = ${workspaceId} AND is_active = true
       ORDER BY created_at DESC
@@ -135,7 +144,7 @@ export class WebhookService {
   /** Get a single webhook by ID. */
   async findById(workspaceId: string, webhookId: string): Promise<WebhookDto> {
     const rows = await this.prisma.$queryRaw<WebhookRow[]>`
-      SELECT id, workspace_id, url, events, secret_hash, is_active, created_at, updated_at
+      SELECT id, workspace_id, url, events, secret_hash, is_active, failure_count, created_at, updated_at
       FROM webhooks
       WHERE id = ${webhookId} AND workspace_id = ${workspaceId}
     `;
@@ -167,6 +176,107 @@ export class WebhookService {
     this.logger.log(`Webhook ${webhookId} deactivated in workspace ${workspaceId}`);
   }
 
+  // ── Enable / Disable ───────────────────────────────────────────────────────
+
+  /**
+   * Toggle the enabled state of a webhook.
+   * Re-enabling also resets the failure counter.
+   */
+  async setEnabled(workspaceId: string, webhookId: string, enabled: boolean): Promise<WebhookDto> {
+    const rows = await this.prisma.$queryRaw<WebhookRow[]>`
+      SELECT id, workspace_id, url, events, secret_hash, is_active, failure_count, created_at, updated_at
+      FROM webhooks
+      WHERE id = ${webhookId} AND workspace_id = ${workspaceId}
+    `;
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Webhook not found');
+    }
+
+    // When re-enabling, reset failure count so it gets a fresh start
+    if (enabled) {
+      await this.prisma.$executeRaw`
+        UPDATE webhooks SET is_active = true, failure_count = 0 WHERE id = ${webhookId}
+      `;
+    } else {
+      await this.prisma.$executeRaw`
+        UPDATE webhooks SET is_active = false WHERE id = ${webhookId}
+      `;
+    }
+
+    this.logger.log(
+      `Webhook ${webhookId} ${enabled ? 'enabled' : 'disabled'} in workspace ${workspaceId}`,
+    );
+
+    // Return the updated webhook
+    const updatedRows = await this.prisma.$queryRaw<WebhookRow[]>`
+      SELECT id, workspace_id, url, events, secret_hash, is_active, failure_count, created_at, updated_at
+      FROM webhooks
+      WHERE id = ${webhookId}
+    `;
+
+    return this.mapRowToDto(updatedRows[0]);
+  }
+
+  // ── Test Delivery ──────────────────────────────────────────────────────────
+
+  /**
+   * Send a test event to a specific webhook.
+   * This delivers a synthetic `test` payload to verify connectivity.
+   */
+  async sendTestEvent(workspaceId: string, webhookId: string): Promise<{ deliveryId: string }> {
+    const webhookRows = await this.prisma.$queryRaw<WebhookRow[]>`
+      SELECT id, workspace_id, url, events, secret_hash, is_active, failure_count, created_at, updated_at
+      FROM webhooks
+      WHERE id = ${webhookId} AND workspace_id = ${workspaceId}
+    `;
+
+    if (webhookRows.length === 0) {
+      throw new NotFoundException('Webhook not found');
+    }
+
+    const webhook = webhookRows[0];
+    const triggeredAt = new Date().toISOString();
+    const testPayload = {
+      test: true,
+      message: 'This is a test webhook delivery from Notesaner',
+      timestamp: triggeredAt,
+    };
+
+    const eventType = 'test' as string;
+    const body = JSON.stringify({
+      event: eventType,
+      triggeredAt,
+      data: testPayload,
+      workspaceId,
+    });
+    const signature = WebhookService.signPayload(body, webhook.secret_hash);
+
+    // Create a delivery record
+    const payloadJson = JSON.stringify(testPayload);
+    const deliveryRows = await this.prisma.$queryRaw<{ id: string }[]>`
+      INSERT INTO webhook_deliveries (id, webhook_id, event, payload)
+      VALUES (gen_random_uuid(), ${webhook.id}, ${eventType}, ${payloadJson}::jsonb)
+      RETURNING id
+    `;
+
+    const deliveryId = deliveryRows[0].id;
+
+    // Enqueue via jobs service for reliable delivery
+    await this.jobsService.enqueueDeliverWebhook({
+      webhookId: webhook.id,
+      deliveryId,
+      url: webhook.url,
+      event: eventType,
+      body,
+      signature,
+    });
+
+    this.logger.log(`Test event dispatched to webhook ${webhookId} (delivery ${deliveryId})`);
+
+    return { deliveryId };
+  }
+
   // ── Delivery ────────────────────────────────────────────────────────────────
 
   /**
@@ -174,7 +284,7 @@ export class WebhookService {
    * that are subscribed to this event type.
    *
    * Enqueues a background job for each matching webhook. Delivery failures
-   * are retried with exponential back-off (up to WEBHOOK_MAX_ATTEMPTS times).
+   * are retried with exponential back-off (up to 3 times).
    */
   async dispatchEvent(
     workspaceId: string,
@@ -184,7 +294,7 @@ export class WebhookService {
     // PostgreSQL array containment: events @> ARRAY[event]
     const eventParam = event as string;
     const records = await this.prisma.$queryRaw<WebhookRow[]>`
-      SELECT id, workspace_id, url, events, secret_hash, is_active, created_at, updated_at
+      SELECT id, workspace_id, url, events, secret_hash, is_active, failure_count, created_at, updated_at
       FROM webhooks
       WHERE workspace_id = ${workspaceId}
         AND is_active = true
@@ -199,12 +309,15 @@ export class WebhookService {
 
     await Promise.all(
       records.map(async (webhook) => {
-        const body = JSON.stringify({ event, triggeredAt, data: payload });
+        const body = JSON.stringify({
+          event,
+          triggeredAt,
+          data: payload,
+          workspaceId,
+        });
         const signature = WebhookService.signPayload(body, webhook.secret_hash);
 
         // Create a delivery record
-        // Prisma $queryRaw requires Prisma.sql for non-primitive values.
-        // Serialize to string and cast via ::jsonb for safe JSON insertion.
         const payloadJson = JSON.stringify(payload);
         const deliveryRows = await this.prisma.$queryRaw<{ id: string }[]>`
           INSERT INTO webhook_deliveries (id, webhook_id, event, payload)
@@ -217,14 +330,11 @@ export class WebhookService {
         // Enqueue via jobs service for reliable retry semantics
         await this.jobsService.enqueueDeliverWebhook({
           webhookId: webhook.id,
+          deliveryId,
           url: webhook.url,
           event,
-          payload: {
-            ...payload,
-            _deliveryId: deliveryId,
-            _signature: signature,
-          },
-          triggeredAt,
+          body,
+          signature,
         });
 
         this.logger.debug(
@@ -236,12 +346,12 @@ export class WebhookService {
 
   /**
    * List delivery records for a specific webhook.
-   * Sorted by most recent first.
+   * Returns the last 100 deliveries sorted by most recent first.
    */
   async listDeliveries(
     workspaceId: string,
     webhookId: string,
-    limit = 50,
+    limit = 100,
   ): Promise<WebhookDeliveryDto[]> {
     // Verify the webhook belongs to this workspace
     const webhookRows = await this.prisma.$queryRaw<{ id: string }[]>`
@@ -254,7 +364,7 @@ export class WebhookService {
 
     const safeLimit = Math.min(limit, 200);
     const records = await this.prisma.$queryRaw<WebhookDeliveryRow[]>`
-      SELECT id, webhook_id, event, payload, status_code, success, attempts, delivered_at, created_at
+      SELECT id, webhook_id, event, payload, status_code, response_time_ms, success, attempts, delivered_at, created_at
       FROM webhook_deliveries
       WHERE webhook_id = ${webhookId}
       ORDER BY created_at DESC
@@ -264,32 +374,13 @@ export class WebhookService {
     return records.map((r) => this.mapDeliveryRowToDto(r));
   }
 
-  /**
-   * Record the outcome of a delivery attempt.
-   * Called by the WebhookDeliveryProcessor after each attempt.
-   */
-  async recordDeliveryAttempt(
-    deliveryId: string,
-    statusCode: number | null,
-    success: boolean,
-  ): Promise<void> {
-    await this.prisma.$executeRaw`
-      UPDATE webhook_deliveries
-      SET status_code   = ${statusCode},
-          success       = ${success},
-          attempts      = attempts + 1,
-          delivered_at  = CASE WHEN ${success} THEN now() ELSE NULL END
-      WHERE id = ${deliveryId}
-    `;
-  }
-
   // ── HMAC helpers ────────────────────────────────────────────────────────────
 
   /**
    * Compute HMAC-SHA256 signature of the serialized payload body.
    *
    * The signature header value follows the GitHub webhook convention:
-   *   X-Notesaner-Signature: sha256=<hex>
+   *   X-Webhook-Signature: sha256=<hex>
    *
    * The `secret` parameter is the stored secretHash (SHA-256 of the raw secret),
    * used as the HMAC key.
@@ -329,6 +420,8 @@ export class WebhookService {
       workspaceId: row.workspace_id,
       url: row.url,
       events: row.events as WebhookEvent[],
+      isActive: row.is_active,
+      failureCount: row.failure_count,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
     };
@@ -341,6 +434,7 @@ export class WebhookService {
       event: row.event as WebhookEvent,
       payload: (row.payload ?? {}) as Record<string, unknown>,
       statusCode: row.status_code,
+      responseTimeMs: row.response_time_ms,
       success: row.success,
       attempts: row.attempts,
       deliveredAt: row.delivered_at?.toISOString() ?? null,

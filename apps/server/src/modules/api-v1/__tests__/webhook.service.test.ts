@@ -1,10 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { NotFoundException } from '@nestjs/common';
-import {
-  WebhookService,
-  WEBHOOK_MAX_ATTEMPTS,
-  WEBHOOK_BACKOFF_DELAYS_MS,
-} from '../webhook.service';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { WebhookService } from '../webhook.service';
 import { WebhookEvent } from '../dto/create-webhook.dto';
 import type { PrismaService } from '../../../prisma/prisma.service';
 import type { JobsService } from '../../jobs/jobs.service';
@@ -19,6 +15,7 @@ function makeWebhookRow(overrides: Record<string, unknown> = {}) {
     events: [WebhookEvent.NOTE_CREATED],
     secret_hash: 'abc123',
     is_active: true,
+    failure_count: 0,
     created_at: new Date('2025-01-01'),
     updated_at: new Date('2025-01-01'),
     ...overrides,
@@ -32,6 +29,7 @@ function makeDeliveryRow(overrides: Record<string, unknown> = {}) {
     event: WebhookEvent.NOTE_CREATED,
     payload: { noteId: 'n1' },
     status_code: null,
+    response_time_ms: null,
     success: false,
     attempts: 0,
     delivered_at: null,
@@ -60,27 +58,6 @@ describe('WebhookService', () => {
     } as unknown as Partial<JobsService>;
 
     service = new WebhookService(prisma as PrismaService, jobsService as JobsService);
-  });
-
-  // ── Constants ──────────────────────────────────────────────────────────────
-
-  describe('constants', () => {
-    it('should have WEBHOOK_MAX_ATTEMPTS = 3', () => {
-      expect(WEBHOOK_MAX_ATTEMPTS).toBe(3);
-    });
-
-    it('should have three back-off delay entries', () => {
-      expect(WEBHOOK_BACKOFF_DELAYS_MS).toHaveLength(3);
-    });
-
-    it('should have 0 ms delay for first attempt', () => {
-      expect(WEBHOOK_BACKOFF_DELAYS_MS[0]).toBe(0);
-    });
-
-    it('should have increasing delays for subsequent attempts', () => {
-      expect(WEBHOOK_BACKOFF_DELAYS_MS[1]).toBeGreaterThan(WEBHOOK_BACKOFF_DELAYS_MS[0]!);
-      expect(WEBHOOK_BACKOFF_DELAYS_MS[2]).toBeGreaterThan(WEBHOOK_BACKOFF_DELAYS_MS[1]!);
-    });
   });
 
   // ── hashSecret ─────────────────────────────────────────────────────────────
@@ -156,7 +133,7 @@ describe('WebhookService', () => {
       expect(WebhookService.verifySignature(body, 'secret', '')).toBe(false);
     });
 
-    it('should be resistant to length-extension (different length → false)', () => {
+    it('should be resistant to length-extension (different length -> false)', () => {
       const body = 'test';
       const secret = 'key';
       const validSig = WebhookService.signPayload(body, secret);
@@ -169,7 +146,10 @@ describe('WebhookService', () => {
 
   describe('create', () => {
     it('should create a webhook and return it with secret', async () => {
-      vi.mocked(prisma.$queryRaw!).mockResolvedValue([makeWebhookRow()]);
+      // First call: count query, second call: insert
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([{ count: BigInt(0) }])
+        .mockResolvedValueOnce([makeWebhookRow()]);
 
       const result = await service.create('ws-1', {
         url: 'https://example.com/hook',
@@ -183,7 +163,9 @@ describe('WebhookService', () => {
     });
 
     it('should use provided secret when supplied', async () => {
-      vi.mocked(prisma.$queryRaw!).mockResolvedValue([makeWebhookRow()]);
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([{ count: BigInt(0) }])
+        .mockResolvedValueOnce([makeWebhookRow()]);
 
       await service.create('ws-1', {
         url: 'https://example.com/hook',
@@ -191,11 +173,15 @@ describe('WebhookService', () => {
         secret: '1234567890abcdef1234567890abcdef',
       });
 
-      expect(prisma.$queryRaw).toHaveBeenCalledOnce();
+      // Count query + insert
+      expect(prisma.$queryRaw).toHaveBeenCalledTimes(2);
     });
 
     it('should not expose secret_hash in the returned DTO', async () => {
-      vi.mocked(prisma.$queryRaw!).mockResolvedValue([makeWebhookRow()]);
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([{ count: BigInt(0) }])
+        .mockResolvedValueOnce([makeWebhookRow()]);
+
       const result = await service.create('ws-1', {
         url: 'https://example.com/hook',
         events: [WebhookEvent.NOTE_UPDATED],
@@ -205,9 +191,12 @@ describe('WebhookService', () => {
     });
 
     it('should accept multiple events', async () => {
-      vi.mocked(prisma.$queryRaw!).mockResolvedValue([
-        makeWebhookRow({ events: [WebhookEvent.NOTE_CREATED, WebhookEvent.NOTE_DELETED] }),
-      ]);
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([{ count: BigInt(0) }])
+        .mockResolvedValueOnce([
+          makeWebhookRow({ events: [WebhookEvent.NOTE_CREATED, WebhookEvent.NOTE_DELETED] }),
+        ]);
+
       const result = await service.create('ws-1', {
         url: 'https://example.com/hook',
         events: [WebhookEvent.NOTE_CREATED, WebhookEvent.NOTE_DELETED],
@@ -216,8 +205,35 @@ describe('WebhookService', () => {
       expect(result.events).toContain(WebhookEvent.NOTE_DELETED);
     });
 
+    it('should include isActive and failureCount in response', async () => {
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([{ count: BigInt(0) }])
+        .mockResolvedValueOnce([makeWebhookRow()]);
+
+      const result = await service.create('ws-1', {
+        url: 'https://example.com/hook',
+        events: [WebhookEvent.NOTE_CREATED],
+      });
+      expect(result.isActive).toBe(true);
+      expect(result.failureCount).toBe(0);
+    });
+
+    it('should throw BadRequestException when max webhooks reached', async () => {
+      vi.mocked(prisma.$queryRaw!).mockResolvedValueOnce([{ count: BigInt(10) }]);
+
+      await expect(
+        service.create('ws-1', {
+          url: 'https://example.com/hook',
+          events: [WebhookEvent.NOTE_CREATED],
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
     it('should propagate DB errors', async () => {
-      vi.mocked(prisma.$queryRaw!).mockRejectedValue(new Error('unique constraint'));
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([{ count: BigInt(0) }])
+        .mockRejectedValueOnce(new Error('unique constraint'));
+
       await expect(
         service.create('ws-1', {
           url: 'https://example.com/hook',
@@ -250,6 +266,13 @@ describe('WebhookService', () => {
       const result = await service.list('ws-1');
       expect((result[0] as unknown as Record<string, unknown>).secret_hash).toBeUndefined();
       expect((result[0] as unknown as Record<string, unknown>).secretHash).toBeUndefined();
+    });
+
+    it('should include isActive and failureCount in list results', async () => {
+      vi.mocked(prisma.$queryRaw!).mockResolvedValue([makeWebhookRow({ failure_count: 3 })]);
+      const result = await service.list('ws-1');
+      expect(result[0].isActive).toBe(true);
+      expect(result[0].failureCount).toBe(3);
     });
   });
 
@@ -294,12 +317,80 @@ describe('WebhookService', () => {
     });
   });
 
+  // ── setEnabled ────────────────────────────────────────────────────────────
+
+  describe('setEnabled', () => {
+    it('should enable a webhook and reset failure count', async () => {
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([makeWebhookRow({ is_active: false, failure_count: 5 })])
+        .mockResolvedValueOnce([makeWebhookRow({ is_active: true, failure_count: 0 })]);
+
+      const result = await service.setEnabled('ws-1', 'wh-1', true);
+
+      expect(prisma.$executeRaw).toHaveBeenCalledOnce();
+      expect(result.isActive).toBe(true);
+      expect(result.failureCount).toBe(0);
+    });
+
+    it('should disable a webhook', async () => {
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([makeWebhookRow({ is_active: true })])
+        .mockResolvedValueOnce([makeWebhookRow({ is_active: false })]);
+
+      const result = await service.setEnabled('ws-1', 'wh-1', false);
+
+      expect(prisma.$executeRaw).toHaveBeenCalledOnce();
+      expect(result.isActive).toBe(false);
+    });
+
+    it('should throw NotFoundException for unknown webhook', async () => {
+      vi.mocked(prisma.$queryRaw!).mockResolvedValue([]);
+      await expect(service.setEnabled('ws-1', 'wh-nonexistent', true)).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
+  // ── sendTestEvent ─────────────────────────────────────────────────────────
+
+  describe('sendTestEvent', () => {
+    it('should create a delivery record and enqueue a job', async () => {
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([makeWebhookRow()])
+        .mockResolvedValueOnce([{ id: 'del-test-1' }]);
+
+      const result = await service.sendTestEvent('ws-1', 'wh-1');
+
+      expect(result.deliveryId).toBe('del-test-1');
+      expect(jobsService.enqueueDeliverWebhook).toHaveBeenCalledOnce();
+    });
+
+    it('should include test payload in the enqueued job', async () => {
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([makeWebhookRow({ secret_hash: 'test-hash' })])
+        .mockResolvedValueOnce([{ id: 'del-test-1' }]);
+
+      await service.sendTestEvent('ws-1', 'wh-1');
+
+      const callArg = vi.mocked(jobsService.enqueueDeliverWebhook!).mock.calls[0]?.[0];
+      expect(callArg?.event).toBe('test');
+      expect(callArg?.webhookId).toBe('wh-1');
+      expect(callArg?.signature).toMatch(/^sha256=[0-9a-f]{64}$/);
+      expect(callArg?.body).toContain('"test":true');
+    });
+
+    it('should throw NotFoundException for unknown webhook', async () => {
+      vi.mocked(prisma.$queryRaw!).mockResolvedValue([]);
+      await expect(service.sendTestEvent('ws-1', 'wh-nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+  });
+
   // ── dispatchEvent ──────────────────────────────────────────────────────────
 
   describe('dispatchEvent', () => {
     it('should enqueue a job for each matching webhook', async () => {
-      // First call: find matching webhooks
-      // Second call: insert delivery record
       vi.mocked(prisma.$queryRaw!)
         .mockResolvedValueOnce([makeWebhookRow()])
         .mockResolvedValueOnce([{ id: 'del-1' }]);
@@ -340,7 +431,7 @@ describe('WebhookService', () => {
       expect(jobsService.enqueueDeliverWebhook).toHaveBeenCalledTimes(2);
     });
 
-    it('should include HMAC signature in payload', async () => {
+    it('should include HMAC signature in job data', async () => {
       vi.mocked(prisma.$queryRaw!)
         .mockResolvedValueOnce([makeWebhookRow({ secret_hash: 'test-hash' })])
         .mockResolvedValueOnce([{ id: 'del-1' }]);
@@ -348,10 +439,22 @@ describe('WebhookService', () => {
       await service.dispatchEvent('ws-1', WebhookEvent.NOTE_CREATED, { noteId: 'n1' });
 
       const callArg = vi.mocked(jobsService.enqueueDeliverWebhook!).mock.calls[0]?.[0];
-      expect(callArg?.payload._signature).toMatch(/^sha256=[0-9a-f]{64}$/);
+      expect(callArg?.signature).toMatch(/^sha256=[0-9a-f]{64}$/);
     });
 
-    it('should include triggeredAt ISO timestamp', async () => {
+    it('should include workspaceId in payload body', async () => {
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([makeWebhookRow()])
+        .mockResolvedValueOnce([{ id: 'del-1' }]);
+
+      await service.dispatchEvent('ws-1', WebhookEvent.NOTE_PUBLISHED, { noteId: 'n1' });
+
+      const callArg = vi.mocked(jobsService.enqueueDeliverWebhook!).mock.calls[0]?.[0];
+      const parsedBody = JSON.parse(callArg?.body ?? '{}');
+      expect(parsedBody.workspaceId).toBe('ws-1');
+    });
+
+    it('should include triggeredAt ISO timestamp in body', async () => {
       vi.mocked(prisma.$queryRaw!)
         .mockResolvedValueOnce([makeWebhookRow()])
         .mockResolvedValueOnce([{ id: 'del-1' }]);
@@ -359,10 +462,11 @@ describe('WebhookService', () => {
       await service.dispatchEvent('ws-1', WebhookEvent.NOTE_PUBLISHED, {});
 
       const callArg = vi.mocked(jobsService.enqueueDeliverWebhook!).mock.calls[0]?.[0];
-      expect(callArg?.triggeredAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
+      const parsedBody = JSON.parse(callArg?.body ?? '{}');
+      expect(parsedBody.triggeredAt).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/);
     });
 
-    it('should include deliveryId in payload', async () => {
+    it('should include deliveryId in enqueued job data', async () => {
       vi.mocked(prisma.$queryRaw!)
         .mockResolvedValueOnce([makeWebhookRow()])
         .mockResolvedValueOnce([{ id: 'del-999' }]);
@@ -370,7 +474,30 @@ describe('WebhookService', () => {
       await service.dispatchEvent('ws-1', WebhookEvent.NOTE_CREATED, {});
 
       const callArg = vi.mocked(jobsService.enqueueDeliverWebhook!).mock.calls[0]?.[0];
-      expect(callArg?.payload._deliveryId).toBe('del-999');
+      expect(callArg?.deliveryId).toBe('del-999');
+    });
+
+    it('should support member.joined event', async () => {
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([makeWebhookRow({ events: [WebhookEvent.MEMBER_JOINED] })])
+        .mockResolvedValueOnce([{ id: 'del-1' }]);
+
+      await service.dispatchEvent('ws-1', WebhookEvent.MEMBER_JOINED, {
+        userId: 'u1',
+        role: 'EDITOR',
+      });
+
+      expect(jobsService.enqueueDeliverWebhook).toHaveBeenCalledOnce();
+    });
+
+    it('should support member.left event', async () => {
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([makeWebhookRow({ events: [WebhookEvent.MEMBER_LEFT] })])
+        .mockResolvedValueOnce([{ id: 'del-1' }]);
+
+      await service.dispatchEvent('ws-1', WebhookEvent.MEMBER_LEFT, { userId: 'u1' });
+
+      expect(jobsService.enqueueDeliverWebhook).toHaveBeenCalledOnce();
     });
   });
 
@@ -403,13 +530,14 @@ describe('WebhookService', () => {
       expect(JSON.stringify(deliveryCall)).toContain('200');
     });
 
-    it('should correctly map delivery status fields', async () => {
+    it('should correctly map delivery status fields including response time', async () => {
       const delivered = new Date('2025-06-01T12:00:00Z');
       vi.mocked(prisma.$queryRaw!)
         .mockResolvedValueOnce([{ id: 'wh-1' }])
         .mockResolvedValueOnce([
           makeDeliveryRow({
             status_code: 200,
+            response_time_ms: 150,
             success: true,
             attempts: 1,
             delivered_at: delivered,
@@ -418,42 +546,31 @@ describe('WebhookService', () => {
 
       const result = await service.listDeliveries('ws-1', 'wh-1');
       expect(result[0].statusCode).toBe(200);
+      expect(result[0].responseTimeMs).toBe(150);
       expect(result[0].success).toBe(true);
       expect(result[0].attempts).toBe(1);
       expect(result[0].deliveredAt).toBe(delivered.toISOString());
     });
 
-    it('should handle null status_code for pending deliveries', async () => {
+    it('should handle null status_code and response_time_ms for pending deliveries', async () => {
       vi.mocked(prisma.$queryRaw!)
         .mockResolvedValueOnce([{ id: 'wh-1' }])
-        .mockResolvedValueOnce([makeDeliveryRow({ status_code: null })]);
+        .mockResolvedValueOnce([makeDeliveryRow({ status_code: null, response_time_ms: null })]);
 
       const result = await service.listDeliveries('ws-1', 'wh-1');
       expect(result[0].statusCode).toBeNull();
-    });
-  });
-
-  // ── recordDeliveryAttempt ──────────────────────────────────────────────────
-
-  describe('recordDeliveryAttempt', () => {
-    it('should update the delivery record on success', async () => {
-      await service.recordDeliveryAttempt('del-1', 200, true);
-      expect(prisma.$executeRaw).toHaveBeenCalledOnce();
+      expect(result[0].responseTimeMs).toBeNull();
     });
 
-    it('should update the delivery record on failure', async () => {
-      await service.recordDeliveryAttempt('del-1', 503, false);
-      expect(prisma.$executeRaw).toHaveBeenCalledOnce();
-    });
+    it('should default limit to 100', async () => {
+      vi.mocked(prisma.$queryRaw!)
+        .mockResolvedValueOnce([{ id: 'wh-1' }])
+        .mockResolvedValueOnce([]);
 
-    it('should handle null statusCode (network failure)', async () => {
-      await service.recordDeliveryAttempt('del-1', null, false);
-      expect(prisma.$executeRaw).toHaveBeenCalledOnce();
-    });
+      await service.listDeliveries('ws-1', 'wh-1');
 
-    it('should propagate DB errors', async () => {
-      vi.mocked(prisma.$executeRaw!).mockRejectedValue(new Error('DB error'));
-      await expect(service.recordDeliveryAttempt('del-1', 200, true)).rejects.toThrow('DB error');
+      const deliveryCall = vi.mocked(prisma.$queryRaw!).mock.calls[1];
+      expect(JSON.stringify(deliveryCall)).toContain('100');
     });
   });
 });

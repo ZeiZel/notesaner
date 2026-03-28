@@ -83,7 +83,7 @@ import { ActivityModule } from './modules/activity/activity.module';
     FilesModule,
     SearchModule,
     SyncModule,
-    PluginsModule,
+    PluginsModule.forRoot(),
     PublishModule,
     HealthModule,
     AdminModule,

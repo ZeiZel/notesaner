@@ -1,19 +1,28 @@
 import { Module, forwardRef } from '@nestjs/common';
 import { BullModule } from '@nestjs/bullmq';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { FRESHNESS_CHECK_QUEUE, NOTE_INDEX_QUEUE } from './jobs.constants';
+import {
+  FRESHNESS_CHECK_QUEUE,
+  NOTE_INDEX_QUEUE,
+  STORAGE_RECALCULATION_QUEUE,
+  WEBHOOK_DELIVERY_QUEUE,
+} from './jobs.constants';
 import { JobsService } from './jobs.service';
 import { JobsController } from './jobs.controller';
 import { NoteIndexingProcessor } from './processors/note-indexing.processor';
 import { FreshnessCheckProcessor } from './processors/freshness-check.processor';
+import { WebhookDeliveryProcessor } from './processors/webhook-delivery.processor';
+import { StorageRecalculationProcessor } from './processors/storage-recalculation.processor';
 import { EmailModule } from '../email/email.module';
 import { NotesModule } from '../notes/notes.module';
+import { WorkspacesModule } from '../workspaces/workspaces.module';
 
 @Module({
   imports: [
     EmailModule,
     // Use forwardRef to break the circular dependency: NotesModule -> JobsModule -> NotesModule
     forwardRef(() => NotesModule),
+    WorkspacesModule,
     BullModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: (config: ConfigService) => ({
@@ -40,6 +49,20 @@ import { NotesModule } from '../notes/notes.module';
         backoff: { type: 'fixed', delay: 60_000 },
       },
     }),
+    BullModule.registerQueue({
+      name: WEBHOOK_DELIVERY_QUEUE,
+      defaultJobOptions: {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 1_000 },
+      },
+    }),
+    BullModule.registerQueue({
+      name: STORAGE_RECALCULATION_QUEUE,
+      defaultJobOptions: {
+        attempts: 2,
+        backoff: { type: 'fixed', delay: 60_000 },
+      },
+    }),
   ],
   controllers: [JobsController],
   providers: [
@@ -51,6 +74,14 @@ import { NotesModule } from '../notes/notes.module';
     {
       provide: FreshnessCheckProcessor,
       useClass: FreshnessCheckProcessor,
+    },
+    {
+      provide: WebhookDeliveryProcessor,
+      useClass: WebhookDeliveryProcessor,
+    },
+    {
+      provide: StorageRecalculationProcessor,
+      useClass: StorageRecalculationProcessor,
     },
   ],
   exports: [JobsService],

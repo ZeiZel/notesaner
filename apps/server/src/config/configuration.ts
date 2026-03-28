@@ -35,6 +35,20 @@ export const configuration = () => ({
 
   frontendUrl: process.env['FRONTEND_URL'] ?? 'http://localhost:3000',
 
+  // ── Storage Quota ─────────────────────────────────────────────────────────
+  quota: {
+    maxStorageBytes: BigInt(
+      process.env['QUOTA_MAX_STORAGE_BYTES'] ?? String(5 * 1024 * 1024 * 1024),
+    ), // 5 GB
+    maxNotes: parseInt(process.env['QUOTA_MAX_NOTES'] ?? '50000', 10),
+    maxFileSizeBytes: BigInt(process.env['QUOTA_MAX_FILE_SIZE_BYTES'] ?? String(50 * 1024 * 1024)), // 50 MB
+    warningThresholdPercent: parseInt(process.env['QUOTA_WARNING_THRESHOLD_PERCENT'] ?? '80', 10),
+  },
+
+  upload: {
+    maxFileSizeMb: parseInt(process.env['UPLOAD_MAX_FILE_SIZE_MB'] ?? '50', 10),
+  },
+
   logging: {
     level: process.env['LOG_LEVEL'] ?? 'info',
   },

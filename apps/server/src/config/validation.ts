@@ -85,6 +85,21 @@ const envSchema = z.object({
   BACKUP_RETENTION_WEEKLY: z.coerce.number().int().positive().default(4),
   BACKUP_RETENTION_MONTHLY: z.coerce.number().int().positive().default(3),
 
+  // ── Storage Quota ──────────────────────────────────────────────────────────
+  QUOTA_MAX_STORAGE_BYTES: z.coerce
+    .bigint()
+    .positive()
+    .default(BigInt(5 * 1024 * 1024 * 1024)),
+  QUOTA_MAX_NOTES: z.coerce.number().int().positive().default(50000),
+  QUOTA_MAX_FILE_SIZE_BYTES: z.coerce
+    .bigint()
+    .positive()
+    .default(BigInt(50 * 1024 * 1024)),
+  QUOTA_WARNING_THRESHOLD_PERCENT: z.coerce.number().int().min(1).max(100).default(80),
+
+  // ── Upload ────────────────────────────────────────────────────────────────
+  UPLOAD_MAX_FILE_SIZE_MB: z.coerce.number().int().positive().default(50),
+
   // S3-compatible storage (optional — omit all to use local-only)
   BACKUP_S3_ENDPOINT: z.string().url().optional().or(z.literal('')),
   BACKUP_S3_REGION: z.string().default('us-east-1'),
