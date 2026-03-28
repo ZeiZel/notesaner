@@ -25,6 +25,7 @@ CREATE TABLE notifications (
   title       TEXT              NOT NULL,
   body        TEXT              NOT NULL,
   is_read     BOOLEAN           NOT NULL DEFAULT FALSE,
+  note_id     TEXT              DEFAULT NULL,
   metadata    JSONB             NOT NULL DEFAULT '{}',
   created_at  TIMESTAMPTZ       NOT NULL DEFAULT NOW()
 );
@@ -37,6 +38,10 @@ CREATE INDEX idx_notifications_user_created
 
 CREATE INDEX idx_notifications_type
   ON notifications (type);
+
+-- Index on created_at for efficient cleanup of old notifications
+CREATE INDEX idx_notifications_created_at
+  ON notifications (created_at);
 
 -- ── notification_preferences ─────────────────────────────────────────────────
 

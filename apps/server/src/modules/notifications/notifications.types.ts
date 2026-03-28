@@ -51,6 +51,7 @@ export interface CreateNotificationInput {
   type: NotificationType;
   title: string;
   body: string;
+  noteId?: string;
   metadata?: NotificationMetadata;
 }
 
@@ -82,6 +83,7 @@ export interface NotificationDto {
   title: string;
   body: string;
   isRead: boolean;
+  noteId: string | null;
   metadata: Record<string, unknown>;
   createdAt: string;
 }
@@ -109,5 +111,17 @@ export interface DigestJobData {
 export interface DigestJobResult {
   usersProcessed: number;
   emailsSent: number;
+  durationMs: number;
+}
+
+// ─── Cleanup job data ────────────────────────────────────────────────────────
+
+export interface CleanupJobData {
+  /** Maximum age in days for notifications before they are deleted. */
+  maxAgeDays: number;
+}
+
+export interface CleanupJobResult {
+  deletedCount: number;
   durationMs: number;
 }

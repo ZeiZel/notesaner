@@ -3,6 +3,7 @@ import { NotFoundException } from '@nestjs/common';
 import { NotificationsService } from '../notifications.service';
 import type { PrismaService } from '../../../prisma/prisma.service';
 import type { EmailService } from '../../email/email.service';
+import type { NotificationsGateway } from '../notifications.gateway';
 
 // ─── Mocks ──────────────────────────────────────────────────────────────────
 
@@ -15,6 +16,7 @@ function createMockPrisma() {
       count: vi.fn(),
       update: vi.fn(),
       updateMany: vi.fn(),
+      deleteMany: vi.fn(),
     },
     notificationPreference: {
       findUnique: vi.fn(),
@@ -41,6 +43,22 @@ function createMockEmailService() {
   } as unknown as EmailService;
 }
 
+function createMockGateway() {
+  return {
+    sendNotification: vi.fn(),
+    sendUnreadCount: vi.fn(),
+    getConnectionCount: vi.fn().mockReturnValue(0),
+  } as unknown as NotificationsGateway;
+}
+
+function createMockRedis() {
+  return {
+    get: vi.fn().mockResolvedValue(null),
+    incr: vi.fn().mockResolvedValue(1),
+    expire: vi.fn().mockResolvedValue(1),
+  };
+}
+
 // Helper to access mock functions
 function mockFn(obj: unknown) {
   return obj as ReturnType<typeof vi.fn>;
@@ -52,12 +70,16 @@ describe('NotificationsService', () => {
   let service: NotificationsService;
   let prisma: ReturnType<typeof createMockPrisma>;
   let emailService: ReturnType<typeof createMockEmailService>;
+  let gateway: ReturnType<typeof createMockGateway>;
+  let redis: ReturnType<typeof createMockRedis>;
 
   beforeEach(() => {
     prisma = createMockPrisma();
     emailService = createMockEmailService();
+    gateway = createMockGateway();
+    redis = createMockRedis();
     // Construct directly — avoids NestJS DI overhead in unit tests
-    service = new NotificationsService(prisma, emailService);
+    service = new NotificationsService(prisma, emailService, gateway, redis as unknown as null);
   });
 
   // ─── create ─────────────────────────────────────────────────────────────
@@ -68,6 +90,7 @@ describe('NotificationsService', () => {
       type: 'COMMENT_MENTION' as const,
       title: 'You were mentioned',
       body: 'Alice mentioned you in Project Notes',
+      noteId: 'note-1',
       metadata: { noteId: 'note-1', commentId: 'comment-1' } as Record<string, unknown>,
     };
 
@@ -75,7 +98,11 @@ describe('NotificationsService', () => {
       mockFn(prisma.notificationPreference.findUnique).mockResolvedValue(null); // defaults to BOTH
       mockFn(prisma.notification.create).mockResolvedValue({
         id: 'notif-1',
-        ...input,
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        noteId: input.noteId,
         isRead: false,
         metadata: input.metadata,
         createdAt: new Date('2026-01-01T00:00:00Z'),
@@ -89,8 +116,36 @@ describe('NotificationsService', () => {
 
       expect(result).not.toBeNull();
       expect(result?.id).toBe('notif-1');
+      expect(result?.noteId).toBe('note-1');
       expect(prisma.notification.create).toHaveBeenCalledTimes(1);
       expect(emailService.send).toHaveBeenCalledTimes(1);
+    });
+
+    it('should push notification via WebSocket when creating in-app notification', async () => {
+      mockFn(prisma.notificationPreference.findUnique).mockResolvedValue(null);
+      mockFn(prisma.notification.create).mockResolvedValue({
+        id: 'notif-ws',
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        noteId: input.noteId,
+        isRead: false,
+        metadata: input.metadata,
+        createdAt: new Date(),
+      });
+      mockFn(prisma.user.findUnique).mockResolvedValue({
+        email: 'alice@example.com',
+        displayName: 'Alice',
+      });
+
+      await service.create(input);
+
+      expect(gateway.sendNotification).toHaveBeenCalledTimes(1);
+      expect(gateway.sendNotification).toHaveBeenCalledWith(
+        'user-1',
+        expect.objectContaining({ id: 'notif-ws' }),
+      );
     });
 
     it('should create in-app notification only when channel is IN_APP', async () => {
@@ -99,7 +154,11 @@ describe('NotificationsService', () => {
       });
       mockFn(prisma.notification.create).mockResolvedValue({
         id: 'notif-2',
-        ...input,
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        noteId: input.noteId,
         isRead: false,
         metadata: input.metadata,
         createdAt: new Date(),
@@ -139,6 +198,73 @@ describe('NotificationsService', () => {
       expect(prisma.notification.create).not.toHaveBeenCalled();
       expect(emailService.send).not.toHaveBeenCalled();
     });
+
+    it('should skip when rate limited', async () => {
+      mockFn(redis.get).mockResolvedValue('100'); // At the limit
+
+      const result = await service.create(input);
+
+      expect(result).toBeNull();
+      expect(prisma.notification.create).not.toHaveBeenCalled();
+      expect(emailService.send).not.toHaveBeenCalled();
+    });
+
+    it('should increment rate limit counter after creating notification', async () => {
+      mockFn(prisma.notificationPreference.findUnique).mockResolvedValue({
+        channel: 'IN_APP',
+      });
+      mockFn(prisma.notification.create).mockResolvedValue({
+        id: 'notif-rl',
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        noteId: null,
+        isRead: false,
+        metadata: {},
+        createdAt: new Date(),
+      });
+
+      await service.create({ ...input, noteId: undefined });
+
+      expect(redis.incr).toHaveBeenCalledTimes(1);
+      expect(redis.expire).toHaveBeenCalledTimes(1);
+      expect(redis.expire).toHaveBeenCalledWith(expect.stringContaining('notif:rate:user-1'), 3600);
+    });
+
+    it('should create notification with null noteId when not provided', async () => {
+      mockFn(prisma.notificationPreference.findUnique).mockResolvedValue({
+        channel: 'IN_APP',
+      });
+      mockFn(prisma.notification.create).mockResolvedValue({
+        id: 'notif-no-note',
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+        noteId: null,
+        isRead: false,
+        metadata: {},
+        createdAt: new Date(),
+      });
+
+      const result = await service.create({
+        userId: input.userId,
+        type: input.type,
+        title: input.title,
+        body: input.body,
+      });
+
+      expect(result).not.toBeNull();
+      expect(result?.noteId).toBeNull();
+      expect(prisma.notification.create).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            noteId: null,
+          }),
+        }),
+      );
+    });
   });
 
   // ─── findAllForUser ───────────────────────────────────────────────────
@@ -152,6 +278,7 @@ describe('NotificationsService', () => {
           title: 'Title 1',
           body: 'Body 1',
           isRead: false,
+          noteId: 'note-1',
           metadata: {},
           createdAt: new Date('2026-01-02'),
         },
@@ -161,6 +288,7 @@ describe('NotificationsService', () => {
           title: 'Title 2',
           body: 'Body 2',
           isRead: true,
+          noteId: null,
           metadata: {},
           createdAt: new Date('2026-01-01'),
         },
@@ -171,6 +299,8 @@ describe('NotificationsService', () => {
       const result = await service.findAllForUser('user-1', { limit: 20, offset: 0 });
 
       expect(result.data).toHaveLength(2);
+      expect(result.data[0].noteId).toBe('note-1');
+      expect(result.data[1].noteId).toBeNull();
       expect(result.pagination.total).toBe(2);
       expect(result.unreadCount).toBe(1);
       expect(result.pagination.hasMore).toBe(false);
@@ -185,6 +315,7 @@ describe('NotificationsService', () => {
             title: 'T',
             body: 'B',
             isRead: false,
+            noteId: null,
             metadata: {},
             createdAt: new Date(),
           },
@@ -218,7 +349,7 @@ describe('NotificationsService', () => {
   // ─── markAsRead ───────────────────────────────────────────────────────
 
   describe('markAsRead', () => {
-    it('should mark a notification as read', async () => {
+    it('should mark a notification as read and push unread count via WebSocket', async () => {
       const notification = {
         id: 'n-1',
         userId: 'user-1',
@@ -226,6 +357,7 @@ describe('NotificationsService', () => {
         title: 'Title',
         body: 'Body',
         isRead: false,
+        noteId: null,
         metadata: {},
         createdAt: new Date(),
       };
@@ -235,6 +367,7 @@ describe('NotificationsService', () => {
         ...notification,
         isRead: true,
       });
+      mockFn(prisma.notification.count).mockResolvedValue(2);
 
       const result = await service.markAsRead('user-1', 'n-1');
 
@@ -243,6 +376,7 @@ describe('NotificationsService', () => {
         where: { id: 'n-1' },
         data: { isRead: true },
       });
+      expect(gateway.sendUnreadCount).toHaveBeenCalledWith('user-1', 2);
     });
 
     it('should throw NotFoundException when notification does not exist', async () => {
@@ -261,7 +395,7 @@ describe('NotificationsService', () => {
   // ─── markAllAsRead ────────────────────────────────────────────────────
 
   describe('markAllAsRead', () => {
-    it('should mark all unread notifications as read', async () => {
+    it('should mark all unread notifications as read and push zero count', async () => {
       mockFn(prisma.notification.updateMany).mockResolvedValue({ count: 3 });
 
       const result = await service.markAllAsRead('user-1');
@@ -271,6 +405,7 @@ describe('NotificationsService', () => {
         where: { userId: 'user-1', isRead: false },
         data: { isRead: true },
       });
+      expect(gateway.sendUnreadCount).toHaveBeenCalledWith('user-1', 0);
     });
 
     it('should return 0 when no unread notifications exist', async () => {
@@ -279,6 +414,8 @@ describe('NotificationsService', () => {
       const result = await service.markAllAsRead('user-1');
 
       expect(result.updated).toBe(0);
+      // Should NOT push WebSocket when nothing changed
+      expect(gateway.sendUnreadCount).not.toHaveBeenCalled();
     });
   });
 
@@ -407,6 +544,38 @@ describe('NotificationsService', () => {
       expect(result.usersProcessed).toBe(1);
       expect(result.emailsSent).toBe(0);
       expect(emailService.send).not.toHaveBeenCalled();
+    });
+  });
+
+  // ─── Rate limiting (no Redis) ─────────────────────────────────────────
+
+  describe('rate limiting without Redis', () => {
+    it('should fail open when Redis is not available', async () => {
+      const serviceNoRedis = new NotificationsService(prisma, emailService, gateway, null);
+
+      mockFn(prisma.notificationPreference.findUnique).mockResolvedValue({
+        channel: 'IN_APP',
+      });
+      mockFn(prisma.notification.create).mockResolvedValue({
+        id: 'notif-no-redis',
+        userId: 'user-1',
+        type: 'COMMENT_MENTION',
+        title: 'Test',
+        body: 'Test',
+        noteId: null,
+        isRead: false,
+        metadata: {},
+        createdAt: new Date(),
+      });
+
+      const result = await serviceNoRedis.create({
+        userId: 'user-1',
+        type: 'COMMENT_MENTION',
+        title: 'Test',
+        body: 'Test',
+      });
+
+      expect(result).not.toBeNull();
     });
   });
 });

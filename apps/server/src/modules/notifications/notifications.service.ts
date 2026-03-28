@@ -1,13 +1,20 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { Inject, Optional } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { EmailService } from '../email/email.service';
+import { NotificationsGateway } from './notifications.gateway';
 import type {
   NotificationType,
   NotificationChannel,
   DigestFrequency,
   Prisma,
 } from '@prisma/client';
-import { DEFAULT_PAGE_LIMIT } from './notifications.constants';
+import {
+  DEFAULT_PAGE_LIMIT,
+  RATE_LIMIT_MAX_PER_HOUR,
+  RATE_LIMIT_WINDOW_SECONDS,
+  RATE_LIMIT_KEY_PREFIX,
+} from './notifications.constants';
 import type {
   CreateNotificationInput,
   NotificationListResponse,
@@ -17,12 +24,16 @@ import type {
   UnreadCountDto,
   NotificationPreferenceInput,
 } from './notifications.types';
+import type Redis from 'ioredis';
+import { VALKEY_CLIENT } from '../valkey/valkey.constants';
 
 /**
  * NotificationsService — core business logic for the notification system.
  *
  * Responsibilities:
  *   - Create in-app notifications (with optional email dispatch)
+ *   - Push notifications via WebSocket for real-time delivery
+ *   - Rate-limit notification creation per user (max 100/hour via ValKey)
  *   - Query notifications with pagination and filtering
  *   - Mark notifications as read (single or bulk)
  *   - Manage per-user notification channel preferences
@@ -35,6 +46,11 @@ export class NotificationsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly emailService: EmailService,
+    @Optional()
+    private readonly gateway: NotificationsGateway | null,
+    @Optional()
+    @Inject(VALKEY_CLIENT)
+    private readonly redis: Redis | null,
   ) {}
 
   // ─── Create ───────────────────────────────────────────────────────────────
@@ -43,13 +59,23 @@ export class NotificationsService {
    * Creates a notification and optionally sends an email based on user preferences.
    *
    * Flow:
-   *   1. Check user's channel preference for this notification type
-   *   2. If NONE, skip entirely
-   *   3. If IN_APP or BOTH, create the database record
-   *   4. If EMAIL or BOTH, queue an immediate email
+   *   1. Check rate limit (max 100 notifications per user per hour)
+   *   2. Check user's channel preference for this notification type
+   *   3. If NONE, skip entirely
+   *   4. If IN_APP or BOTH, create the database record and push via WebSocket
+   *   5. If EMAIL or BOTH, queue an immediate email
    */
   async create(input: CreateNotificationInput): Promise<NotificationDto | null> {
-    const { userId, type, title, body, metadata } = input;
+    const { userId, type, title, body, noteId, metadata } = input;
+
+    // Check rate limit
+    const isRateLimited = await this.checkRateLimit(userId);
+    if (isRateLimited) {
+      this.logger.warn(
+        `Notification [${type}] rate-limited for user ${userId} (exceeded ${RATE_LIMIT_MAX_PER_HOUR}/hour)`,
+      );
+      return null;
+    }
 
     // Resolve user preference for this notification type
     const channel = await this.getChannelForType(userId, type);
@@ -69,17 +95,24 @@ export class NotificationsService {
           type,
           title,
           body,
+          noteId: noteId ?? null,
           metadata: (metadata ?? {}) as Prisma.InputJsonValue,
         },
       });
 
       notification = this.toDto(created);
+
+      // Push via WebSocket for real-time delivery
+      this.pushToWebSocket(userId, notification);
     }
 
     // Send immediate email if channel includes email
     if (channel === 'EMAIL' || channel === 'BOTH') {
       await this.sendNotificationEmail(userId, type, title, body);
     }
+
+    // Increment rate limit counter
+    await this.incrementRateLimit(userId);
 
     return notification;
   }
@@ -187,6 +220,10 @@ export class NotificationsService {
       data: { isRead: true },
     });
 
+    // Push updated unread count via WebSocket
+    const { count } = await this.getUnreadCount(userId);
+    this.pushUnreadCount(userId, count);
+
     return this.toDto(updated);
   }
 
@@ -199,6 +236,11 @@ export class NotificationsService {
       where: { userId, isRead: false },
       data: { isRead: true },
     });
+
+    // Push updated unread count (0) via WebSocket
+    if (result.count > 0) {
+      this.pushUnreadCount(userId, 0);
+    }
 
     return { updated: result.count };
   }
@@ -361,6 +403,97 @@ export class NotificationsService {
     return { usersProcessed: schedules.length, emailsSent };
   }
 
+  // ─── Rate Limiting ────────────────────────────────────────────────────────
+
+  /**
+   * Checks whether the user has exceeded the notification rate limit.
+   * Returns true if rate-limited, false otherwise.
+   *
+   * Uses ValKey INCR + EXPIRE for a sliding window counter.
+   * Falls open (allows) if ValKey is unavailable.
+   */
+  private async checkRateLimit(userId: string): Promise<boolean> {
+    if (!this.redis) {
+      return false; // Fail open when ValKey is not available
+    }
+
+    try {
+      const key = `${RATE_LIMIT_KEY_PREFIX}${userId}`;
+      const count = await this.redis.get(key);
+
+      if (count !== null && parseInt(count, 10) >= RATE_LIMIT_MAX_PER_HOUR) {
+        return true;
+      }
+
+      return false;
+    } catch (err) {
+      this.logger.warn(
+        `Rate limit check failed for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return false; // Fail open
+    }
+  }
+
+  /**
+   * Increments the rate limit counter for a user.
+   * Sets a TTL on the key matching the rate limit window.
+   */
+  private async incrementRateLimit(userId: string): Promise<void> {
+    if (!this.redis) {
+      return;
+    }
+
+    try {
+      const key = `${RATE_LIMIT_KEY_PREFIX}${userId}`;
+      const newCount = await this.redis.incr(key);
+
+      // Set TTL only on first increment (when count is 1)
+      if (newCount === 1) {
+        await this.redis.expire(key, RATE_LIMIT_WINDOW_SECONDS);
+      }
+    } catch (err) {
+      this.logger.warn(
+        `Rate limit increment failed for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  // ─── WebSocket Push ──────────────────────────────────────────────────────
+
+  /**
+   * Pushes a notification to the user via WebSocket gateway.
+   */
+  private pushToWebSocket(userId: string, notification: NotificationDto): void {
+    if (!this.gateway) {
+      return;
+    }
+
+    try {
+      this.gateway.sendNotification(userId, notification);
+    } catch (err) {
+      this.logger.warn(
+        `WebSocket push failed for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
+  /**
+   * Pushes the updated unread count to the user via WebSocket gateway.
+   */
+  private pushUnreadCount(userId: string, count: number): void {
+    if (!this.gateway) {
+      return;
+    }
+
+    try {
+      this.gateway.sendUnreadCount(userId, count);
+    } catch (err) {
+      this.logger.warn(
+        `WebSocket unread count push failed for user ${userId}: ${err instanceof Error ? err.message : String(err)}`,
+      );
+    }
+  }
+
   // ─── Private helpers ──────────────────────────────────────────────────────
 
   /**
@@ -465,6 +598,7 @@ export class NotificationsService {
     title: string;
     body: string;
     isRead: boolean;
+    noteId: string | null;
     metadata: unknown;
     createdAt: Date;
   }): NotificationDto {
@@ -474,6 +608,7 @@ export class NotificationsService {
       title: notification.title,
       body: notification.body,
       isRead: notification.isRead,
+      noteId: notification.noteId,
       metadata: (notification.metadata ?? {}) as Record<string, unknown>,
       createdAt: notification.createdAt.toISOString(),
     };
