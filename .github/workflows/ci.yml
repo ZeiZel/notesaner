@@ -1,31 +1,116 @@
 name: CI
 
-# Run on every push to integration branches and on all PRs targeting main.
-# Concurrency group cancels in-progress runs for the same ref so stale
-# pipeline runs don't consume runner minutes after a force-push or rebase.
+# Triggers:
+#   - pull_request targeting main: full affected pipeline with PR context
+#   - push to main: reruns affected pipeline against the previous commit as base
+#     (NX SHA action handles base/head selection automatically in both cases)
 on:
   push:
     branches: [main, develop]
   pull_request:
     branches: [main]
 
+# Cancel in-progress runs for the same ref when a new commit is pushed.
+# This prevents stale runner minutes after a force-push or rebase.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Shared defaults applied to every job unless overridden.
+defaults:
+  run:
+    shell: bash
+
+# ── Reusable step fragments via env ─────────────────────────────────────────
+# NX_CLOUD_AUTH_TOKEN is read from secrets but left blank by default so the
+# pipeline runs without NX Cloud. Set the secret in the repo to enable
+# distributed caching across all jobs automatically.
+env:
+  NX_CLOUD_AUTH_TOKEN: ${{ secrets.NX_CLOUD_AUTH_TOKEN }}
+  # Suppress the "NX Cloud is not configured" banner when the token is absent.
+  NX_NO_CLOUD: ${{ secrets.NX_CLOUD_AUTH_TOKEN == '' && 'true' || 'false' }}
+  # Deterministic pnpm store path for cache actions.
+  PNPM_STORE_PATH: ~/.pnpm-store
+
 jobs:
+  # ── affected-check ──────────────────────────────────────────────────────────
+  # Determines which NX projects are affected by the change set and emits a
+  # JSON matrix that downstream Docker-build jobs can consume to skip unchanged
+  # images. This job runs unconditionally and finishes fast (~30 s) because it
+  # installs deps and invokes `nx show projects --affected` without building.
+  #
+  # Outputs:
+  #   affected_apps  — JSON array of affected app names, e.g. ["web","server"]
+  #   has_affected   — "true" if at least one app is affected, else "false"
+  affected-check:
+    name: Affected Check
+    runs-on: ubuntu-latest
+    outputs:
+      affected_apps: ${{ steps.affected.outputs.affected_apps }}
+      has_affected: ${{ steps.affected.outputs.has_affected }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history is required for NX to compute the affected set relative
+          # to the base branch. Shallow clones produce incorrect diffs.
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # nrwl/nx-set-shas sets NX_BASE and NX_HEAD environment variables.
+      # On pull_request:  NX_BASE = merge-base of PR head and main
+      # On push to main:  NX_BASE = previous commit SHA, NX_HEAD = HEAD
+      - name: Set NX SHAs
+        uses: nrwl/nx-set-shas@v4
+
+      - name: Compute affected apps
+        id: affected
+        run: |
+          # Retrieve all affected project names (newline-separated).
+          ALL_AFFECTED=$(pnpm nx show projects --affected --base="$NX_BASE" --head="$NX_HEAD" 2>/dev/null || true)
+
+          # Filter to only deployable apps (web, server).
+          APPS=()
+          for proj in web server; do
+            if echo "$ALL_AFFECTED" | grep -qx "$proj"; then
+              APPS+=("\"$proj\"")
+            fi
+          done
+
+          # Build JSON array, e.g. ["web","server"] or [].
+          APPS_JSON="[$(IFS=,; echo "${APPS[*]}")]"
+          HAS_AFFECTED="false"
+          if [ ${#APPS[@]} -gt 0 ]; then
+            HAS_AFFECTED="true"
+          fi
+
+          echo "affected_apps=${APPS_JSON}" >> "$GITHUB_OUTPUT"
+          echo "has_affected=${HAS_AFFECTED}"  >> "$GITHUB_OUTPUT"
+
+          echo "Affected apps: ${APPS_JSON}"
+
   # ── Lint ────────────────────────────────────────────────────────────────────
-  # Run ESLint only on projects affected by the change set.
-  # Keeping lint as a separate job lets it run in parallel with type-check
-  # and provides a clearer signal in the GitHub status checks UI.
+  # ESLint across all affected projects, running in parallel via NX's built-in
+  # task scheduler. Separated from type-check so the two signals appear
+  # independently in the GitHub checks UI and can be triaged faster.
   lint:
     name: Lint
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
-          # Full history is required for NX affected to compute the change set
-          # relative to the base branch (defaultBase: main in nx.json).
           fetch-depth: 0
 
       - uses: pnpm/action-setup@v4
@@ -37,21 +122,39 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Restore pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Set NX SHAs
         uses: nrwl/nx-set-shas@v4
 
+      - name: Restore NX cache
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-lint-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-lint-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}-
+            nx-${{ runner.os }}-lint-
+            nx-${{ runner.os }}-
+
       - name: Lint affected projects
-        run: pnpm nx affected -t lint
+        # --parallel lets NX run independent lint tasks concurrently.
+        # --max-parallel caps concurrency to avoid OOM on 2-core runners.
+        run: pnpm nx affected -t lint --base="$NX_BASE" --head="$NX_HEAD" --parallel --max-parallel=4
 
   # ── Type check ──────────────────────────────────────────────────────────────
-  # Runs tsc --noEmit across affected projects.
-  # A dedicated step surfaces type errors independently of lint failures.
   type-check:
     name: Type Check
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,20 +169,37 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Restore pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Set NX SHAs
         uses: nrwl/nx-set-shas@v4
 
+      - name: Restore NX cache
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-type-check-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-type-check-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}-
+            nx-${{ runner.os }}-type-check-
+            nx-${{ runner.os }}-
+
       - name: Type check affected projects
-        run: pnpm nx affected -t type-check
+        run: pnpm nx affected -t type-check --base="$NX_BASE" --head="$NX_HEAD" --parallel --max-parallel=4
 
   # ── Test ────────────────────────────────────────────────────────────────────
-  # Runs Vitest via `nx affected -t test` so only projects touched by the
-  # change set are tested. Services (postgres, valkey) are always started
-  # because integration tests in apps/server require them; unit-only lib
-  # tests simply ignore the env vars.
+  # Vitest unit + integration tests for all affected projects.
+  # PostgreSQL 17 and ValKey 8 service containers are always started because
+  # the server integration tests depend on them; pure library unit tests simply
+  # ignore these env vars.
   test:
     name: Test
     runs-on: ubuntu-latest
@@ -123,21 +243,51 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Restore pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Set NX SHAs
         uses: nrwl/nx-set-shas@v4
 
+      - name: Restore NX cache
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-test-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-test-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}-
+            nx-${{ runner.os }}-test-
+            nx-${{ runner.os }}-
+
       - name: Run tests for affected projects
-        run: pnpm nx affected -t test
+        run: pnpm nx affected -t test --base="$NX_BASE" --head="$NX_HEAD" --parallel --max-parallel=4
         env:
           DATABASE_URL: postgresql://test:test@localhost:5432/notesaner_test
           VALKEY_URL: valkey://localhost:6379
+          NODE_ENV: test
+
+      - name: Upload coverage reports
+        uses: actions/upload-artifact@v4
+        # Always upload coverage even if tests partially fail so that coverage
+        # data is not lost on a flaky run.
+        if: always()
+        with:
+          name: coverage-reports
+          path: coverage/
+          retention-days: 7
 
   # ── Build ───────────────────────────────────────────────────────────────────
-  # Build only what has changed. Depends on lint, type-check, and test so
-  # that a broken build artifact is never produced for a failing commit.
+  # Compiles only affected projects. Blocked on lint, type-check, and test so
+  # that a broken artifact is never produced for a failing commit.
+  # Build outputs are uploaded as artifacts so the Docker job can reuse them
+  # without rebuilding from source.
   build:
     name: Build
     runs-on: ubuntu-latest
@@ -157,22 +307,189 @@ jobs:
           node-version: 22
           cache: pnpm
 
+      - name: Restore pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
       - name: Set NX SHAs
         uses: nrwl/nx-set-shas@v4
 
-      # Restore the NX remote cache so repeated builds of unchanged projects
-      # are instant. The cache key changes when nx.json or pnpm-lock.yaml
-      # changes, which are the two files most likely to invalidate all targets.
+      # NX local cache is restored so unchanged projects hit the cache and are
+      # not rebuilt. The key includes nx.json and pnpm-lock.yaml because changes
+      # to either can invalidate all cached task results.
       - name: Restore NX build cache
         uses: actions/cache@v4
         with:
           path: .nx/cache
-          key: nx-${{ runner.os }}-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}
+          key: nx-${{ runner.os }}-build-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}-${{ github.sha }}
           restore-keys: |
+            nx-${{ runner.os }}-build-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}-
+            nx-${{ runner.os }}-build-
             nx-${{ runner.os }}-
 
       - name: Build affected projects
-        run: pnpm nx affected -t build
+        run: pnpm nx affected -t build --base="$NX_BASE" --head="$NX_HEAD"
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-artifacts
+          path: dist/
+          retention-days: 3
+
+  # ── E2E ─────────────────────────────────────────────────────────────────────
+  # Playwright end-to-end tests. This job is a no-op when no projects define an
+  # `e2e` target (nx affected -t e2e exits cleanly with no matching tasks).
+  # When Playwright tests are added, set PLAYWRIGHT_BASE_URL and configure the
+  # application's e2e target in its project.json.
+  #
+  # This job deliberately does NOT gate the build job so that infrastructure
+  # PRs (CI changes, Dockerfiles, etc.) are not blocked waiting for a full
+  # browser test suite.
+  e2e:
+    name: E2E
+    runs-on: ubuntu-latest
+    needs: [build]
+    # Only run E2E on pull requests to main; skip on direct pushes to main to
+    # keep the merge queue fast. Adjust this condition as the test suite grows.
+    if: github.event_name == 'pull_request'
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Restore pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Install Playwright browsers only when there are e2e targets to run.
+      # `npx playwright install --with-deps` is intentionally placed after the
+      # NX affected check to avoid the ~200 MB download on non-e2e PRs.
+      - name: Set NX SHAs
+        uses: nrwl/nx-set-shas@v4
+
+      - name: Check for affected e2e targets
+        id: e2e-check
+        run: |
+          HAS_E2E=$(pnpm nx show projects --affected --base="$NX_BASE" --head="$NX_HEAD" --withTarget=e2e 2>/dev/null | wc -l | tr -d ' ')
+          echo "has_e2e=$( [ "$HAS_E2E" -gt 0 ] && echo true || echo false )" >> "$GITHUB_OUTPUT"
+
+      - name: Install Playwright browsers
+        if: steps.e2e-check.outputs.has_e2e == 'true'
+        run: npx playwright install --with-deps chromium
+
+      - name: Restore NX cache
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-e2e-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}-${{ github.sha }}
+          restore-keys: |
+            nx-${{ runner.os }}-e2e-${{ hashFiles('nx.json', 'pnpm-lock.yaml') }}-
+            nx-${{ runner.os }}-e2e-
+            nx-${{ runner.os }}-
+
+      - name: Run E2E tests for affected projects
+        run: pnpm nx affected -t e2e --base="$NX_BASE" --head="$NX_HEAD"
+        env:
+          NODE_ENV: test
+
+      - name: Upload Playwright report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-report
+          path: |
+            **/playwright-report/
+            **/test-results/
+          retention-days: 7
+
+  # ── Docker ──────────────────────────────────────────────────────────────────
+  # Build Docker images only for apps that were changed in this PR/push.
+  # The matrix is driven by the affected-check job's `affected_apps` output so
+  # unchanged images are never rebuilt, cutting image push time significantly.
+  #
+  # Images are pushed to GHCR with a pr-<number> or sha-<short> tag on PRs and
+  # a `main-<sha>` tag on pushes to main. This gives each CI run a unique,
+  # traceable image that can be used for staging validation or rollback.
+  docker:
+    name: Docker (${{ matrix.app }})
+    runs-on: ubuntu-latest
+    needs: [affected-check, build]
+    # Skip when nothing is affected (e.g. docs-only PRs).
+    if: needs.affected-check.outputs.has_affected == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        app: ${{ fromJson(needs.affected-check.outputs.affected_apps) }}
+
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image tag
+        id: tag
+        run: |
+          SHORT_SHA="${GITHUB_SHA::8}"
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            TAG="pr-${{ github.event.number }}-${SHORT_SHA}"
+          else
+            TAG="main-${SHORT_SHA}"
+          fi
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "image=ghcr.io/${{ github.repository }}/${{ matrix.app }}" >> "$GITHUB_OUTPUT"
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.${{ matrix.app }}
+          # On PRs we build but do not push to avoid polluting the registry with
+          # every commit. Set push: true here unconditionally if you want
+          # per-PR preview environments.
+          push: ${{ github.ref == 'refs/heads/main' }}
+          tags: |
+            ${{ steps.tag.outputs.image }}:${{ steps.tag.outputs.tag }}
+            ${{ steps.tag.outputs.image }}:latest
+          # GitHub Actions cache keeps layer cache across runs within the same
+          # repo, avoiding redundant layer downloads for unchanged base stages.
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.created=${{ github.event.head_commit.timestamp }}

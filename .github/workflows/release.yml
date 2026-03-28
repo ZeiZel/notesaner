@@ -1,5 +1,8 @@
 name: Release
 
+# Triggered on semver tags (v1.2.3). Builds and pushes Docker images for each
+# deployable app. Unlike the CI workflow, release builds always build ALL apps
+# because a versioned release should be a complete, consistent artifact set.
 on:
   push:
     tags:
@@ -10,10 +13,17 @@ permissions:
   packages: write
 
 jobs:
+  # ── Release Docker builds ───────────────────────────────────────────────────
+  # Static matrix: on a release tag, every deployable app is built regardless
+  # of what changed since the last commit. This guarantees that all images in
+  # a release share the same version tag and are mutually consistent.
   docker:
+    name: Docker (${{ matrix.app }})
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
       matrix:
+        # Add new deployable apps here as the project grows.
         app: [web, server]
 
     steps:
@@ -29,9 +39,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Extract version
+      - name: Extract version from tag
         id: version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_OUTPUT
+        # Strip the leading 'v' from the tag (v1.2.3 → 1.2.3).
+        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> "$GITHUB_OUTPUT"
 
       - name: Build and push
         uses: docker/build-push-action@v6
@@ -42,5 +53,11 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}/${{ matrix.app }}:${{ steps.version.outputs.VERSION }}
             ghcr.io/${{ github.repository }}/${{ matrix.app }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # GitHub Actions cache scoped per app avoids cross-contamination
+          # between web and server layer caches.
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+          labels: |
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.version.outputs.VERSION }}
+            org.opencontainers.image.revision=${{ github.sha }}

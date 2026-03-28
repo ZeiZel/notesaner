@@ -32,6 +32,10 @@
     "type-check": {
       "inputs": ["default", "^default"],
       "cache": true
+    },
+    "e2e": {
+      "inputs": ["default", "^production"],
+      "cache": true
     }
   },
   "plugins": [
