@@ -128,6 +128,42 @@ export async function copyNoteTitle(title: string): Promise<boolean> {
   return copyText(title);
 }
 
+/**
+ * Copies a note's full markdown content to the clipboard.
+ * Useful for "Copy as Markdown" operations.
+ */
+export async function copyMarkdownContent(markdown: string): Promise<boolean> {
+  return copyText(markdown);
+}
+
+/**
+ * Copies a share link URL to the clipboard.
+ * Provides both the URL as plain text and an HTML anchor for rich paste.
+ */
+export async function copyShareLink(url: string, noteTitle?: string): Promise<boolean> {
+  if (noteTitle) {
+    const html = `<a href="${escapeHtml(url)}">${escapeHtml(noteTitle)}</a>`;
+    return copyRichText(url, html);
+  }
+  return copyText(url);
+}
+
+/**
+ * Copies a note's frontmatter as a YAML string.
+ * Expects the serialized YAML block (including --- delimiters).
+ */
+export async function copyFrontmatterAsYaml(yaml: string): Promise<boolean> {
+  return copyText(yaml);
+}
+
+/**
+ * Copies a note's file path to the clipboard.
+ * Used by the Cmd+Shift+C keyboard shortcut.
+ */
+export async function copyNotePath(path: string): Promise<boolean> {
+  return copyText(path);
+}
+
 // ---------------------------------------------------------------------------
 // Fallback for browsers without Clipboard API
 // ---------------------------------------------------------------------------

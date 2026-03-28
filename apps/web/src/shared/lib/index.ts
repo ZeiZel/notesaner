@@ -36,6 +36,10 @@ export {
   copyNoteLink,
   copyBlockReference,
   copyNoteTitle,
+  copyMarkdownContent,
+  copyShareLink,
+  copyFrontmatterAsYaml,
+  copyNotePath,
 } from './clipboard';
 export type { ClipboardWriteOptions, ClipboardFormat } from './clipboard';
 
@@ -108,6 +112,10 @@ export {
   assignPresenceCursorColor,
 } from './presence-colors';
 export type { PresenceColor } from './presence-colors';
+
+// ---- CSS sanitizer ----
+export { sanitizeCss, isCssSafe, combineSnippets } from './css-sanitizer';
+export type { SanitizeResult } from './css-sanitizer';
 
 // ---- Theme system ----
 // Re-exported via sub-path: import { useTheme, ThemeToggle } from '@/shared/lib/theme';
