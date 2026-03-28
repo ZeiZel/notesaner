@@ -35,6 +35,10 @@ test-results/
 .benchmarks/
 .lighthouseci/
 
+# Benchmark reports (generated, not committed)
+reports/benchmarks/
+reports/lighthouse/
+
 # Prisma
 apps/server/prisma/*.db
 

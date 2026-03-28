@@ -17,6 +17,7 @@ export default defineConfig({
       'src/__tests__/e2e/**',
       'src/__tests__/accessibility/**',
       'src/__tests__/performance/**',
+      'src/__tests__/benchmarks/**',
       'node_modules/**',
     ],
     globals: false,

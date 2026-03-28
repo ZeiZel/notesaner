@@ -7,6 +7,9 @@ import { KEYBOARD_SHORTCUTS, formatCombo, type ShortcutId } from '@/shared/lib/k
 import { useSidebarStore } from '@/shared/stores/sidebar-store';
 import { useWorkspaceStore } from '@/shared/stores/workspace-store';
 import { useTheme } from '@/shared/lib/providers/ThemeProvider';
+import { useFavoritesStore } from '@/shared/stores/favorites-store';
+import { useNoteStateStore } from '@/shared/stores/note-state-store';
+import { useAuthStore } from '@/shared/stores/auth-store';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -347,6 +350,25 @@ export function CommandPaletteDialog({
         icon: <IconFile />,
         action: () => {
           // Auto-save is active; this is a no-op but provides user feedback
+        },
+      },
+      {
+        id: 'cmd-toggle-favorite',
+        label: 'Toggle favorite',
+        description: 'Add or remove the current note from favorites',
+        group: 'File Operations',
+        shortcutId: 'toggle-favorite',
+        keywords: ['favorite', 'bookmark', 'star', 'pin'],
+        icon: <IconFile />,
+        action: () => {
+          const { activeNote } = useNoteStateStore.getState();
+          if (!activeNote) return;
+          const { toggleFavorite, syncToServer } = useFavoritesStore.getState();
+          toggleFavorite(activeNote.id, activeNote.title, activeNote.path);
+          const { accessToken } = useAuthStore.getState();
+          if (accessToken) {
+            syncToServer(accessToken);
+          }
         },
       },
 

@@ -298,6 +298,15 @@
     box-shadow: var(--ns-shadow-ring-error);
   }
 
+  /* Hide scrollbar while allowing scrolling */
+  .scrollbar-none {
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none; /* Chrome/Safari/Opera */
+  }
+
   /* Truncation */
   .truncate-2 {
     display: -webkit-box;

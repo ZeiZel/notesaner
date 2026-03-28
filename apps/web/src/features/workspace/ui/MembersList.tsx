@@ -22,9 +22,11 @@
  *   />
  */
 
+import { Badge } from 'antd';
 import type { WorkspaceMember, MemberRole } from '../model/members-store';
 import { canChangeRole, canRemoveMember } from '../model/members-store';
 import { RoleBadge } from './RoleBadge';
+import { usePresenceStore, type PresenceStatus } from '@/shared/stores/presence-store';
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
@@ -81,15 +83,28 @@ function TrashIcon({ className }: { className?: string }) {
 
 // ─── Avatar component ──────────────────────────────────────────────────────
 
+// ─── Presence status helpers ──────────────────────────────────────────────
+
+const PRESENCE_STATUS_COLORS: Record<PresenceStatus, string> = {
+  online: '#52c41a',
+  away: '#faad14',
+  offline: '#8c8c8c',
+};
+
 function MemberAvatar({
   displayName,
   avatarUrl,
+  userId,
   size = 8,
 }: {
   displayName: string;
   avatarUrl: string | null;
+  userId: string;
   size?: number;
 }) {
+  const presenceUser = usePresenceStore((state) => state.users.get(userId));
+  const status: PresenceStatus = presenceUser?.status ?? 'offline';
+
   const initials = displayName
     .split(' ')
     .filter(Boolean)
@@ -98,20 +113,23 @@ function MemberAvatar({
     .join('');
 
   const sizeClass = `h-${size} w-${size}`;
+  const statusColor = PRESENCE_STATUS_COLORS[status];
 
-  if (avatarUrl) {
-    return (
-      <img src={avatarUrl} alt={displayName} className={`${sizeClass} rounded-full object-cover`} />
-    );
-  }
-
-  return (
+  const avatarElement = avatarUrl ? (
+    <img src={avatarUrl} alt={displayName} className={`${sizeClass} rounded-full object-cover`} />
+  ) : (
     <div
       className={`${sizeClass} flex shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary text-xs font-semibold select-none`}
       aria-label={displayName}
     >
       {initials}
     </div>
+  );
+
+  return (
+    <Badge dot color={statusColor} offset={[-3, size * 4 - 4]}>
+      {avatarElement}
+    </Badge>
   );
 }
 
@@ -144,10 +162,11 @@ function MemberRow({
       className="flex items-center gap-3 rounded-lg px-4 py-3 transition-colors hover:bg-background-hover"
       aria-label={`Member: ${member.user.displayName}`}
     >
-      {/* Avatar */}
+      {/* Avatar with presence status */}
       <MemberAvatar
         displayName={member.user.displayName}
         avatarUrl={member.user.avatarUrl}
+        userId={member.userId}
         size={9}
       />
 

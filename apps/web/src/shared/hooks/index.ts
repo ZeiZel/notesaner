@@ -39,3 +39,13 @@ export {
   type SwipeDirection,
   type SwipeGestureOptions,
 } from './useSwipeGesture';
+
+// Idle detection
+export {
+  useIdleDetection,
+  DEFAULT_IDLE_TIMEOUT_MS,
+  type UseIdleDetectionOptions,
+} from './useIdleDetection';
+
+// Presence + idle integration
+export { usePresenceWithIdle, type UsePresenceWithIdleOptions } from './usePresenceWithIdle';

@@ -69,6 +69,41 @@
         "command": "tsc --noEmit",
         "cwd": "apps/web"
       }
+    },
+    "benchmark": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx tsx tools/benchmarks/run-benchmarks.ts",
+        "cwd": "."
+      },
+      "configurations": {
+        "unit": {
+          "command": "npx tsx tools/benchmarks/run-benchmarks.ts --suite editor"
+        },
+        "browser": {
+          "command": "npx tsx tools/benchmarks/run-benchmarks.ts --suite browser"
+        },
+        "lighthouse": {
+          "command": "npx tsx tools/benchmarks/run-benchmarks.ts --suite lighthouse"
+        },
+        "save-baseline": {
+          "command": "npx tsx tools/benchmarks/run-benchmarks.ts --save-baseline"
+        }
+      }
+    },
+    "benchmark:browser": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm exec playwright test --config=apps/web/playwright/benchmark.config.ts",
+        "cwd": "."
+      }
+    },
+    "benchmark:lighthouse": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx @lhci/cli autorun --config=.lighthouserc.js",
+        "cwd": "."
+      }
     }
   },
   "tags": ["scope:web", "type:app"]

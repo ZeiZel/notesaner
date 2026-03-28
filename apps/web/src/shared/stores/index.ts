@@ -18,6 +18,7 @@ export { useWorkspaceStore } from './workspace-store';
 export { useSearchStore } from './search-store';
 export type { SavedSearch, SearchStoreState } from './search-store';
 export { useNotificationStore } from './notification-store';
+export { useActivityStore } from './activity-store';
 export {
   useCommentStore,
   selectThreadsArray,
@@ -62,3 +63,30 @@ export { useSidebarStore } from './sidebar-store';
 export type { PanelConfig as SidebarPanelConfig } from './sidebar-store';
 export { useThemePreferencesStore } from './theme-store';
 export type { ThemePreferences } from './theme-store';
+export {
+  useRibbonStore,
+  getActionDefinition,
+  getVisibleActions,
+  registerRibbonAction,
+  DEFAULT_RIBBON_ACTIONS,
+} from './ribbon-store';
+export type { RibbonAction, BuiltInRibbonActionId } from './ribbon-store';
+export {
+  useFavoritesStore,
+  selectFavoritesCount,
+  selectIsFavoritesFull,
+  MAX_FAVORITES,
+} from './favorites-store';
+export type { FavoriteEntry } from './favorites-store';
+export { useRecentStore, MAX_RECENT_NOTES } from './recent-store';
+export type { RecentNoteEntry } from './recent-store';
+
+// ---- Presence ----
+export {
+  usePresenceStore,
+  selectPresenceUsers,
+  selectUsersOnNote,
+  selectNoteViewerCounts,
+  selectOnlineUserCount,
+} from './presence-store';
+export type { PresenceStatus, WorkspacePresenceUser } from './presence-store';

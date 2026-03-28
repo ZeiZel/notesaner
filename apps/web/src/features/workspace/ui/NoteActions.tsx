@@ -17,6 +17,8 @@ import { cn } from '@/shared/lib/utils';
 import { useNoteActions } from '../hooks/useNoteActions';
 import { FolderPickerDialog } from './FolderPickerDialog';
 import type { NoteDto } from '@notesaner/contracts';
+import { useFavoritesStore } from '@/shared/stores/favorites-store';
+import { useAuthStore } from '@/shared/stores/auth-store';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -64,6 +66,14 @@ function MoveIcon() {
         d="M1.5 3.25a2.25 2.25 0 013-2.122V1A2.25 2.25 0 016.75 3.25v.894l.57-.57a.75.75 0 011.06 1.06L6.56 6.456a.75.75 0 01-1.06 0L3.68 4.634a.75.75 0 011.06-1.06l.51.51V3.25a.75.75 0 00-1.5 0v.5a.75.75 0 01-1.5 0v-.5zM8.75 8A.75.75 0 009.5 7.25h4.75a.75.75 0 010 1.5H9.5A.75.75 0 018.75 8zm0 3a.75.75 0 01.75-.75h4.75a.75.75 0 010 1.5H9.5a.75.75 0 01-.75-.75z"
         clipRule="evenodd"
       />
+    </svg>
+  );
+}
+
+function StarIcon() {
+  return (
+    <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
+      <path d="M8 1.25l1.75 3.55 3.92.57-2.84 2.77.67 3.9L8 10.18l-3.5 1.86.67-3.9L2.33 5.37l3.92-.57L8 1.25z" />
     </svg>
   );
 }
@@ -135,9 +145,22 @@ export function NoteActions({
     },
   });
 
+  const isFavorite = useFavoritesStore((s) => s.favorites.some((f) => f.noteId === note.id));
+  const toggleFavorite = useFavoritesStore((s) => s.toggleFavorite);
+  const syncFavoritesToServer = useFavoritesStore((s) => s.syncToServer);
+  const token = useAuthStore((s) => s.accessToken);
+
   const handleToggle = useCallback(() => {
     setIsOpen((prev) => !prev);
   }, []);
+
+  const handleToggleFavorite = useCallback(() => {
+    setIsOpen(false);
+    toggleFavorite(note.id, note.title, note.path);
+    if (token) {
+      syncFavoritesToServer(token);
+    }
+  }, [note, toggleFavorite, syncFavoritesToServer, token]);
 
   const handleDuplicate = useCallback(() => {
     setIsOpen(false);
@@ -222,6 +245,12 @@ export function NoteActions({
                 'animate-in fade-in-0 zoom-in-95',
               )}
             >
+              <MenuItem
+                icon={<StarIcon />}
+                label={isFavorite ? 'Unfavorite' : 'Add to favorites'}
+                onClick={handleToggleFavorite}
+              />
+              <div className="my-1 h-px bg-border" role="separator" />
               <MenuItem
                 icon={<DuplicateIcon />}
                 label="Duplicate"

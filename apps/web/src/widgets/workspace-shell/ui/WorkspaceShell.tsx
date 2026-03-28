@@ -31,6 +31,10 @@ import { getPanelDefinition } from '@/features/workspace/model/PanelRegistry';
 import { preloadGraph, preloadSettings, preloadPluginBrowser } from '@/shared/lib/lazy-components';
 import { announceToScreenReader } from '@/shared/lib/a11y';
 import { OfflineFallback } from '@/shared/ui/OfflineFallback';
+import { TabBar } from '@/widgets/tab-bar';
+import { Ribbon } from '@/widgets/ribbon';
+import { NotificationBell, useNotificationWebSocket } from '@/features/notifications';
+import { FavoritesPanel, useFavoriteShortcut } from '@/features/favorites';
 
 interface WorkspaceShellProps {
   children: ReactNode;
@@ -40,17 +44,17 @@ interface WorkspaceShellProps {
  * WorkspaceShell -- the responsive application layout.
  *
  * Desktop (>1024px):
- *   +--------------------+---------------------------+-----------------+
- *   | Left Sidebar       | Main Content Area         | Right Sidebar   |
- *   | 260px (resizable)  | flex-1                    | 280px (toggle)  |
- *   +--------------------+---------------------------+-----------------+
+ *   +--------+--------------------+---------------------------+-----------------+
+ *   | Ribbon | Left Sidebar       | Main Content Area         | Right Sidebar   |
+ *   | 44px   | 260px (resizable)  | flex-1                    | 280px (toggle)  |
+ *   +--------+--------------------+---------------------------+-----------------+
  *
  * Tablet (640-1024px):
- *   Sidebars open as overlays. Single content pane by default.
+ *   Ribbon visible, sidebars open as overlays. Single content pane by default.
  *   Left sidebar toggle available in toolbar.
  *
  * Mobile (<640px):
- *   Full-screen single pane. Bottom navigation for switching views.
+ *   Ribbon hidden (replaced by bottom nav). Full-screen single pane.
  *   Sidebars are hidden; content panels (files, search, outline)
  *   replace the main area via bottom nav tabs.
  *
@@ -59,6 +63,12 @@ interface WorkspaceShellProps {
 export function WorkspaceShell({ children }: WorkspaceShellProps) {
   // Register Cmd+Shift+L shortcut for snap layout picker
   useSnapLayout();
+
+  // Register Cmd+Shift+B shortcut for toggling favorite
+  useFavoriteShortcut();
+
+  // Connect to the notification WebSocket for real-time push events
+  useNotificationWebSocket();
 
   // Layout persistence: auto-save changes, restore on login
   useLayoutPersistence();
@@ -228,7 +238,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
     () => ({
       files: <FileExplorerPlaceholder />,
       search: <SearchPanelPlaceholder />,
-      bookmarks: <EmptyPanelState label="No bookmarks yet" />,
+      bookmarks: <FavoritesPanel />,
       tags: <EmptyPanelState label="No tags yet" />,
       outline: <EmptyPanelState label="Open a note to see its outline" />,
       backlinks: <EmptyPanelState label="Open a note to see backlinks" />,
@@ -277,6 +287,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               />
             )}
 
+            {/* ---- Ribbon (quick-action icon strip) ---- */}
+            <Ribbon />
+
             {/* ---- Left Sidebar ---- */}
             {showLeftSidebar && (
               <SidebarContainer
@@ -300,6 +313,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                 isMobile ? 'pb-14' : '', // Leave room for bottom nav
               ].join(' ')}
             >
+              {/* Global tab bar — desktop/tablet only */}
+              {showToolbar && <TabBar />}
+
               {/* Desktop/Tablet Toolbar */}
               {showToolbar && (
                 <header
@@ -329,6 +345,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
                   <span className="ml-1 text-xs text-foreground-muted">No file open</span>
                   <div className="ml-auto flex items-center gap-1">
+                    {/* Notification bell */}
+                    <NotificationBell />
+
                     {/* Layout preset manager */}
                     {isDesktop && <LayoutPresetButton />}
 

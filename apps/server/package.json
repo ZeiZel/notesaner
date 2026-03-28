@@ -21,7 +21,14 @@
     "prisma-seed": "prisma db seed",
     "migrate:safe": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/migrate-safe.ts",
     "migrate:safe:dry-run": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/migrate-safe.ts --dry-run",
+    "migrate:deploy": "prisma migrate deploy --schema=./prisma/schema.prisma",
+    "migrate:status": "prisma migrate status --schema=./prisma/schema.prisma",
+    "migrate:diff": "prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma --exit-code",
+    "migrate:diff:sql": "prisma migrate diff --from-migrations ./prisma/migrations --to-schema-datamodel ./prisma/schema.prisma --script",
     "migrate:check": "ts-node --compiler-options {\"module\":\"CommonJS\"} scripts/check-migrations.ts",
+    "migrate:sh": "bash scripts/migrate.sh",
+    "migrate:sh:dry-run": "bash scripts/migrate.sh --dry-run",
+    "rollback": "bash scripts/rollback.sh",
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
@@ -75,6 +82,7 @@
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.4.0",
     "@nestjs/cli": "^11.0.0",
     "@nestjs/testing": "^11.0.0",
     "@types/cookie-parser": "^1.4.8",

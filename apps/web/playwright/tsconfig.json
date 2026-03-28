@@ -16,6 +16,7 @@
   "include": [
     "../src/__tests__/accessibility/**/*.ts",
     "../src/__tests__/e2e/**/*.ts",
+    "../src/__tests__/benchmarks/**/*.ts",
     "./**/*.ts"
   ],
   "exclude": ["node_modules"]

@@ -71,9 +71,10 @@ const nextConfig: NextConfig = {
     // Responsive image breakpoints matching common device widths
     deviceSizes: [640, 750, 828, 1080, 1200, 1920, 2048],
     imageSizes: [16, 32, 48, 64, 96, 128, 256, 384],
-    // Cache optimized images for 60 seconds before revalidating (ISR-like).
-    // CDN or reverse proxy should cache these with longer TTLs.
-    minimumCacheTTL: 60,
+    // Cache optimized images for 1 hour before revalidating.
+    // CDN (nginx proxy_cache) caches these for 24h; this controls the
+    // Cache-Control max-age sent to the browser for /_next/image responses.
+    minimumCacheTTL: 3600,
     // Allow configurable image loader for CDN-hosted images
     ...(assetPrefix
       ? {
@@ -121,6 +122,16 @@ const nextConfig: NextConfig = {
           {
             key: 'Cache-Control',
             value: 'public, max-age=0, stale-while-revalidate=60',
+          },
+        ],
+      },
+      // Image optimization — moderate cache, CDN handles longer TTL
+      {
+        source: '/_next/image',
+        headers: [
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=3600, stale-while-revalidate=86400',
           },
         ],
       },

@@ -99,6 +99,16 @@ export {
   preloadAuditLog,
 } from './lazy-components';
 
+// ---- Presence cursor colors ----
+export {
+  PRESENCE_CURSOR_COLORS,
+  MAX_VISIBLE_CURSORS,
+  CURSOR_FADE_TIMEOUT_MS,
+  CURSOR_UPDATE_THROTTLE_MS,
+  assignPresenceCursorColor,
+} from './presence-colors';
+export type { PresenceColor } from './presence-colors';
+
 // ---- Theme system ----
 // Re-exported via sub-path: import { useTheme, ThemeToggle } from '@/shared/lib/theme';
 // Not flattened here to avoid naming collisions.

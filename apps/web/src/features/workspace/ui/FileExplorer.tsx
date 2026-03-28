@@ -12,6 +12,7 @@
  */
 
 import { useCallback, useRef, useMemo, useEffect } from 'react';
+import { Tooltip } from 'antd';
 import {
   VirtualTree,
   type FlatNode,
@@ -19,6 +20,7 @@ import {
   type VirtualTreeHandle,
 } from '@/shared/ui/VirtualTree';
 import { useSidebarStore } from '@/shared/stores/sidebar-store';
+import { usePresenceStore, selectUsersOnNote } from '@/shared/stores/presence-store';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -104,6 +106,37 @@ function ChevronIcon({ expanded }: { expanded: boolean }) {
 // Tree row renderer
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Presence dot for file tree items
+// ---------------------------------------------------------------------------
+
+function FilePresenceDot({ nodeId }: { nodeId: string }) {
+  const viewers = usePresenceStore((state) => selectUsersOnNote(state, nodeId));
+
+  if (viewers.length === 0) return null;
+
+  const dotColor = viewers[0].color;
+  const tooltipText =
+    viewers.length === 1
+      ? `${viewers[0].displayName} is editing`
+      : `${viewers.length} users editing: ${viewers.map((v) => v.displayName).join(', ')}`;
+
+  return (
+    <Tooltip title={tooltipText} placement="right" mouseEnterDelay={0.3}>
+      <span
+        className="inline-block shrink-0 rounded-full"
+        style={{
+          width: 6,
+          height: 6,
+          backgroundColor: dotColor,
+        }}
+        role="status"
+        aria-label={tooltipText}
+      />
+    </Tooltip>
+  );
+}
+
 function FileTreeRow({
   flatNode,
   isSelected,
@@ -141,6 +174,8 @@ function FileTreeRow({
       {!isParent && <span className="w-3" aria-hidden="true" />}
       {isFolder ? <FolderIcon expanded={isExpanded} /> : <FileIcon extension={extension} />}
       <span className="truncate">{name}</span>
+      {/* Presence dot: shows when others are editing this note */}
+      {!isFolder && <FilePresenceDot nodeId={node.id} />}
     </button>
   );
 }

@@ -24,6 +24,7 @@ export { default as axiosInstance } from './axios-instance';
 export { getQueryClient, makeQueryClient } from './query-client';
 
 // ---- Domain API modules ----
+export { activityApi } from './activity';
 export { analyticsApi } from './analytics';
 export { domainApi } from './domain';
 export { freshnessApi } from './freshness';
@@ -33,5 +34,10 @@ export { notificationsApi } from './notifications';
 export { searchPublicVault } from './public-search';
 export { readerCommentsApi } from './reader-comments';
 export { sharingApi } from './sharing';
+export { quickCaptureApi } from './quick-capture';
+export type { QuickCapturePayload, FolderTreeNode } from './quick-capture';
 export { workspacesApi } from './workspaces';
 export { workspaceSettingsApi } from './workspace-settings';
+export { searchReplaceApi } from './search-replace';
+export { preferencesApi } from './preferences';
+export type { PreferenceResponse, PreferencesMap, BulkPreferenceEntry } from './preferences';
