@@ -7,6 +7,21 @@
   "targets": {
     "type-check": {
       "command": "tsc --noEmit -p packages/ui/tsconfig.json"
+    },
+    "storybook": {
+      "command": "storybook dev -p 6006 -c packages/ui/.storybook",
+      "options": {
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "storybook:build": {
+      "command": "storybook build -c packages/ui/.storybook -o packages/ui/storybook-static",
+      "options": {
+        "cwd": "{workspaceRoot}"
+      },
+      "cache": true,
+      "inputs": ["default"],
+      "outputs": ["{projectRoot}/storybook-static"]
     }
   }
 }
