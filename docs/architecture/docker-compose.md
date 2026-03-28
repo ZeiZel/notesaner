@@ -1,6 +1,35 @@
 # Docker Configuration
 
+## Architecture
+
+```
+[Internet] --> nginx:443 (TLS termination, HTTP/2)
+           |-> /api/*  --> server:4000 (NestJS backend)     [backend-net]
+           |-> /ws/*   --> server:4000 (WebSocket proxy)    [backend-net]
+           \-> /*      --> web:3000    (Next.js frontend)   [frontend-net]
+
+server:4000 --> postgres:5432                               [backend-net]
+server:4000 --> valkey:6379                                 [backend-net]
+```
+
+### Network Isolation
+
+- **frontend-net** (bridge): nginx <-> web (Next.js). Public-facing.
+- **backend-net** (bridge, internal): nginx <-> server, server <-> postgres, server <-> valkey. Never exposed to host.
+
+### Named Volumes
+
+| Volume          | Mount                      | Purpose                          |
+| --------------- | -------------------------- | -------------------------------- |
+| `postgres_data` | `/var/lib/postgresql/data` | PostgreSQL WAL + data            |
+| `valkey_data`   | `/data`                    | ValKey AOF + RDB snapshots       |
+| `notes_data`    | `/data/notes`              | Markdown notes (source of truth) |
+| `nginx_certs`   | `/etc/nginx/certs`         | TLS certificates (certbot/ACME)  |
+| `nginx_logs`    | `/var/log/nginx`           | Nginx access/error logs          |
+
 ## docker-compose.yml (Development)
+
+Infrastructure-only compose for local development. Apps run via `pnpm nx serve`.
 
 ```yaml
 services:
@@ -11,12 +40,11 @@ services:
       POSTGRES_PASSWORD: notesaner_dev
       POSTGRES_DB: notesaner
     ports:
-      - "5432:5432"
+      - '5432:5432'
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./apps/server/prisma/init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U notesaner"]
+      test: ['CMD-SHELL', 'pg_isready -U notesaner']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -24,11 +52,11 @@ services:
   valkey:
     image: valkey/valkey:8-alpine
     ports:
-      - "6379:6379"
+      - '6379:6379'
     volumes:
       - valkey_data:/data
     healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
+      test: ['CMD', 'valkey-cli', 'ping']
       interval: 5s
       timeout: 5s
       retries: 5
@@ -40,135 +68,87 @@ volumes:
 
 ## docker-compose.prod.yml (Production)
 
-```yaml
-services:
-  web:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.web
-    ports:
-      - "3000:3000"
-    environment:
-      - NEXT_PUBLIC_API_URL=http://server:4000
-    depends_on:
-      server:
-        condition: service_healthy
+Full production stack at `docker/docker-compose.prod.yml`.
 
-  server:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.server
-    ports:
-      - "4000:4000"
-    environment:
-      - DATABASE_URL=postgresql://notesaner:${DB_PASSWORD}@postgres:5432/notesaner
-      - VALKEY_URL=valkey://valkey:6379
-      - JWT_SECRET=${JWT_SECRET}
-      - NOTES_STORAGE_PATH=/data/notes
-    volumes:
-      - notes_data:/data/notes
-    depends_on:
-      postgres:
-        condition: service_healthy
-      valkey:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:4000/health"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+### Services
 
-  postgres:
-    image: postgres:17-alpine
-    environment:
-      POSTGRES_USER: notesaner
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: notesaner
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U notesaner"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+| Service  | Image                    | CPU                 | Memory               | Restart | Networks                  |
+| -------- | ------------------------ | ------------------- | -------------------- | ------- | ------------------------- |
+| postgres | postgres:17-alpine       | 1.0 (0.25 reserved) | 1G (256M reserved)   | always  | backend-net               |
+| valkey   | valkey/valkey:8-alpine   | 0.5 (0.1 reserved)  | 512M (128M reserved) | always  | backend-net               |
+| server   | ghcr.io/notesaner/server | 2.0 (0.25 reserved) | 1G (256M reserved)   | always  | backend-net               |
+| web      | ghcr.io/notesaner/web    | 1.0 (0.1 reserved)  | 512M (128M reserved) | always  | frontend-net              |
+| nginx    | nginx:1.27-alpine        | 0.5 (0.05 reserved) | 128M (32M reserved)  | always  | frontend-net, backend-net |
 
-  valkey:
-    image: valkey/valkey:8-alpine
-    volumes:
-      - valkey_data:/data
-    healthcheck:
-      test: ["CMD", "valkey-cli", "ping"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
+### Prerequisites
 
-volumes:
-  notes_data:
-  postgres_data:
-  valkey_data:
+1. Copy and configure environment:
+
+   ```bash
+   cp docker/.env.example docker/.env
+   chmod 600 docker/.env
+   # Edit docker/.env with production values
+   ```
+
+2. Place TLS certificates:
+   ```
+   /etc/nginx/certs/fullchain.pem
+   /etc/nginx/certs/privkey.pem
+   ```
+
+### Usage
+
+```bash
+# Start all services
+docker compose -f docker/docker-compose.prod.yml --env-file docker/.env up -d
+
+# Rolling update (zero-downtime)
+docker compose -f docker/docker-compose.prod.yml --env-file docker/.env pull
+docker compose -f docker/docker-compose.prod.yml --env-file docker/.env up -d --no-deps --build web server
+
+# View logs
+docker compose -f docker/docker-compose.prod.yml logs -f server
+
+# Backup volumes
+docker run --rm -v notesaner-prod_postgres_data:/data -v $(pwd)/backups:/backup \
+  alpine tar czf /backup/postgres_data_$(date +%Y%m%d).tar.gz -C /data .
+docker run --rm -v notesaner-prod_notes_data:/data -v $(pwd)/backups:/backup \
+  alpine tar czf /backup/notes_data_$(date +%Y%m%d).tar.gz -C /data .
 ```
+
+### Security Features
+
+- All services run with `no-new-privileges:true`
+- Containers run as non-root users (nextjs:1001, nestjs:1001)
+- PostgreSQL and ValKey are not exposed to host (backend-net only)
+- ValKey dangerous commands are renamed with random tokens
+- TLS 1.2+ only, strong cipher suites, HSTS preload
+- Rate limiting on API (10r/s) and frontend (30r/s) endpoints
+- Security headers: CSP, X-Frame-Options, X-Content-Type-Options
+
+### Startup Order
+
+```
+postgres (healthy) --> server (healthy) --> web (healthy) --> nginx
+valkey   (healthy) -/
+```
+
+Server entrypoint (`docker/entrypoint.sh`) runs `prisma migrate deploy` before starting the app.
 
 ## Dockerfile.web
 
-```dockerfile
-FROM node:22-alpine AS base
-RUN corepack enable && corepack prepare pnpm@latest --activate
+Multi-stage build for the Next.js frontend:
 
-FROM base AS deps
-WORKDIR /app
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY apps/web/package.json ./apps/web/
-COPY libs/*/package.json ./libs/*/
-COPY packages/*/package.json ./packages/*/
-RUN pnpm install --frozen-lockfile
-
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN pnpm nx build web --configuration=production
-
-FROM base AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nextjs
-COPY --from=builder /app/apps/web/.next/standalone ./
-COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
-COPY --from=builder /app/apps/web/public ./apps/web/public
-USER nextjs
-EXPOSE 3000
-ENV PORT=3000 HOSTNAME="0.0.0.0"
-CMD ["node", "apps/web/server.js"]
-```
+1. **base**: Node 22 Alpine + pnpm
+2. **deps**: Install dependencies with frozen lockfile
+3. **builder**: Build Next.js standalone output
+4. **runner**: Minimal runtime image (non-root user, port 3000)
 
 ## Dockerfile.server
 
-```dockerfile
-FROM node:22-alpine AS base
-RUN corepack enable && corepack prepare pnpm@latest --activate
+Multi-stage build for the NestJS backend:
 
-FROM base AS deps
-WORKDIR /app
-COPY pnpm-lock.yaml pnpm-workspace.yaml package.json ./
-COPY apps/server/package.json ./apps/server/
-COPY libs/*/package.json ./libs/*/
-RUN pnpm install --frozen-lockfile
-
-FROM base AS builder
-WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
-COPY . .
-RUN pnpm nx build server --configuration=production
-RUN pnpm prisma generate --schema=apps/server/prisma/schema.prisma
-
-FROM base AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 nestjs
-COPY --from=builder /app/dist/apps/server ./
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/apps/server/prisma ./prisma
-USER nestjs
-EXPOSE 4000
-CMD ["node", "main.js"]
-```
+1. **base**: Node 22 Alpine + pnpm
+2. **deps**: Install dependencies with frozen lockfile
+3. **builder**: Build NestJS + generate Prisma client
+4. **runner**: Minimal runtime image (non-root user, port 4000, entrypoint runs migrations)
