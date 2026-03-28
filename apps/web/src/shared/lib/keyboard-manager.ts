@@ -105,6 +105,12 @@ class KeyboardManager {
   /** Active handler registrations. */
   private handlers = new Map<string, RegisteredHandler>();
 
+  /**
+   * Dynamically registered shortcuts (e.g. from plugins).
+   * These extend KEYBOARD_SHORTCUTS at runtime.
+   */
+  private dynamicShortcuts = new Map<string, KeyboardShortcut>();
+
   /** Listeners notified when the registry changes. */
   private changeListeners = new Set<ChangeListener>();
 
@@ -173,6 +179,93 @@ class KeyboardManager {
   }
 
   // -------------------------------------------------------------------------
+  // Dynamic shortcut registration (plugins)
+  // -------------------------------------------------------------------------
+
+  /**
+   * Register a dynamic shortcut at runtime (e.g. from a plugin).
+   *
+   * @param id       - Unique action identifier (must not clash with built-in IDs)
+   * @param label    - Human-readable label for the cheatsheet
+   * @param combo    - Default key combination
+   * @param callback - Handler function
+   * @param options  - Optional category and scope overrides
+   * @returns Unregister function for cleanup
+   */
+  registerKeybinding(
+    id: string,
+    combo: KeyCombo,
+    callback: () => void,
+    options?: {
+      label?: string;
+      category?: ShortcutCategory;
+      scope?: ShortcutScope;
+    },
+  ): () => void {
+    const label = options?.label ?? id;
+    const category = options?.category ?? 'plugin';
+    const scope: 'global' | 'editor' = options?.scope === 'editor' ? 'editor' : 'global';
+
+    const shortcut: KeyboardShortcut = { id, label, category, combo, scope };
+
+    // Warn on duplicate ID
+    if (this.dynamicShortcuts.has(id) || KEYBOARD_SHORTCUTS.some((s) => s.id === id)) {
+      console.warn(
+        `[ShortcutManager] Duplicate shortcut ID "${id}". Overwriting previous registration.`,
+      );
+    }
+
+    this.dynamicShortcuts.set(id, shortcut);
+
+    // Also register the handler
+    const unregisterHandler = this.register(id, scope, callback);
+
+    // Check for conflicts and warn
+    this.warnConflicts();
+    this.notifyChange();
+
+    return () => {
+      unregisterHandler();
+      this.dynamicShortcuts.delete(id);
+      this.notifyChange();
+    };
+  }
+
+  /**
+   * Remove a dynamically registered shortcut by ID.
+   */
+  unregisterKeybinding(id: string): void {
+    this.dynamicShortcuts.delete(id);
+    // Also remove any handler for this shortcut
+    for (const [key, reg] of this.handlers.entries()) {
+      if (reg.actionId === id) {
+        this.handlers.delete(key);
+      }
+    }
+    this.notifyChange();
+  }
+
+  /**
+   * Returns all shortcuts: built-in + dynamically registered.
+   */
+  getAllShortcuts(): readonly KeyboardShortcut[] {
+    return [...KEYBOARD_SHORTCUTS, ...this.dynamicShortcuts.values()];
+  }
+
+  /**
+   * Log conflict warnings to the console.
+   * Called on initialization and when overrides/dynamic shortcuts change.
+   */
+  warnConflicts(): void {
+    const conflicts = this.detectConflicts();
+    for (const conflict of conflicts) {
+      console.warn(
+        `[ShortcutManager] Conflict: ${conflict.comboLabel} is bound to multiple actions: ${conflict.actionIds.join(', ')} (scope: ${conflict.scope})`,
+      );
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Override management
   // -------------------------------------------------------------------------
 
@@ -191,13 +284,16 @@ class KeyboardManager {
   /**
    * Get the effective combo for a shortcut (override or default).
    * Returns null if the shortcut is disabled via override.
+   * Checks both built-in and dynamically registered shortcuts.
    */
   getEffectiveCombo(actionId: string): KeyCombo | null {
     if (this.overrides.has(actionId)) {
       return this.overrides.get(actionId) ?? null;
     }
-    const shortcut = KEYBOARD_SHORTCUTS.find((s) => s.id === actionId);
-    return shortcut?.combo ?? null;
+    const builtIn = KEYBOARD_SHORTCUTS.find((s) => s.id === actionId);
+    if (builtIn) return builtIn.combo;
+    const dynamic = this.dynamicShortcuts.get(actionId);
+    return dynamic?.combo ?? null;
   }
 
   // -------------------------------------------------------------------------
@@ -211,8 +307,9 @@ class KeyboardManager {
    */
   detectConflicts(): ShortcutConflict[] {
     const comboMap = new Map<string, { actionId: string; scope: ShortcutScope }[]>();
+    const allShortcuts = this.getAllShortcuts();
 
-    for (const shortcut of KEYBOARD_SHORTCUTS) {
+    for (const shortcut of allShortcuts) {
       const combo = this.getEffectiveCombo(shortcut.id);
       if (!combo) continue; // Disabled shortcut
 
@@ -250,8 +347,9 @@ class KeyboardManager {
   wouldConflict(combo: KeyCombo, scope: ShortcutScope, excludeActionId?: string): string[] {
     const serialized = serializeCombo(combo);
     const conflicting: string[] = [];
+    const allShortcuts = this.getAllShortcuts();
 
-    for (const shortcut of KEYBOARD_SHORTCUTS) {
+    for (const shortcut of allShortcuts) {
       if (shortcut.id === excludeActionId) continue;
 
       const effectiveCombo = this.getEffectiveCombo(shortcut.id);
@@ -290,7 +388,8 @@ class KeyboardManager {
       }
     }
 
-    return KEYBOARD_SHORTCUTS.map((shortcut) => {
+    const allShortcuts = this.getAllShortcuts();
+    return allShortcuts.map((shortcut) => {
       const effectiveCombo = this.getEffectiveCombo(shortcut.id);
       return {
         ...shortcut,
@@ -436,8 +535,17 @@ export const CATEGORY_LABELS: Record<ShortcutCategory, string> = {
   navigation: 'Navigation',
   workspace: 'Workspace',
   editor: 'Editor',
+  search: 'Search',
   view: 'View',
+  plugin: 'Plugin',
 };
 
 /** Category display order. */
-export const CATEGORY_ORDER: ShortcutCategory[] = ['navigation', 'workspace', 'editor', 'view'];
+export const CATEGORY_ORDER: ShortcutCategory[] = [
+  'navigation',
+  'workspace',
+  'editor',
+  'search',
+  'view',
+  'plugin',
+];

@@ -32,7 +32,7 @@ export interface KeyCombo {
 }
 
 /** Categories used to group shortcuts in the help UI. */
-export type ShortcutCategory = 'navigation' | 'editor' | 'workspace' | 'view';
+export type ShortcutCategory = 'navigation' | 'editor' | 'workspace' | 'search' | 'view' | 'plugin';
 
 /**
  * A fully-described keyboard shortcut.
@@ -117,9 +117,16 @@ export const KEYBOARD_SHORTCUTS = [
   {
     id: 'global-search',
     label: 'Search in all notes',
-    category: 'navigation',
+    category: 'search',
     scope: 'global',
     combo: { key: 'f', mod: true, shift: true },
+  },
+  {
+    id: 'global-search-replace',
+    label: 'Search & replace in all notes',
+    category: 'search',
+    scope: 'global',
+    combo: { key: 'h', mod: true, shift: true },
   },
   {
     id: 'toggle-left-sidebar',
@@ -138,14 +145,14 @@ export const KEYBOARD_SHORTCUTS = [
   {
     id: 'find-in-note',
     label: 'Find in note',
-    category: 'editor',
+    category: 'search',
     scope: 'global',
     combo: { key: 'f', mod: true },
   },
   {
     id: 'find-replace',
     label: 'Find & replace in note',
-    category: 'editor',
+    category: 'search',
     scope: 'global',
     combo: { key: 'h', mod: true },
   },
@@ -162,6 +169,13 @@ export const KEYBOARD_SHORTCUTS = [
     category: 'editor',
     scope: 'global',
     combo: { key: 'e', mod: true, shift: true },
+  },
+  {
+    id: 'quick-capture',
+    label: 'Quick capture',
+    category: 'workspace',
+    scope: 'global',
+    combo: { key: 'n', mod: true, shift: true },
   },
   {
     id: 'workspace-switcher',
@@ -201,6 +215,27 @@ export const KEYBOARD_SHORTCUTS = [
     combo: { key: '\\', mod: true, shift: true },
   },
   {
+    id: 'close-tab',
+    label: 'Close active tab',
+    category: 'workspace',
+    scope: 'global',
+    combo: { key: 'w', mod: true },
+  },
+  {
+    id: 'cycle-tab-forward',
+    label: 'Next tab',
+    category: 'navigation',
+    scope: 'global',
+    combo: { key: 'Tab', mod: true },
+  },
+  {
+    id: 'cycle-tab-backward',
+    label: 'Previous tab',
+    category: 'navigation',
+    scope: 'global',
+    combo: { key: 'Tab', mod: true, shift: true },
+  },
+  {
     id: 'toggle-theme',
     label: 'Toggle dark/light theme',
     category: 'view',
@@ -221,6 +256,22 @@ export const KEYBOARD_SHORTCUTS = [
     category: 'workspace',
     scope: 'global',
     combo: { key: '.', mod: true, shift: true },
+  },
+  // --- Favorites ---
+  {
+    id: 'toggle-favorite',
+    label: 'Toggle favorite / bookmark',
+    category: 'workspace',
+    scope: 'global',
+    combo: { key: 'b', mod: true, shift: true },
+  },
+  // --- Shortcut cheatsheet ---
+  {
+    id: 'shortcut-cheatsheet',
+    label: 'Show keyboard shortcut reference',
+    category: 'navigation',
+    scope: 'global',
+    combo: { key: '/', mod: true },
   },
   // --- Editor-internal (TipTap handles these; listed for help panel only) ---
   {
