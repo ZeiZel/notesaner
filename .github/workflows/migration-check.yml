@@ -1,0 +1,211 @@
+name: Migration Check
+
+# Runs migration-specific validation on every PR that touches the server app,
+# Prisma schema, or migration files. This catches schema drift, destructive
+# operations, and naming convention violations before code reaches main.
+#
+# The workflow also applies migrations to a fresh test database to verify they
+# execute cleanly, preventing "works on my machine" migration failures.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'apps/server/prisma/**'
+      - 'apps/server/src/common/utils/migration-helper*'
+      - 'apps/server/scripts/migrate*'
+      - 'apps/server/scripts/check-migrations*'
+      - 'docker/entrypoint.sh'
+  push:
+    branches: [main]
+    paths:
+      - 'apps/server/prisma/**'
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  PNPM_STORE_PATH: ~/.pnpm-store
+
+jobs:
+  # ── Static Migration Checks ──────────────────────────────────────────────────
+  # Validates migration files without requiring a database. Fast and cheap.
+  static-check:
+    name: Static Migration Check
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Restore pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm prisma generate --schema=apps/server/prisma/schema.prisma
+
+      - name: Run migration checks (naming, destructive ops, file integrity)
+        working-directory: apps/server
+        run: npx ts-node --compiler-options '{"module":"CommonJS"}' scripts/check-migrations.ts
+
+      - name: Check schema drift (prisma migrate diff --exit-code)
+        working-directory: apps/server
+        run: |
+          # prisma migrate diff --exit-code returns:
+          #   0 — no drift (schema.prisma matches migration history)
+          #   2 — drift detected (schema.prisma has changes not in migrations)
+          #
+          # This catches the case where someone edits schema.prisma without
+          # creating a corresponding migration file.
+          EXIT_CODE=0
+          npx prisma migrate diff \
+            --from-migrations ./prisma/migrations \
+            --to-schema-datamodel ./prisma/schema.prisma \
+            --exit-code 2>&1 || EXIT_CODE=$?
+
+          if [ "$EXIT_CODE" -eq 2 ]; then
+            echo "::error::Schema drift detected! The Prisma schema does not match the migration history."
+            echo "::error::Run 'pnpm prisma-migrate' to create a migration for your schema changes."
+            exit 1
+          elif [ "$EXIT_CODE" -ne 0 ]; then
+            echo "::error::prisma migrate diff failed with exit code ${EXIT_CODE}"
+            exit 1
+          fi
+
+          echo "No schema drift detected."
+
+  # ── Migration Test Against Real Database ─────────────────────────────────────
+  # Spins up a PostgreSQL container and applies all migrations from scratch to
+  # verify they execute cleanly. This catches SQL syntax errors, constraint
+  # violations, and ordering issues that static checks cannot detect.
+  migration-test:
+    name: Migration Test (PostgreSQL)
+    runs-on: ubuntu-latest
+    needs: [static-check]
+
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: migration_test
+          POSTGRES_PASSWORD: migration_test
+          POSTGRES_DB: notesaner_migration_test
+          POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql://migration_test:migration_test@localhost:5432/notesaner_migration_test?schema=public
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Restore pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ env.PNPM_STORE_PATH }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Enable PostgreSQL extensions
+        run: |
+          PGPASSWORD=migration_test psql -h localhost -U migration_test -d notesaner_migration_test -c "
+            CREATE EXTENSION IF NOT EXISTS pg_trgm;
+            CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";
+            CREATE EXTENSION IF NOT EXISTS unaccent;
+            CREATE EXTENSION IF NOT EXISTS pgcrypto;
+          "
+
+      - name: Generate Prisma client
+        run: pnpm prisma generate --schema=apps/server/prisma/schema.prisma
+
+      - name: Apply all migrations (prisma migrate deploy)
+        working-directory: apps/server
+        run: |
+          echo "Applying all migrations to test database..."
+          npx prisma migrate deploy --schema=./prisma/schema.prisma
+
+      - name: Verify migration status
+        working-directory: apps/server
+        run: |
+          echo "Checking migration status..."
+          npx prisma migrate status --schema=./prisma/schema.prisma
+
+      - name: Verify no schema drift after deploy
+        working-directory: apps/server
+        run: |
+          # After deploying all migrations, there should be zero drift
+          # between the migrations and the schema.prisma file.
+          EXIT_CODE=0
+          npx prisma migrate diff \
+            --from-migrations ./prisma/migrations \
+            --to-schema-datamodel ./prisma/schema.prisma \
+            --exit-code 2>&1 || EXIT_CODE=$?
+
+          if [ "$EXIT_CODE" -eq 2 ]; then
+            echo "::error::Post-deploy schema drift detected! Migrations do not fully represent the Prisma schema."
+            exit 1
+          fi
+
+          echo "Post-deploy verification passed. No drift."
+
+      - name: Preview generated SQL for pending changes (informational)
+        working-directory: apps/server
+        run: |
+          echo "=== Generated SQL (if any pending schema changes) ==="
+          npx prisma migrate diff \
+            --from-migrations ./prisma/migrations \
+            --to-schema-datamodel ./prisma/schema.prisma \
+            --script 2>&1 || true
+
+      - name: Test database introspection matches schema
+        working-directory: apps/server
+        run: |
+          # Verify that the live database matches what Prisma expects
+          # by diffing the database state against the schema
+          EXIT_CODE=0
+          npx prisma migrate diff \
+            --from-url "$DATABASE_URL" \
+            --to-schema-datamodel ./prisma/schema.prisma \
+            --exit-code 2>&1 || EXIT_CODE=$?
+
+          if [ "$EXIT_CODE" -eq 2 ]; then
+            echo "::warning::Database state differs from schema. This may be expected if raw SQL migrations add columns not in schema.prisma (e.g. tsvector)."
+          fi

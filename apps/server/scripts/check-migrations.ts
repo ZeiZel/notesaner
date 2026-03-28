@@ -45,13 +45,21 @@ interface CheckResult {
 function checkNamingConvention(migrationName: string): string[] {
   const errors: string[] = [];
 
-  // Must start with 4 digits
-  if (!/^\d{4}_/.test(migrationName)) {
-    errors.push(`Migration "${migrationName}" does not follow naming convention: NNNN_description`);
+  // Two accepted formats:
+  //   1. Legacy: NNNN_description (e.g. 0010_notifications) -- grandfathered
+  //   2. New:    YYYYMMDDHHMMSS_description (e.g. 20260328143000_add_priority)
+  const legacyPattern = /^\d{4}_/;
+  const timestampPattern = /^\d{14}_/;
+
+  if (!legacyPattern.test(migrationName) && !timestampPattern.test(migrationName)) {
+    errors.push(
+      `Migration "${migrationName}" does not follow naming convention: ` +
+        `YYYYMMDDHHMMSS_description (preferred) or NNNN_description (legacy)`,
+    );
   }
 
   // Must use snake_case for description
-  const description = migrationName.replace(/^\d{4}_/, '');
+  const description = migrationName.replace(/^\d+_/, '');
   if (description && !/^[a-z0-9_]+$/.test(description)) {
     errors.push(`Migration "${migrationName}" description should use snake_case (a-z, 0-9, _)`);
   }
