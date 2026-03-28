@@ -14,7 +14,6 @@
 //     patterns that are disallowed in production code (any, non-null, etc.).
 
 import tseslint from 'typescript-eslint';
-
 import nxPlugin from '@nx/eslint-plugin';
 
 /** @type {import('eslint').Linter.Config[]} */

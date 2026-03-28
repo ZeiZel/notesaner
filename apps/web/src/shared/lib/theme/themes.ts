@@ -532,10 +532,211 @@ export const themeNord: Theme = {
 };
 
 // ---------------------------------------------------------------------------
+// Built-in: Solarized Dark
+// ---------------------------------------------------------------------------
+
+export const themeSolarizedDark: Theme = {
+  id: 'solarized-dark',
+  name: 'Solarized Dark',
+  isDark: true,
+  colors: {
+    'color-background': '#002b36',
+    'color-background-surface': '#073642',
+    'color-background-elevated': '#0a4050',
+    'color-background-overlay': '#0d4d5e',
+    'color-background-input': '#00232d',
+    'color-background-hover': 'rgba(255, 255, 255, 0.05)',
+    'color-background-active': 'rgba(255, 255, 255, 0.09)',
+
+    'color-foreground': '#839496',
+    'color-foreground-secondary': '#93a1a1',
+    'color-foreground-muted': '#586e75',
+    'color-foreground-inverse': '#002b36',
+
+    'color-primary': '#268bd2',
+    'color-primary-hover': '#1a7abf',
+    'color-primary-active': '#1569a8',
+    'color-primary-muted': 'rgba(38, 139, 210, 0.15)',
+    'color-primary-foreground': '#fdf6e3',
+
+    'color-secondary': '#073642',
+    'color-secondary-hover': '#0a4050',
+    'color-secondary-foreground': '#839496',
+
+    'color-accent': '#2aa198',
+    'color-accent-hover': '#238e87',
+    'color-accent-muted': 'rgba(42, 161, 152, 0.15)',
+    'color-accent-foreground': '#fdf6e3',
+
+    'color-muted': '#073642',
+    'color-muted-foreground': '#586e75',
+
+    'color-destructive': '#dc322f',
+    'color-destructive-hover': '#c72926',
+    'color-destructive-muted': 'rgba(220, 50, 47, 0.15)',
+    'color-destructive-foreground': '#fdf6e3',
+
+    'color-success': '#859900',
+    'color-success-muted': 'rgba(133, 153, 0, 0.15)',
+    'color-warning': '#cb4b16',
+    'color-warning-muted': 'rgba(203, 75, 22, 0.15)',
+    'color-error': '#dc322f',
+    'color-error-muted': 'rgba(220, 50, 47, 0.15)',
+    'color-info': '#268bd2',
+    'color-info-muted': 'rgba(38, 139, 210, 0.15)',
+
+    'color-border': '#073642',
+    'color-border-subtle': 'rgba(255, 255, 255, 0.06)',
+
+    'color-input': '#073642',
+    'color-ring': '#268bd2',
+
+    'color-card': '#073642',
+    'color-card-foreground': '#839496',
+
+    'color-popover': '#073642',
+    'color-popover-foreground': '#839496',
+
+    'color-sidebar-background': '#00222b',
+    'color-sidebar-foreground': '#839496',
+    'color-sidebar-border': '#073642',
+    'color-sidebar-accent': '#0a4050',
+    'color-sidebar-accent-foreground': '#93a1a1',
+    'color-sidebar-muted': '#586e75',
+    'color-sidebar-ring': '#268bd2',
+
+    'color-rosewater': '#eee8d5',
+    'color-flamingo': '#dc322f',
+    'color-pink': '#d33682',
+    'color-mauve': '#6c71c4',
+    'color-red': '#dc322f',
+    'color-maroon': '#cb4b16',
+    'color-peach': '#cb4b16',
+    'color-yellow': '#b58900',
+    'color-green': '#859900',
+    'color-teal': '#2aa198',
+    'color-sky': '#268bd2',
+    'color-sapphire': '#268bd2',
+    'color-blue': '#268bd2',
+    'color-lavender': '#6c71c4',
+
+    'color-chart-1': '#268bd2',
+    'color-chart-2': '#2aa198',
+    'color-chart-3': '#859900',
+    'color-chart-4': '#b58900',
+    'color-chart-5': '#dc322f',
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Built-in: Dracula
+// ---------------------------------------------------------------------------
+
+export const themeDracula: Theme = {
+  id: 'dracula',
+  name: 'Dracula',
+  isDark: true,
+  colors: {
+    'color-background': '#282a36',
+    'color-background-surface': '#2d303e',
+    'color-background-elevated': '#343746',
+    'color-background-overlay': '#3b3e50',
+    'color-background-input': '#22242e',
+    'color-background-hover': 'rgba(255, 255, 255, 0.05)',
+    'color-background-active': 'rgba(255, 255, 255, 0.09)',
+
+    'color-foreground': '#f8f8f2',
+    'color-foreground-secondary': '#bfbfb6',
+    'color-foreground-muted': '#6272a4',
+    'color-foreground-inverse': '#282a36',
+
+    'color-primary': '#bd93f9',
+    'color-primary-hover': '#a87cf5',
+    'color-primary-active': '#9465f1',
+    'color-primary-muted': 'rgba(189, 147, 249, 0.15)',
+    'color-primary-foreground': '#282a36',
+
+    'color-secondary': '#44475a',
+    'color-secondary-hover': '#515468',
+    'color-secondary-foreground': '#f8f8f2',
+
+    'color-accent': '#ff79c6',
+    'color-accent-hover': '#ff5cb7',
+    'color-accent-muted': 'rgba(255, 121, 198, 0.15)',
+    'color-accent-foreground': '#282a36',
+
+    'color-muted': '#44475a',
+    'color-muted-foreground': '#6272a4',
+
+    'color-destructive': '#ff5555',
+    'color-destructive-hover': '#ff3838',
+    'color-destructive-muted': 'rgba(255, 85, 85, 0.15)',
+    'color-destructive-foreground': '#282a36',
+
+    'color-success': '#50fa7b',
+    'color-success-muted': 'rgba(80, 250, 123, 0.15)',
+    'color-warning': '#ffb86c',
+    'color-warning-muted': 'rgba(255, 184, 108, 0.15)',
+    'color-error': '#ff5555',
+    'color-error-muted': 'rgba(255, 85, 85, 0.15)',
+    'color-info': '#8be9fd',
+    'color-info-muted': 'rgba(139, 233, 253, 0.15)',
+
+    'color-border': '#44475a',
+    'color-border-subtle': 'rgba(255, 255, 255, 0.08)',
+
+    'color-input': '#44475a',
+    'color-ring': '#bd93f9',
+
+    'color-card': '#313342',
+    'color-card-foreground': '#f8f8f2',
+
+    'color-popover': '#313342',
+    'color-popover-foreground': '#f8f8f2',
+
+    'color-sidebar-background': '#21222c',
+    'color-sidebar-foreground': '#f8f8f2',
+    'color-sidebar-border': '#313342',
+    'color-sidebar-accent': '#44475a',
+    'color-sidebar-accent-foreground': '#f8f8f2',
+    'color-sidebar-muted': '#6272a4',
+    'color-sidebar-ring': '#bd93f9',
+
+    'color-rosewater': '#f8f8f2',
+    'color-flamingo': '#ff5555',
+    'color-pink': '#ff79c6',
+    'color-mauve': '#bd93f9',
+    'color-red': '#ff5555',
+    'color-maroon': '#ff6e6e',
+    'color-peach': '#ffb86c',
+    'color-yellow': '#f1fa8c',
+    'color-green': '#50fa7b',
+    'color-teal': '#8be9fd',
+    'color-sky': '#8be9fd',
+    'color-sapphire': '#6272a4',
+    'color-blue': '#6272a4',
+    'color-lavender': '#bd93f9',
+
+    'color-chart-1': '#bd93f9',
+    'color-chart-2': '#8be9fd',
+    'color-chart-3': '#50fa7b',
+    'color-chart-4': '#ffb86c',
+    'color-chart-5': '#ff5555',
+  },
+};
+
+// ---------------------------------------------------------------------------
 // Registry of all built-in themes
 // ---------------------------------------------------------------------------
 
-export const BUILT_IN_THEMES: Theme[] = [themeDark, themeLight, themeAyuDark, themeNord];
+export const BUILT_IN_THEMES: Theme[] = [
+  themeDark,
+  themeLight,
+  themeAyuDark,
+  themeNord,
+  themeSolarizedDark,
+  themeDracula,
+];
 
 /** Preference key in localStorage */
 export const THEME_STORAGE_KEY = 'notesaner-theme';

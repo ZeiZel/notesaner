@@ -207,6 +207,21 @@ export const KEYBOARD_SHORTCUTS = [
     scope: 'global',
     combo: { key: 'd', mod: true, shift: true },
   },
+  // --- Panel controls ---
+  {
+    id: 'toggle-maximize-pane',
+    label: 'Toggle maximize focused pane',
+    category: 'workspace',
+    scope: 'global',
+    combo: { key: 'm', mod: true, shift: true },
+  },
+  {
+    id: 'toggle-minimize-pane',
+    label: 'Toggle minimize focused pane',
+    category: 'workspace',
+    scope: 'global',
+    combo: { key: '.', mod: true, shift: true },
+  },
   // --- Editor-internal (TipTap handles these; listed for help panel only) ---
   {
     id: 'bold',
