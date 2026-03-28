@@ -8,7 +8,7 @@ import type { PluginManifest } from './plugin.types';
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const PLUGIN_MANIFEST_FILENAME = 'plugin.json';
-const DEBOUNCE_MS = 300;
+const DEBOUNCE_MS = 500;
 const WATCHED_EXTENSIONS = /\.(ts|js|json|css|html|svelte|vue)$/;
 
 // ── Types ────────────────────────────────────────────────────────────────────

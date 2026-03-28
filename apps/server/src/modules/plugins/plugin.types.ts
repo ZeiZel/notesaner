@@ -27,6 +27,8 @@ export interface PluginManifest {
   icon?: string;
   /** Keywords for registry search */
   keywords?: string[];
+  /** Expected SHA-256 checksum of the release .zip (hex-encoded) */
+  checksum?: string;
   /** Plugin configuration schema (JSON Schema) */
   configSchema?: Record<string, unknown>;
 }
