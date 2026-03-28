@@ -277,7 +277,45 @@ importers:
 
   packages/plugin-slides: {}
 
+  packages/plugin-spaced-repetition:
+    dependencies:
+      '@notesaner/contracts':
+        specifier: workspace:*
+        version: link:../../libs/contracts
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+      zustand:
+        specifier: ^5.0.0
+        version: 5.0.12(@types/react@19.2.14)(react@19.2.4)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.10
+        version: 19.2.14
+
   packages/plugin-templates: {}
+
+  packages/plugin-web-clipper:
+    dependencies:
+      '@notesaner/contracts':
+        specifier: workspace:*
+        version: link:../../libs/contracts
+      react:
+        specifier: ^19.0.0
+        version: 19.2.4
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.4(react@19.2.4)
+      zustand:
+        specifier: ^5.0.12
+        version: 5.0.12(@types/react@19.2.14)(react@19.2.4)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.10
+        version: 19.2.14
 
   packages/ui: {}
 
