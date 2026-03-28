@@ -2,6 +2,7 @@
 
 import { useRef, useEffect, useState } from 'react';
 import { useLayoutStore } from '@/shared/stores/layout-store';
+import { useGridLayoutStore, GRID_PRESETS } from './grid-layout-store';
 import type { SnapTemplate, SavedLayout, SnapTemplateId } from './snap-layout-types';
 import { SNAP_TEMPLATES } from './snap-layout-types';
 
@@ -15,11 +16,7 @@ interface LayoutTemplatePreviewProps {
   onClick: () => void;
 }
 
-function LayoutTemplatePreview({
-  template,
-  isActive,
-  onClick,
-}: LayoutTemplatePreviewProps) {
+function LayoutTemplatePreview({ template, isActive, onClick }: LayoutTemplatePreviewProps) {
   return (
     <button
       type="button"
@@ -94,14 +91,8 @@ function SaveLayoutDialog({ onSave, onCancel }: SaveLayoutDialogProps) {
   }
 
   return (
-    <form
-      onSubmit={handleSubmit}
-      className="flex flex-col gap-3 border-t border-border pt-3"
-    >
-      <label
-        htmlFor="layout-name-input"
-        className="text-xs font-medium text-foreground-secondary"
-      >
+    <form onSubmit={handleSubmit} className="flex flex-col gap-3 border-t border-border pt-3">
+      <label htmlFor="layout-name-input" className="text-xs font-medium text-foreground-secondary">
         Layout name
       </label>
       <input
@@ -189,12 +180,7 @@ function SavedLayoutItem({ layout, onLoad, onDelete }: SavedLayoutItemProps) {
         aria-label={`Delete ${layout.name}`}
         className="hidden shrink-0 rounded p-0.5 text-foreground-muted transition-colors hover:bg-destructive/15 hover:text-destructive group-hover:flex"
       >
-        <svg
-          viewBox="0 0 16 16"
-          className="h-3 w-3"
-          fill="currentColor"
-          aria-hidden="true"
-        >
+        <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor" aria-hidden="true">
           <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.75.75 0 111.06 1.06L9.06 8l3.22 3.22a.75.75 0 11-1.06 1.06L8 9.06l-3.22 3.22a.75.75 0 01-1.06-1.06L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
         </svg>
       </button>
@@ -220,13 +206,15 @@ export function SnapLayoutPicker({ anchorX, anchorY }: SnapLayoutPickerProps) {
   const isOpen = useLayoutStore((s) => s.isSnapPickerOpen);
   const setOpen = useLayoutStore((s) => s.setSnapPickerOpen);
   const applyTemplate = useLayoutStore((s) => s.applySnapTemplate);
-  const currentTemplateId = useLayoutStore(
-    (s) => s.currentLayout.snapTemplateId ?? 'single',
-  );
+  const currentTemplateId = useLayoutStore((s) => s.currentLayout.snapTemplateId ?? 'single');
   const savedLayouts = useLayoutStore((s) => s.savedLayouts);
   const saveCurrentLayout = useLayoutStore((s) => s.saveCurrentLayout);
   const loadSavedLayout = useLayoutStore((s) => s.loadSavedLayout);
   const deleteSavedLayout = useLayoutStore((s) => s.deleteSavedLayout);
+
+  // Grid layout store integration
+  const applyGridPreset = useGridLayoutStore((s) => s.applyPreset);
+  const setGridConfig = useGridLayoutStore((s) => s.setGridConfig);
 
   const [isSaving, setIsSaving] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -250,18 +238,14 @@ export function SnapLayoutPicker({ anchorX, anchorY }: SnapLayoutPickerProps) {
     if (!isOpen) return;
 
     function handlePointerDown(e: PointerEvent) {
-      if (
-        containerRef.current &&
-        !containerRef.current.contains(e.target as Node)
-      ) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setOpen(false);
       }
     }
 
     // Use capture so this fires before any stopPropagation inside the picker
     document.addEventListener('pointerdown', handlePointerDown, true);
-    return () =>
-      document.removeEventListener('pointerdown', handlePointerDown, true);
+    return () => document.removeEventListener('pointerdown', handlePointerDown, true);
   }, [isOpen, setOpen]);
 
   if (!isOpen) return null;
@@ -308,7 +292,30 @@ export function SnapLayoutPicker({ anchorX, anchorY }: SnapLayoutPickerProps) {
             key={template.id}
             template={template}
             isActive={currentTemplateId === template.id}
-            onClick={() => applyTemplate(template.id as SnapTemplateId)}
+            onClick={() => {
+              // Apply to both stores for full sync
+              applyTemplate(template.id as SnapTemplateId);
+              // Sync grid layout store with the preset
+              const gridPreset = GRID_PRESETS[template.id];
+              if (gridPreset) {
+                applyGridPreset(template.id);
+              } else {
+                // For templates without a direct grid preset, build one
+                setGridConfig({
+                  columns: template.gridCols.split(/\s+/),
+                  rows: template.gridRows.split(/\s+/),
+                  panes: template.panels.map((tp) => ({
+                    id: tp.id,
+                    gridArea: tp.id,
+                    colStart: tp.colStart,
+                    colEnd: tp.colEnd,
+                    rowStart: tp.rowStart,
+                    rowEnd: tp.rowEnd,
+                    focusedNoteId: null,
+                  })),
+                });
+              }
+            }}
           />
         ))}
       </div>
@@ -316,14 +323,24 @@ export function SnapLayoutPicker({ anchorX, anchorY }: SnapLayoutPickerProps) {
       {/* Saved layouts section */}
       {savedLayouts.length > 0 && (
         <div className="flex flex-col gap-0.5 border-t border-border pt-2">
-          <span className="mb-1 text-xs font-medium text-foreground-muted">
-            Saved layouts
-          </span>
+          <span className="mb-1 text-xs font-medium text-foreground-muted">Saved layouts</span>
           {savedLayouts.map((layout) => (
             <SavedLayoutItem
               key={layout.id}
               layout={layout}
-              onLoad={() => loadSavedLayout(layout.id)}
+              onLoad={() => {
+                loadSavedLayout(layout.id);
+                // Sync grid layout store with the saved config
+                if (layout.gridConfig) {
+                  setGridConfig(layout.gridConfig);
+                } else {
+                  // Fall back to preset if no grid config saved
+                  const gridPreset = GRID_PRESETS[layout.templateId];
+                  if (gridPreset) {
+                    applyGridPreset(layout.templateId);
+                  }
+                }
+              }}
               onDelete={() => deleteSavedLayout(layout.id)}
             />
           ))}
@@ -345,12 +362,7 @@ export function SnapLayoutPicker({ anchorX, anchorY }: SnapLayoutPickerProps) {
           onClick={() => setIsSaving(true)}
           className="flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-border py-1.5 text-xs text-foreground-muted transition-colors hover:border-primary hover:text-primary"
         >
-          <svg
-            viewBox="0 0 16 16"
-            className="h-3.5 w-3.5"
-            fill="currentColor"
-            aria-hidden="true"
-          >
+          <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
             <path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z" />
           </svg>
           Save current layout

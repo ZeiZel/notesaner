@@ -13,7 +13,8 @@ export type SnapTemplateId =
   | 'three-columns'
   | 'two-x-two'
   | 'main-sidebar-right'
-  | 'main-sidebar-left';
+  | 'main-sidebar-left'
+  | 'main-plus-two';
 
 export interface SnapPanel {
   /** Unique panel identifier within the template */
@@ -44,6 +45,23 @@ export interface SavedLayout {
   templateId: SnapTemplateId;
   /** Custom panel size ratios after user drag-resize */
   customRatios?: number[];
+  /**
+   * Full grid configuration for custom layouts. When present, this takes
+   * precedence over templateId + customRatios for restoring the layout.
+   */
+  gridConfig?: {
+    columns: string[];
+    rows: string[];
+    panes: Array<{
+      id: string;
+      gridArea: string;
+      colStart: number;
+      colEnd: number;
+      rowStart: number;
+      rowEnd: number;
+      focusedNoteId: string | null;
+    }>;
+  };
   createdAt: string;
 }
 
@@ -110,6 +128,37 @@ export const SNAP_TEMPLATES: SnapTemplate[] = [
       { id: 'p2', colStart: 2, colEnd: 3, rowStart: 1, rowEnd: 2 },
       { id: 'p3', colStart: 1, colEnd: 2, rowStart: 2, rowEnd: 3 },
       { id: 'p4', colStart: 2, colEnd: 3, rowStart: 2, rowEnd: 3 },
+    ],
+  },
+  {
+    id: 'main-sidebar-right',
+    label: 'Main + Right',
+    gridCols: '7fr 3fr',
+    gridRows: '1fr',
+    panels: [
+      { id: 'p1', colStart: 1, colEnd: 2, rowStart: 1, rowEnd: 2 },
+      { id: 'p2', colStart: 2, colEnd: 3, rowStart: 1, rowEnd: 2 },
+    ],
+  },
+  {
+    id: 'main-sidebar-left',
+    label: 'Left + Main',
+    gridCols: '3fr 7fr',
+    gridRows: '1fr',
+    panels: [
+      { id: 'p1', colStart: 1, colEnd: 2, rowStart: 1, rowEnd: 2 },
+      { id: 'p2', colStart: 2, colEnd: 3, rowStart: 1, rowEnd: 2 },
+    ],
+  },
+  {
+    id: 'main-plus-two',
+    label: '1 + 2',
+    gridCols: '2fr 1fr',
+    gridRows: '1fr 1fr',
+    panels: [
+      { id: 'p1', colStart: 1, colEnd: 2, rowStart: 1, rowEnd: 3 },
+      { id: 'p2', colStart: 2, colEnd: 3, rowStart: 1, rowEnd: 2 },
+      { id: 'p3', colStart: 2, colEnd: 3, rowStart: 2, rowEnd: 3 },
     ],
   },
 ];
