@@ -118,7 +118,7 @@ describe('CacheControlMiddleware', () => {
 
     middleware.use(req as Request, res as Response, next);
 
-    expect(headers['Vary']).toContain('Authorization');
+    expect(headers['Vary']).toContain('Accept-Encoding');
   });
 
   it('sets Surrogate-Control for CDN-cacheable routes', () => {

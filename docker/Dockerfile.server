@@ -28,7 +28,13 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=builder /app/dist/apps/server ./
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/apps/server/prisma ./prisma
-RUN mkdir -p /data/notes && chown nestjs:nodejs /data/notes
+COPY docker/entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh && \
+    mkdir -p /data/notes && chown nestjs:nodejs /data/notes
 USER nestjs
 EXPOSE 4000
+# Entrypoint runs prisma migrate deploy before starting the application.
+# Prisma uses PostgreSQL advisory locks internally to prevent concurrent
+# migration runs when multiple containers start simultaneously.
+ENTRYPOINT ["/app/entrypoint.sh"]
 CMD ["node", "main.js"]

@@ -22,6 +22,8 @@ import {
 } from '@nestjs/swagger';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
+import { CachePolicy } from '../../common/decorators/cache-policy.decorator';
+import { PageCache } from '../../common/interceptors/page-cache.interceptor';
 import { PublishService } from './publish.service';
 
 // ── DTOs ────────────────────────────────────────────────────────────────────
@@ -105,6 +107,8 @@ export class PublishController {
   // ---- Public access (no auth required) ----
 
   @Public()
+  @CachePolicy('public')
+  @PageCache({ ttl: 300, prefix: 'page' })
   @Get('public/:publicSlug')
   @ApiOperation({
     summary: 'Get public vault index',
@@ -118,6 +122,8 @@ export class PublishController {
   }
 
   @Public()
+  @CachePolicy('public')
+  @PageCache({ ttl: 300, prefix: 'page' })
   @Get('public/:publicSlug/nav')
   @ApiOperation({
     summary: 'Get public vault navigation tree',
@@ -132,6 +138,8 @@ export class PublishController {
   }
 
   @Public()
+  @CachePolicy('public')
+  @PageCache({ ttl: 300, prefix: 'page' })
   @Get('public/:publicSlug/graph')
   @ApiOperation({
     summary: 'Get public vault graph data',
@@ -145,6 +153,8 @@ export class PublishController {
   }
 
   @Public()
+  @CachePolicy('public')
+  @PageCache({ ttl: 300, prefix: 'page' })
   @Get('public/:publicSlug/notes/*')
   @ApiOperation({
     summary: 'Get a published note by path',

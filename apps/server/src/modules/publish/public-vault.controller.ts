@@ -7,6 +7,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
+import { CachePolicy } from '../../common/decorators/cache-policy.decorator';
+import { PageCache } from '../../common/interceptors/page-cache.interceptor';
 import { PublicVaultService } from './public-vault.service';
 import { PublicVaultQueryDto } from './dto/public-vault-query.dto';
 
@@ -14,14 +16,17 @@ import { PublicVaultQueryDto } from './dto/public-vault-query.dto';
  * PublicVaultController -- routes for publicly accessible vaults.
  *
  * All endpoints under /p/:slug are unauthenticated.
+ * Responses are cached in ValKey via @PageCache() decorator (5-minute TTL).
  */
 @ApiTags('Public Vault')
 @Public()
+@CachePolicy('public')
 @Controller('p')
 export class PublicVaultController {
   constructor(private readonly publicVaultService: PublicVaultService) {}
 
   @Get(':slug')
+  @PageCache({ ttl: 300, prefix: 'page' })
   @ApiOperation({
     summary: 'Get public vault home',
     description:
@@ -35,6 +40,7 @@ export class PublicVaultController {
   }
 
   @Get(':slug/notes')
+  @PageCache({ ttl: 300, prefix: 'page', includeQuery: true })
   @ApiOperation({
     summary: 'List published notes in vault',
     description:
@@ -48,6 +54,7 @@ export class PublicVaultController {
   }
 
   @Get(':slug/*')
+  @PageCache({ ttl: 300, prefix: 'page' })
   @ApiOperation({
     summary: 'Get a published note by path',
     description:

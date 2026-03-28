@@ -136,15 +136,35 @@ describe('resolveCachePolicyForPath', () => {
     expect(policy!.cacheControl).toContain('public');
   });
 
-  it('returns undefined for unmatched paths', () => {
+  it('returns API default for unmatched API paths', () => {
     const policy = resolveCachePolicyForPath('/api/some/unknown/route');
+    expect(policy).toBeDefined();
+    expect(policy!.cacheControl).toBe('private, no-cache');
+    expect(policy!.vary).toContain('Authorization');
+  });
+
+  it('returns undefined for completely unmatched paths', () => {
+    const policy = resolveCachePolicyForPath('/unknown/non-api/path');
     expect(policy).toBeUndefined();
   });
 
   it('includes Vary header for attachment endpoints', () => {
     const policy = resolveCachePolicyForPath('/api/workspaces/ws-1/attachments/file.pdf');
     expect(policy).toBeDefined();
-    expect(policy!.vary).toContain('Authorization');
+    expect(policy!.vary).toContain('Accept-Encoding');
+  });
+
+  it('returns public cache for public vault pages', () => {
+    const policy = resolveCachePolicyForPath('/p/my-vault/some-note');
+    expect(policy).toBeDefined();
+    expect(policy!.cacheControl).toContain('public');
+    expect(policy!.cacheControl).toContain('max-age=300');
+  });
+
+  it('returns public cache with 24h for file attachments', () => {
+    const policy = resolveCachePolicyForPath('/api/workspaces/ws-1/files/image.png');
+    expect(policy).toBeDefined();
+    expect(policy!.cacheControl).toContain('max-age=86400');
   });
 
   it('includes Surrogate-Control for CDN-cacheable policies', () => {

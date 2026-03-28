@@ -29,6 +29,21 @@ export function computeETag(body: string): string {
 }
 
 /**
+ * Computes a strong ETag from an updatedAt timestamp and optional content hash.
+ *
+ * This is more efficient than hashing the full response body — if the
+ * resource has not been modified since the provided timestamp, the ETag
+ * will remain stable. The content hash adds a secondary check in case
+ * the timestamp is not sufficient (e.g. same-second updates).
+ */
+export function computeETagFromTimestamp(updatedAt: Date | string, contentHash?: string): string {
+  const ts = typeof updatedAt === 'string' ? updatedAt : updatedAt.toISOString();
+  const input = contentHash ? `${ts}:${contentHash}` : ts;
+  const hash = createHash('md5').update(input).digest('hex').substring(0, 16);
+  return `W/"${hash}"`;
+}
+
+/**
  * Normalises an ETag value for comparison by stripping surrounding quotes
  * and the weak indicator prefix.
  */
@@ -55,21 +70,84 @@ export function isETagMatch(clientETag: string, serverETag: string): boolean {
     .some((e) => e === serverNorm);
 }
 
+/**
+ * Returns `true` when the resource has not been modified since the client's
+ * `If-Modified-Since` timestamp. Used as a secondary freshness check alongside
+ * ETag-based validation.
+ */
+export function isNotModifiedSince(
+  ifModifiedSince: string | undefined,
+  lastModified: Date | string | undefined,
+): boolean {
+  if (!ifModifiedSince || !lastModified) return false;
+
+  const clientDate = new Date(ifModifiedSince);
+  const serverDate = typeof lastModified === 'string' ? new Date(lastModified) : lastModified;
+
+  // If either date is invalid, cannot determine freshness — skip
+  if (isNaN(clientDate.getTime()) || isNaN(serverDate.getTime())) return false;
+
+  // HTTP dates have 1-second granularity; truncate to seconds for comparison
+  return Math.floor(serverDate.getTime() / 1000) <= Math.floor(clientDate.getTime() / 1000);
+}
+
+/**
+ * Extracts an `updatedAt` field from a response body if it exists.
+ * Supports both Date objects and ISO 8601 strings.
+ */
+function extractUpdatedAt(body: unknown): Date | undefined {
+  if (body === null || body === undefined || typeof body !== 'object') return undefined;
+
+  const record = body as Record<string, unknown>;
+
+  // Try common field names for last-modified timestamps
+  for (const field of ['updatedAt', 'updated_at', 'modifiedAt', 'modified_at', 'lastModified']) {
+    const value = record[field];
+    if (value instanceof Date) return value;
+    if (typeof value === 'string') {
+      const parsed = new Date(value);
+      if (!isNaN(parsed.getTime())) return parsed;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Extracts a content hash field from a response body if it exists.
+ * Some endpoints return a pre-computed content hash for efficient ETag generation.
+ */
+function extractContentHash(body: unknown): string | undefined {
+  if (body === null || body === undefined || typeof body !== 'object') return undefined;
+
+  const record = body as Record<string, unknown>;
+
+  for (const field of ['contentHash', 'content_hash', 'hash', 'checksum']) {
+    const value = record[field];
+    if (typeof value === 'string' && value.length > 0) return value;
+  }
+
+  return undefined;
+}
+
 // ─── Interceptor ─────────────────────────────────────────────────────────────
 
 /**
- * Computes and sets ETag headers on GET responses, enabling conditional
- * requests that return HTTP 304 Not Modified when the content has not changed.
+ * Computes and sets ETag and Last-Modified headers on GET responses, enabling
+ * conditional requests that return HTTP 304 Not Modified when the content has
+ * not changed.
  *
- * Workflow:
- * 1. Allow the handler to produce a response body.
- * 2. Serialise the body to JSON.
- * 3. Hash the JSON to produce a weak ETag.
- * 4. Compare against the client's `If-None-Match` header.
- * 5. Return 304 (no body) when they match; otherwise attach the ETag header
- *    and return the full response.
+ * ETag generation strategy (ordered by preference):
+ * 1. If the response body contains `updatedAt` and/or `contentHash` fields,
+ *    compute an ETag from those fields (avoids full-body serialisation).
+ * 2. Fall back to hashing the serialised JSON body.
  *
- * Only applies to GET and HEAD requests.  POST/PUT/PATCH/DELETE responses
+ * Conditional request handling:
+ * - `If-None-Match` — compared against the computed ETag (primary).
+ * - `If-Modified-Since` — compared against the `updatedAt` field (secondary).
+ * - Returns 304 when either condition indicates no change.
+ *
+ * Only applies to GET and HEAD requests. POST/PUT/PATCH/DELETE responses
  * are passed through unchanged.
  *
  * @example
@@ -102,24 +180,66 @@ export class ETagInterceptor implements NestInterceptor {
           return body;
         }
 
-        let serialised: string;
-        try {
-          serialised = typeof body === 'string' ? body : JSON.stringify(body);
-        } catch (err) {
-          this.logger.warn(`ETag serialisation failed: ${String(err)}`);
-          return body;
+        // --- Compute ETag ---
+
+        let etag: string;
+        let lastModified: Date | undefined;
+
+        // Strategy 1: Use updatedAt and/or contentHash from the response body.
+        const updatedAt = extractUpdatedAt(body);
+        const contentHash = extractContentHash(body);
+
+        if (updatedAt || contentHash) {
+          // Prefer timestamp-based ETag — avoids full-body hashing
+          if (updatedAt) {
+            etag = computeETagFromTimestamp(updatedAt, contentHash);
+            lastModified = updatedAt;
+          } else {
+            // contentHash only — use it directly
+            etag = `W/"${contentHash}"`;
+          }
+        } else {
+          // Strategy 2: Full-body hash fallback
+          let serialised: string;
+          try {
+            serialised = typeof body === 'string' ? body : JSON.stringify(body);
+          } catch (err) {
+            this.logger.warn(`ETag serialisation failed: ${String(err)}`);
+            return body;
+          }
+          etag = computeETag(serialised);
         }
 
-        const etag = computeETag(serialised);
-        const clientETag = req.headers[IF_NONE_MATCH_HEADER] as string | undefined;
+        // --- Set Last-Modified header ---
 
+        if (lastModified) {
+          res.setHeader(LAST_MODIFIED_HEADER, lastModified.toUTCString());
+        }
+
+        // --- Conditional request evaluation ---
+
+        const clientETag = req.headers[IF_NONE_MATCH_HEADER] as string | undefined;
+        const clientIfModifiedSince = req.headers[IF_MODIFIED_SINCE_HEADER] as string | undefined;
+
+        // Primary: ETag match
         if (clientETag && isETagMatch(clientETag, etag)) {
-          // Content has not changed — send a 304 with no body.
           res.status(304);
           res.setHeader(ETAG_HEADER, etag);
           res.end();
-          // Return undefined so NestJS does not attempt to serialize a body.
           return undefined;
+        }
+
+        // Secondary: If-Modified-Since (only when no If-None-Match was sent)
+        if (!clientETag && clientIfModifiedSince && lastModified) {
+          if (isNotModifiedSince(clientIfModifiedSince, lastModified)) {
+            res.status(304);
+            res.setHeader(ETAG_HEADER, etag);
+            if (lastModified) {
+              res.setHeader(LAST_MODIFIED_HEADER, lastModified.toUTCString());
+            }
+            res.end();
+            return undefined;
+          }
         }
 
         res.setHeader(ETAG_HEADER, etag);

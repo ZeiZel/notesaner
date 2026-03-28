@@ -4,12 +4,13 @@
  *
  * These policies are applied by the CacheControlMiddleware based on URL
  * pattern matching, and can be overridden at the route level via the
- * @CachePolicy() decorator (read by CacheControlInterceptor).
+ * @CachePolicy() or @CacheControl() decorators (read by CacheControlInterceptor).
  *
  * Policy hierarchy (first match wins):
- *   1. @CachePolicy() decorator on the handler/controller
- *   2. Route pattern match from this configuration
- *   3. Default: private, no-cache
+ *   1. @CacheControl() fine-grained options on the handler/controller
+ *   2. @CachePolicy() preset on the handler/controller
+ *   3. Route pattern match from this configuration
+ *   4. Default: private, no-cache
  *
  * Cache-Control reference:
  *   - immutable: resource will never change (hashed filenames)
@@ -59,18 +60,41 @@ const HASHED_ASSETS: CachePolicyEntry = {
 
 /**
  * User-uploaded attachments served via the backend.
- * Moderate cache with revalidation support.
+ * Public cache with ETag-based revalidation. CDN caches for 24 hours.
  */
 const ATTACHMENTS: CachePolicyEntry = {
   pattern: '/api/workspaces/*/attachments/*',
-  cacheControl: 'private, max-age=3600, stale-while-revalidate=600',
-  vary: 'Authorization',
-  description: 'User attachments -- private, 1h cache with SWR.',
+  cacheControl: 'public, max-age=86400, stale-while-revalidate=3600',
+  vary: 'Accept-Encoding',
+  surrogateControl: 'max-age=86400',
+  description: 'User attachments -- public, 24h cache with SWR and ETag.',
+};
+
+/**
+ * Workspace file attachments (images, PDFs, etc.) served from the files endpoint.
+ */
+const FILES: CachePolicyEntry = {
+  pattern: '/api/workspaces/*/files/*',
+  cacheControl: 'public, max-age=86400, stale-while-revalidate=3600',
+  vary: 'Accept-Encoding',
+  surrogateControl: 'max-age=86400',
+  description: 'Workspace files -- public, 24h cache with SWR and ETag.',
 };
 
 /**
  * Public vault / published note content.
  * CDN can cache for 5 minutes; stale-while-revalidate for 1 minute.
+ */
+const PUBLIC_VAULT: CachePolicyEntry = {
+  pattern: '/p/*',
+  cacheControl: 'public, max-age=300, stale-while-revalidate=60',
+  surrogateControl: 'max-age=300',
+  vary: 'Accept-Encoding',
+  description: 'Published public vault pages -- CDN cacheable for 5 minutes.',
+};
+
+/**
+ * Public content via /public/ route.
  */
 const PUBLIC_CONTENT: CachePolicyEntry = {
   pattern: '/public/*',
@@ -147,6 +171,17 @@ const DOCS: CachePolicyEntry = {
   description: 'API documentation -- 1 hour public cache.',
 };
 
+/**
+ * Default API responses -- private with ETag-based conditional requests.
+ * Catches all /api/* routes not matched by more specific patterns above.
+ */
+const API_DEFAULT: CachePolicyEntry = {
+  pattern: '/api/*',
+  cacheControl: 'private, no-cache',
+  vary: 'Authorization, Accept-Encoding',
+  description: 'Default API responses -- private, ETag revalidation.',
+};
+
 // ─── Ordered Policy List ────────────────────────────────────────────────────
 
 /**
@@ -162,18 +197,23 @@ export const CACHE_POLICIES: CachePolicyEntry[] = [
   AUTH_NO_STORE,
   API_KEYS_NO_STORE,
 
-  // Specific API endpoints
+  // Specific API endpoints (most specific first)
   NOTE_CONTENT,
   API_SWR,
   ATTACHMENTS,
+  FILES,
 
   // Public content
+  PUBLIC_VAULT,
   PUBLIC_CONTENT,
 
   // Infrastructure
   HEALTH,
   METRICS,
   DOCS,
+
+  // API catch-all (must be last among /api/* patterns)
+  API_DEFAULT,
 ];
 
 // ─── Default Policy ─────────────────────────────────────────────────────────
