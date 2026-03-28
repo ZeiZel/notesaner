@@ -1,0 +1,24 @@
+{
+  "id": "notesaner.spaced-repetition",
+  "name": "Spaced Repetition",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "Create and review flashcards from your notes using the SM-2 spaced repetition algorithm. Supports basic front/back cards, cloze deletions, and deck management with daily review sessions.",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-spaced-repetition",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage:notes-read",
+    "storage:notes-write",
+    "ui:register-view",
+    "ui:register-command",
+    "ui:show-notice",
+    "ui:register-sidebar-item"
+  ],
+  "tags": ["flashcards", "spaced-repetition", "learning", "productivity", "zettelkasten"],
+  "entryPoints": {
+    "view": "dist/index.js",
+    "commands": "dist/index.js",
+    "sidebar": "dist/index.js"
+  }
+}

@@ -1,0 +1,19 @@
+{
+  "name": "plugin-web-clipper",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/plugin-web-clipper/src",
+  "projectType": "library",
+  "tags": ["scope:shared"],
+  "targets": {
+    "type-check": {
+      "command": "tsc --noEmit -p packages/plugin-web-clipper/tsconfig.json"
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "pnpm vitest run",
+        "cwd": "packages/plugin-web-clipper"
+      }
+    }
+  }
+}

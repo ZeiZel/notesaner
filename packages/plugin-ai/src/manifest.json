@@ -1,0 +1,63 @@
+{
+  "id": "notesaner.ai",
+  "name": "AI Writing Assistant",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "LLM-powered writing assistance with note summarization, continue writing, rewrite selection, grammar check, translation, link suggestions, and auto-tagging. Supports OpenAI, Anthropic, and local Ollama.",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-ai",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage:notes-read",
+    "storage:notes-write",
+    "ui:register-sidebar",
+    "ui:register-command",
+    "ui:show-notice",
+    "network:fetch"
+  ],
+  "tags": ["ai", "writing", "assistant", "llm", "summarize", "translate", "grammar"],
+  "settings": "dist/settings-schema.json",
+  "entryPoints": {
+    "sidebarPanel": "dist/index.js",
+    "commands": "dist/index.js",
+    "settingsPage": "dist/index.js"
+  },
+  "settingsSchema": {
+    "provider": {
+      "type": "string",
+      "enum": ["openai", "anthropic", "ollama"],
+      "default": "openai",
+      "description": "LLM provider to use for AI features"
+    },
+    "apiKey": {
+      "type": "string",
+      "default": "",
+      "secret": true,
+      "description": "API key for the selected provider (not required for Ollama)"
+    },
+    "model": {
+      "type": "string",
+      "default": "gpt-4o-mini",
+      "description": "Model identifier to use (e.g. gpt-4o-mini, claude-3-5-haiku-20241022, llama3.2)"
+    },
+    "temperature": {
+      "type": "number",
+      "default": 0.7,
+      "minimum": 0,
+      "maximum": 2,
+      "description": "Sampling temperature for response generation"
+    },
+    "maxTokens": {
+      "type": "number",
+      "default": 1024,
+      "minimum": 64,
+      "maximum": 8192,
+      "description": "Maximum tokens to generate per request"
+    },
+    "customEndpoint": {
+      "type": "string",
+      "default": "",
+      "description": "Custom API endpoint URL (for Ollama or OpenAI-compatible providers)"
+    }
+  }
+}

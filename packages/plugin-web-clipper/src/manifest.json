@@ -1,0 +1,21 @@
+{
+  "id": "notesaner.web-clipper",
+  "name": "Web Clipper",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "Clip web pages, articles, selections, and screenshots directly into your Notesaner workspace. Supports full-page, readability-extracted article, selection, and screenshot clip modes.",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-web-clipper",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage:notes-write",
+    "storage:files-write",
+    "ui:register-command",
+    "ui:show-notice",
+    "network:external"
+  ],
+  "tags": ["web-clipper", "import", "productivity", "browser-extension"],
+  "entryPoints": {
+    "commands": "dist/index.js"
+  }
+}

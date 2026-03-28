@@ -1,0 +1,43 @@
+{
+  "_comment": "Chrome Extension Manifest V3 — reference configuration for building the browser extension. This file is documentation; the extension build toolchain (e.g. Vite + CRXJS) consumes it.",
+  "manifest_version": 3,
+  "name": "Notesaner Web Clipper",
+  "version": "1.0.0",
+  "description": "Clip web pages, articles, selections, and screenshots to your Notesaner workspace.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Notesaner Web Clipper",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png"
+    }
+  },
+  "options_page": "options.html",
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content-script.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "permissions": ["activeTab", "storage", "tabs", "scripting"],
+  "host_permissions": ["<all_urls>"],
+  "web_accessible_resources": [
+    {
+      "resources": ["icons/*"],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  }
+}

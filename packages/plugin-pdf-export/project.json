@@ -1,0 +1,12 @@
+{
+  "name": "plugin-pdf-export",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/plugin-pdf-export/src",
+  "projectType": "library",
+  "tags": ["scope:shared"],
+  "targets": {
+    "type-check": {
+      "command": "tsc --noEmit -p packages/plugin-pdf-export/tsconfig.json"
+    }
+  }
+}

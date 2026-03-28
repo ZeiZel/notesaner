@@ -1,0 +1,22 @@
+{
+  "id": "notesaner.pdf-export",
+  "name": "PDF & DOCX Export",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "Export notes to PDF and DOCX formats. Supports custom page sizes, margins, table of contents generation, inline images, batch export with zip download, and multiple style presets.",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-pdf-export",
+  "minAppVersion": "1.0.0",
+  "permissions": [
+    "storage:notes-read",
+    "ui:register-command",
+    "ui:show-modal",
+    "ui:show-notice",
+    "storage:local"
+  ],
+  "tags": ["export", "pdf", "docx", "print", "batch"],
+  "entryPoints": {
+    "commands": "dist/index.js",
+    "view": "dist/index.js"
+  }
+}

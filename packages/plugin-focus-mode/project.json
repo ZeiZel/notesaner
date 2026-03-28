@@ -1,0 +1,12 @@
+{
+  "name": "plugin-focus-mode",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/plugin-focus-mode/src",
+  "projectType": "library",
+  "tags": ["scope:shared"],
+  "targets": {
+    "type-check": {
+      "command": "tsc --noEmit -p packages/plugin-focus-mode/tsconfig.json"
+    }
+  }
+}

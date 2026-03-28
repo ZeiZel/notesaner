@@ -1,0 +1,15 @@
+{
+  "id": "notesaner.focus-mode",
+  "name": "Focus Mode",
+  "version": "1.0.0",
+  "author": "Notesaner",
+  "description": "Distraction-free writing environment. Hides workspace chrome, enables typewriter scrolling, tracks session word count, and provides a word count goal with progress indicator. Press Cmd+Shift+F to toggle.",
+  "main": "dist/index.js",
+  "repository": "notesaner/plugin-focus-mode",
+  "minAppVersion": "1.0.0",
+  "permissions": ["ui:register-command", "ui:show-notice", "storage:local"],
+  "tags": ["focus", "writing", "distraction-free", "productivity", "zen"],
+  "entryPoints": {
+    "commands": "dist/index.js"
+  }
+}
