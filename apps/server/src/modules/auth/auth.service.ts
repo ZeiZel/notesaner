@@ -89,12 +89,35 @@ export class AuthService {
     throw new NotImplementedException('getMe not yet implemented');
   }
 
-  async getUserSessions(_userId: string): Promise<unknown[]> {
-    throw new NotImplementedException('getUserSessions not yet implemented');
+  async getUserSessions(userId: string) {
+    const sessions = await this.prisma.session.findMany({
+      where: { userId, expiresAt: { gt: new Date() } },
+      select: {
+        id: true,
+        userAgent: true,
+        ipAddress: true,
+        expiresAt: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    return sessions;
   }
 
-  async revokeSession(_userId: string, _sessionId: string): Promise<void> {
-    throw new NotImplementedException('revokeSession not yet implemented');
+  async revokeSession(userId: string, sessionId: string): Promise<void> {
+    await this.prisma.session.deleteMany({
+      where: { id: sessionId, userId },
+    });
+  }
+
+  async revokeAllOtherSessions(userId: string, currentSessionId: string): Promise<void> {
+    await this.prisma.session.deleteMany({
+      where: {
+        userId,
+        id: { not: currentSessionId },
+      },
+    });
   }
 
   async getEnabledProviders(): Promise<{

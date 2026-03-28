@@ -39,5 +39,7 @@ export type { QuickCapturePayload, FolderTreeNode } from './quick-capture';
 export { workspacesApi } from './workspaces';
 export { workspaceSettingsApi } from './workspace-settings';
 export { searchReplaceApi } from './search-replace';
+export { sessionsApi, sessionKeys } from './sessions';
+export type { SessionDto } from './sessions';
 export { preferencesApi } from './preferences';
 export type { PreferenceResponse, PreferencesMap, BulkPreferenceEntry } from './preferences';

@@ -168,6 +168,16 @@ export class AuthController {
     await this.authService.revokeSession(user.sub, sessionId);
   }
 
+  @Delete('sessions')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiBearerAuth('bearer')
+  @ApiOperation({ summary: 'Revoke all sessions except the current one' })
+  @ApiNoContentResponse({ description: 'All other sessions revoked successfully.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  async revokeAllOtherSessions(@CurrentUser() user: JwtPayload) {
+    await this.authService.revokeAllOtherSessions(user.sub, user.sessionId);
+  }
+
   @Public()
   @Get('providers')
   @ApiOperation({ summary: 'List enabled authentication providers' })

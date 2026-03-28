@@ -46,6 +46,9 @@ const MemberManagement = lazy(() =>
 const NotificationSettings = lazy(() =>
   import('@/features/notifications').then((m) => ({ default: m.NotificationSettings })),
 );
+const SessionsSettings = lazy(() =>
+  import('./SessionsSettings').then((m) => ({ default: m.SessionsSettings })),
+);
 
 // ---------------------------------------------------------------------------
 // Nav items
@@ -57,6 +60,7 @@ type SettingsTab =
   | 'theme'
   | 'keybindings'
   | 'notifications'
+  | 'sessions'
   | 'plugins'
   | 'workspace'
   | 'members';
@@ -67,6 +71,7 @@ const TAB_TITLES: Record<SettingsTab, string> = {
   theme: 'Appearance',
   keybindings: 'Keybindings',
   notifications: 'Notifications',
+  sessions: 'Sessions',
   plugins: 'Plugins',
   workspace: 'Workspace',
   members: 'Members',
@@ -108,6 +113,7 @@ export function SettingsDialog({
         { key: 'theme', label: 'Appearance' },
         { key: 'keybindings', label: 'Keybindings' },
         { key: 'notifications', label: 'Notifications' },
+        { key: 'sessions', label: 'Sessions' },
         { key: 'plugins', label: 'Plugins' },
       ],
     },
@@ -141,6 +147,8 @@ export function SettingsDialog({
         return <KeybindingsSettings />;
       case 'notifications':
         return <NotificationSettings />;
+      case 'sessions':
+        return <SessionsSettings />;
       case 'plugins':
         return <PluginSettings />;
       case 'workspace':

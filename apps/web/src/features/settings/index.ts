@@ -15,6 +15,7 @@ export { KeybindingsSettings } from './ui/KeybindingsSettings';
 export { PluginSettings } from './ui/PluginSettings';
 export { WorkspaceSettings } from './ui/WorkspaceSettings';
 export { MemberManagement } from './ui/MemberManagement';
+export { SessionsSettings } from './ui/SessionsSettings';
 
 // Workspace settings (page-level, not dialog)
 export { GeneralSettings } from './ui/GeneralSettings';
