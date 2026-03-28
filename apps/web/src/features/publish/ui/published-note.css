@@ -489,3 +489,89 @@
   background: var(--pub-color-selection-bg, #1971c2);
   color: var(--pub-color-selection-fg, #ffffff);
 }
+
+/* ─── Shiki dual-theme support ──────────────────────────────────────── */
+
+/*
+ * Shiki generates dual-theme HTML with --shiki-light and --shiki-dark
+ * CSS variables. We switch between them based on the data-theme attribute
+ * set on the root element.
+ */
+
+.published-note-content .shiki,
+.published-note-content .shiki span {
+  color: var(--shiki-light);
+  background-color: var(--shiki-light-bg);
+}
+
+[data-theme='dark'] .published-note-content .shiki,
+[data-theme='dark'] .published-note-content .shiki span,
+[data-theme='ayu-dark'] .published-note-content .shiki,
+[data-theme='ayu-dark'] .published-note-content .shiki span,
+[data-theme='nord'] .published-note-content .shiki,
+[data-theme='nord'] .published-note-content .shiki span {
+  color: var(--shiki-dark);
+  background-color: var(--shiki-dark-bg);
+}
+
+@media (prefers-color-scheme: dark) {
+  [data-theme='system'] .published-note-content .shiki,
+  [data-theme='system'] .published-note-content .shiki span {
+    color: var(--shiki-dark);
+    background-color: var(--shiki-dark-bg);
+  }
+}
+
+/* Override Shiki's default pre background to match our code block styles */
+.published-note-content .shiki {
+  padding: 1em;
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  line-height: 1.5;
+  font-size: 0.85em;
+}
+
+/* ─── KaTeX overrides ───────────────────────────────────────────────── */
+
+/* Ensure KaTeX block math has proper spacing */
+.published-note-content .katex-display {
+  margin: 1.5em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5em 0;
+}
+
+/* Inline KaTeX should not break the line flow */
+.published-note-content .katex {
+  font-size: 1.05em;
+}
+
+/* Math display block scrollbar styling */
+.published-note-content .katex-display > .katex {
+  white-space: normal;
+}
+
+/* ─── GFM footnotes ─────────────────────────────────────────────────── */
+
+.published-note-content .footnotes {
+  margin-top: 3rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--pub-color-border-subtle, #e9ecef);
+  font-size: 0.875em;
+  color: var(--pub-color-fg-muted, #6c757d);
+}
+
+.published-note-content .footnotes ol {
+  padding-left: 1.5em;
+}
+
+.published-note-content .footnotes li {
+  margin-bottom: 0.5em;
+}
+
+/* Footnote back-reference */
+.published-note-content .data-footnote-backref {
+  font-size: 0.75em;
+  text-decoration: none;
+  margin-left: 0.25em;
+}
