@@ -1,89 +1,83 @@
 /**
  * HTTP API client for the Notesaner backend.
  *
- * Wraps fetch with:
- * - Authorization header injection
- * - JSON content-type defaults
- * - Structured error handling
- * - Request/response logging in development
+ * Public API surface (unchanged):
+ * - ApiError class for structured error handling
+ * - apiClient with get(), post(), put(), patch(), delete() methods
+ *
+ * Internally uses a pre-configured axios instance (see axios-instance.ts)
+ * with automatic auth token injection, error normalisation, and dev logging.
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3001';
+import axiosInstance from './axios-instance';
 
-export class ApiError extends Error {
-  constructor(
-    public readonly status: number,
-    public readonly code: string,
-    message: string,
-    public readonly details?: unknown,
-  ) {
-    super(message);
-    this.name = 'ApiError';
-  }
-}
+// ---------------------------------------------------------------------------
+// Error class — re-exported for backward compatibility
+// ---------------------------------------------------------------------------
 
-interface RequestOptions extends Omit<RequestInit, 'body'> {
-  body?: unknown;
+export { ApiError } from './api-error';
+
+// ---------------------------------------------------------------------------
+// Request options — preserved for backward compatibility
+// ---------------------------------------------------------------------------
+
+interface RequestOptions {
+  /** Optional per-request auth token (overrides interceptor). */
   token?: string;
+  /** Extra headers merged onto the request. */
+  headers?: Record<string, string>;
+  /** AbortController signal for request cancellation. */
+  signal?: AbortSignal;
 }
+
+// ---------------------------------------------------------------------------
+// Internal request helper
+// ---------------------------------------------------------------------------
 
 async function request<T>(
+  method: string,
   path: string,
+  body?: unknown,
   options: RequestOptions = {},
 ): Promise<T> {
-  const { body, token, headers: extraHeaders, ...rest } = options;
-
   const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Accept: 'application/json',
-    ...((extraHeaders as Record<string, string>) ?? {}),
+    ...(options.headers ?? {}),
   };
 
-  if (token) {
-    headers['Authorization'] = `Bearer ${token}`;
+  if (options.token) {
+    headers['Authorization'] = `Bearer ${options.token}`;
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
-    ...rest,
+  const response = await axiosInstance.request<T>({
+    method,
+    url: path,
+    data: body,
     headers,
-    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal: options.signal,
   });
 
-  if (!response.ok) {
-    let errorData: { code?: string; message?: string; details?: unknown } = {};
-    try {
-      errorData = (await response.json()) as typeof errorData;
-    } catch {
-      // Response body is not JSON
-    }
-    throw new ApiError(
-      response.status,
-      errorData.code ?? 'UNKNOWN_ERROR',
-      errorData.message ?? `HTTP ${response.status}`,
-      errorData.details,
-    );
-  }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json() as Promise<T>;
+  // axios returns { data, status, ... }; we only expose the data payload
+  // to keep the public API identical to the original fetch-based client.
+  return response.data;
 }
 
+// ---------------------------------------------------------------------------
+// Public API — same signature as the original fetch-based client
+// ---------------------------------------------------------------------------
+
 export const apiClient = {
-  get: <T>(path: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>
-    request<T>(path, { ...options, method: 'GET' }),
+  get: <T>(path: string, options?: Omit<RequestOptions, 'body'>) =>
+    request<T>('GET', path, undefined, options),
 
-  post: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method'>) =>
-    request<T>(path, { ...options, method: 'POST', body }),
+  post: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('POST', path, body, options),
 
-  put: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method'>) =>
-    request<T>(path, { ...options, method: 'PUT', body }),
+  put: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('PUT', path, body, options),
 
-  patch: <T>(path: string, body?: unknown, options?: Omit<RequestOptions, 'method'>) =>
-    request<T>(path, { ...options, method: 'PATCH', body }),
+  patch: <T>(path: string, body?: unknown, options?: RequestOptions) =>
+    request<T>('PATCH', path, body, options),
 
-  delete: <T>(path: string, options?: Omit<RequestOptions, 'method' | 'body'>) =>
-    request<T>(path, { ...options, method: 'DELETE' }),
+  delete: <T>(path: string, options?: Omit<RequestOptions, 'body'>) =>
+    request<T>('DELETE', path, undefined, options),
 };

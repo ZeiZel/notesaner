@@ -13,6 +13,10 @@
     },
     "types": ["node"]
   },
-  "include": ["../src/__tests__/accessibility/**/*.ts", "./**/*.ts"],
+  "include": [
+    "../src/__tests__/accessibility/**/*.ts",
+    "../src/__tests__/e2e/**/*.ts",
+    "./**/*.ts"
+  ],
   "exclude": ["node_modules"]
 }

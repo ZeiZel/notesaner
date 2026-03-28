@@ -1,5 +1,5 @@
 import { apiClient } from './client';
-import type { DomainStatusDto } from '@/features/publish/domain-store';
+import type { DomainStatusDto } from '@/features/publish/model/domain-store';
 
 /**
  * domainApi — client for the custom domain endpoints on the Notesaner backend.

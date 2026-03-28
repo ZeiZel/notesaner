@@ -1,3 +1,4 @@
+export { cn } from './cn';
 export { slugify } from './slugify';
 export { debounce } from './debounce';
 export { parseWikiLinks, extractAllLinks } from './links';

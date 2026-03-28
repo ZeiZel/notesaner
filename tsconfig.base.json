@@ -29,6 +29,7 @@
       "@notesaner/sync-engine": ["libs/sync-engine/src/index.ts"],
       "@notesaner/markdown": ["libs/markdown/src/index.ts"],
       "@notesaner/plugin-sdk": ["libs/plugin-sdk/src/index.ts"],
+      "@notesaner/query-factory": ["libs/query-factory/src/index.ts"],
       "@notesaner/ui": ["packages/ui/src/index.ts"],
       "@notesaner/plugin-excalidraw": ["packages/plugin-excalidraw/src/index.ts"],
       "@notesaner/plugin-kanban": ["packages/plugin-kanban/src/index.ts"],

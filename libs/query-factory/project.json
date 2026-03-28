@@ -1,0 +1,18 @@
+{
+  "name": "query-factory",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/query-factory/src",
+  "projectType": "library",
+  "tags": ["scope:lib"],
+  "targets": {
+    "type-check": {
+      "command": "tsc --noEmit -p libs/query-factory/tsconfig.json"
+    },
+    "test": {
+      "command": "vitest run --config libs/query-factory/vitest.config.ts"
+    },
+    "test:watch": {
+      "command": "vitest --config libs/query-factory/vitest.config.ts"
+    }
+  }
+}

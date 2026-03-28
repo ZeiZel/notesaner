@@ -102,6 +102,12 @@ export {
   type HeadingInfo,
 } from './extensions/heading-fold';
 
+// Relationship types (Zettelkasten link annotations)
+export {
+  BUILT_IN_RELATIONSHIP_TYPES,
+  type RelationshipTypeDef,
+} from './extensions/relationship-types';
+
 // Block reference (selection-based block reference creation)
 export {
   BlockReference,
