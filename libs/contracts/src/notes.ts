@@ -104,3 +104,45 @@ export interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
 }
+
+// ==========================================
+// Block References
+// ==========================================
+
+/** A single block extracted from a note's markdown content. */
+export interface BlockDto {
+  /** The block identifier (without the ^ prefix). */
+  blockId: string;
+  /** The full text content of the block (without the ^blockId suffix). */
+  content: string;
+  /** 1-based line number where this block starts in the source file. */
+  line: number;
+}
+
+/** Response for GET /workspaces/:workspaceId/notes/:noteId/blocks */
+export interface BlockListResponse {
+  /** UUID of the note. */
+  noteId: string;
+  /** All blocks found in the note, ordered by line number. */
+  blocks: BlockDto[];
+}
+
+/** Request body for POST /workspaces/:workspaceId/notes/:noteId/blocks */
+export interface CreateBlockReferenceRequest {
+  /** 1-based line number of the paragraph to tag with a block ID. */
+  line: number;
+  /** Optional custom block ID. Auto-generated when omitted. */
+  blockId?: string;
+}
+
+/** Response for POST /workspaces/:workspaceId/notes/:noteId/blocks */
+export interface CreateBlockResponse {
+  /** The block ID that was assigned (generated or user-provided). */
+  blockId: string;
+  /** The content of the block. */
+  content: string;
+  /** The 1-based line number where the block ID was inserted. */
+  line: number;
+  /** Whether a new block ID was created (false if the line already had one). */
+  created: boolean;
+}

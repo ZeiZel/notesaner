@@ -1,12 +1,9 @@
 /**
  * DTOs for Zettelkasten typed link relationships.
- *
- * A "relationship type" (e.g. "relates-to", "contradicts") is a semantic
- * annotation layered on top of the structural link type (WIKI / MARKDOWN / EMBED).
- * Built-in types are workspace-independent; custom types are scoped to a workspace.
  */
 
 import { IsHexColor, IsOptional, IsString, Matches, MaxLength, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 // ---------------------------------------------------------------------------
 // Response shapes
@@ -37,10 +34,12 @@ export interface LinkRelationshipTypeDto {
  * Creates a custom (workspace-scoped) relationship type.
  */
 export class CreateLinkTypeDto {
-  /**
-   * URL-safe identifier for the type (e.g. "my-custom-type").
-   * Must be 2–64 lowercase alphanumeric characters and hyphens.
-   */
+  @ApiProperty({
+    description: 'URL-safe slug (lowercase alphanumeric with hyphens)',
+    example: 'my-custom-type',
+    minLength: 2,
+    maxLength: 64,
+  })
   @IsString()
   @MinLength(2, { message: 'slug must be at least 2 characters' })
   @MaxLength(64, { message: 'slug must not exceed 64 characters' })
@@ -49,21 +48,31 @@ export class CreateLinkTypeDto {
   })
   slug!: string;
 
-  /** Human-readable display label (e.g. "My Custom Type"). */
+  @ApiProperty({
+    description: 'Human-readable display label',
+    example: 'My Custom Type',
+    minLength: 2,
+    maxLength: 100,
+  })
   @IsString()
   @MinLength(2, { message: 'label must be at least 2 characters' })
   @MaxLength(100, { message: 'label must not exceed 100 characters' })
   label!: string;
 
-  /**
-   * CSS hex color string used for visual distinction in the editor and graph.
-   * Defaults to indigo (#6366f1) when omitted.
-   */
+  @ApiPropertyOptional({
+    description: 'CSS hex color for visual distinction',
+    example: '#6366f1',
+    default: '#6366f1',
+  })
   @IsOptional()
   @IsHexColor({ message: 'color must be a valid hex color (e.g. #3b82f6)' })
   color?: string;
 
-  /** Optional description of the relationship semantics. */
+  @ApiPropertyOptional({
+    description: 'Description of the relationship semantics',
+    example: 'Indicates that the source note contradicts the target note',
+    maxLength: 500,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(500, { message: 'description must not exceed 500 characters' })
@@ -75,10 +84,11 @@ export class CreateLinkTypeDto {
  * Sets or clears the relationship type on an existing NoteLink row.
  */
 export class SetLinkTypeDto {
-  /**
-   * ID of the LinkRelationshipType to assign.
-   * Pass null to clear the relationship type (revert to untyped).
-   */
+  @ApiProperty({
+    description: 'ID of the LinkRelationshipType to assign, or null to clear',
+    example: 'abc-123-def',
+    nullable: true,
+  })
   @IsOptional()
   @IsString()
   relationshipTypeId!: string | null;
