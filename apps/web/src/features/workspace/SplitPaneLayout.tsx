@@ -11,6 +11,7 @@ import {
   DndContext,
   DragOverlay,
   PointerSensor,
+  TouchSensor,
   useSensor,
   useSensors,
   type DragEndEvent,
@@ -20,6 +21,7 @@ import {
 import { useLayoutStore, type PanelConfig } from '@/shared/stores/layout-store';
 import { SNAP_TEMPLATES } from './snap-layout-types';
 import { SnapLayoutPicker } from './SnapLayoutPicker';
+import { useBreakpoint } from '@/shared/hooks/useBreakpoint';
 
 // ---------------------------------------------------------------------------
 // Edge detection thresholds for snap-on-drag
@@ -59,11 +61,7 @@ interface ResizeDividerProps {
   onResizeStart: (index: number) => void;
 }
 
-function ResizeDivider({
-  direction,
-  index,
-  onResizeStart,
-}: ResizeDividerProps) {
+function ResizeDivider({ direction, index, onResizeStart }: ResizeDividerProps) {
   return (
     <div
       role="separator"
@@ -189,11 +187,13 @@ export interface SplitPaneLayoutProps {
 }
 
 export function SplitPaneLayout({ renderPanel }: SplitPaneLayoutProps) {
+  const breakpoint = useBreakpoint();
+  const isMobile = breakpoint === 'mobile';
+  const isTablet = breakpoint === 'tablet';
+
   const panels = useLayoutStore((s) => s.currentLayout.panels);
   const splitDirection = useLayoutStore((s) => s.currentLayout.splitDirection);
-  const snapTemplateId = useLayoutStore(
-    (s) => s.currentLayout.snapTemplateId ?? 'single',
-  );
+  const snapTemplateId = useLayoutStore((s) => s.currentLayout.snapTemplateId ?? 'single');
   const customRatios = useLayoutStore((s) => s.currentLayout.customRatios);
   const setCustomRatios = useLayoutStore((s) => s.setCustomRatios);
   const setDraggedPanel = useLayoutStore((s) => s.setDraggedPanel);
@@ -206,25 +206,42 @@ export function SplitPaneLayout({ renderPanel }: SplitPaneLayoutProps) {
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Local state for drag-to-snap edge detection
-  const [snapEdge, setSnapEdge] = useState<
-    'left' | 'right' | 'top' | 'bottom' | null
-  >(null);
+  const [snapEdge, setSnapEdge] = useState<'left' | 'right' | 'top' | 'bottom' | null>(null);
   const dragStartPos = useRef<{ x: number; y: number } | null>(null);
 
   // Drop target panel id for visual feedback
-  const [dropTargetPanelId, setDropTargetPanelId] = useState<string | null>(
-    null,
-  );
+  const [dropTargetPanelId, setDropTargetPanelId] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
-  // dnd-kit sensors
+  // dnd-kit sensors -- include TouchSensor for tablet drag support
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
         distance: MIN_DRAG_DISTANCE,
       },
     }),
+    useSensor(TouchSensor, {
+      activationConstraint: {
+        delay: 250,
+        tolerance: 5,
+      },
+    }),
   );
+
+  // On mobile, render only the first panel in full-screen mode.
+  // On tablet, force single-panel (no split) to maximize content area.
+  if (isMobile || isTablet) {
+    const firstPanel = panels[0];
+    if (!firstPanel) return null;
+
+    return (
+      <div ref={containerRef} className="relative h-full w-full">
+        <PanelSlot panelId={firstPanel.id} isDropTarget={false}>
+          {renderPanel?.(firstPanel)}
+        </PanelSlot>
+      </div>
+    );
+  }
 
   // -------------------------------------------------------------------------
   // Resize divider logic (pure pointer events — no dnd-kit)
@@ -235,9 +252,7 @@ export function SplitPaneLayout({ renderPanel }: SplitPaneLayoutProps) {
       resizingIndex.current = index;
 
       // Capture initial ratios from current panels or equal distribution
-      const initialRatios =
-        customRatios ??
-        panels.map(() => 1);
+      const initialRatios = customRatios ?? panels.map(() => 1);
       resizeStartRatios.current = [...initialRatios];
 
       function onPointerMove(e: PointerEvent) {
@@ -256,10 +271,7 @@ export function SplitPaneLayout({ renderPanel }: SplitPaneLayoutProps) {
           // Redistribute: left panel gets `frac` of total, right panel gets rest
           if (i === 0 && resizeStartRatios.current.length >= 2) {
             const leftFr = Math.max(0.5, frac * totalRatio);
-            const rightFr = Math.max(
-              0.5,
-              totalRatio - leftFr,
-            );
+            const rightFr = Math.max(0.5, totalRatio - leftFr);
             const updated = [...resizeStartRatios.current];
             updated[0] = leftFr;
             updated[1] = rightFr;
@@ -357,10 +369,7 @@ export function SplitPaneLayout({ renderPanel }: SplitPaneLayoutProps) {
 
     // If dropped near an edge, apply a snap layout
     if (snapEdge) {
-      const templateMap: Record<
-        NonNullable<typeof snapEdge>,
-        'split-50-50' | 'split-50-50'
-      > = {
+      const templateMap: Record<NonNullable<typeof snapEdge>, 'split-50-50' | 'split-50-50'> = {
         left: 'split-50-50',
         right: 'split-50-50',
         top: 'split-50-50',
@@ -410,11 +419,7 @@ export function SplitPaneLayout({ renderPanel }: SplitPaneLayoutProps) {
       {/* Snap picker — floating, receives no anchor position in this context */}
       <SnapLayoutPicker />
 
-      <div
-        ref={containerRef}
-        className="relative h-full w-full"
-        style={gridStyle}
-      >
+      <div ref={containerRef} className="relative h-full w-full" style={gridStyle}>
         {panels.map((panel, index) => {
           // Get CSS grid placement from template panel definitions
           const templatePanel = template?.panels[index];
@@ -432,22 +437,18 @@ export function SplitPaneLayout({ renderPanel }: SplitPaneLayoutProps) {
               style={cellStyle}
               className="relative flex min-h-0 min-w-0 overflow-hidden"
             >
-              <PanelSlot
-                panelId={panel.id}
-                isDropTarget={dropTargetPanelId === panel.id}
-              >
+              <PanelSlot panelId={panel.id} isDropTarget={dropTargetPanelId === panel.id}>
                 {renderPanel?.(panel)}
               </PanelSlot>
 
               {/* Resize divider — only between panels in a simple split layout */}
-              {index < panels.length - 1 &&
-                template?.panels.length === 2 && (
-                  <ResizeDivider
-                    direction={splitDirection ?? 'horizontal'}
-                    index={index}
-                    onResizeStart={handleResizeStart}
-                  />
-                )}
+              {index < panels.length - 1 && template?.panels.length === 2 && (
+                <ResizeDivider
+                  direction={splitDirection ?? 'horizontal'}
+                  index={index}
+                  onResizeStart={handleResizeStart}
+                />
+              )}
             </div>
           );
         })}

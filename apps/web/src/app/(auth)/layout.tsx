@@ -20,10 +20,13 @@ interface AuthLayoutProps {
 export default function AuthLayout({ children }: AuthLayoutProps) {
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm">
+      <main id="main-content" tabIndex={-1} className="w-full max-w-sm">
         {/* Brand mark */}
         <div className="mb-8 flex flex-col items-center gap-2">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+          <div
+            className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary"
+            aria-hidden="true"
+          >
             <svg
               viewBox="0 0 24 24"
               fill="none"
@@ -39,12 +42,10 @@ export default function AuthLayout({ children }: AuthLayoutProps) {
               />
             </svg>
           </div>
-          <span className="text-xl font-bold tracking-tight text-foreground">
-            Notesaner
-          </span>
+          <span className="text-xl font-bold tracking-tight text-foreground">Notesaner</span>
         </div>
         {children}
-      </div>
+      </main>
     </div>
   );
 }

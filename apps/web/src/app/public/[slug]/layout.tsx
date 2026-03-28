@@ -28,8 +28,14 @@ export default function PublicVaultLayout({ children }: Omit<PublicVaultLayoutPr
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Minimal public navigation */}
-      <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm">
-        <div className="mx-auto flex max-w-wide items-center justify-between px-4 py-3">
+      <header
+        role="banner"
+        className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-sm"
+      >
+        <nav
+          aria-label="Public vault navigation"
+          className="mx-auto flex max-w-wide items-center justify-between px-4 py-3"
+        >
           <span className="text-sm font-semibold text-foreground">Notesaner</span>
           <a
             href="/"
@@ -37,10 +43,16 @@ export default function PublicVaultLayout({ children }: Omit<PublicVaultLayoutPr
           >
             Open in app
           </a>
-        </div>
+        </nav>
       </header>
 
-      <div className="mx-auto max-w-wide px-4 py-8">{children}</div>
+      <main id="main-content" tabIndex={-1} className="mx-auto max-w-wide px-4 py-8">
+        {children}
+      </main>
+
+      <footer role="contentinfo" className="sr-only">
+        <p>Notesaner published vault</p>
+      </footer>
     </div>
   );
 }
