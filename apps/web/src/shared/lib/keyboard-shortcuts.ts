@@ -32,11 +32,7 @@ export interface KeyCombo {
 }
 
 /** Categories used to group shortcuts in the help UI. */
-export type ShortcutCategory =
-  | 'navigation'
-  | 'editor'
-  | 'workspace'
-  | 'view';
+export type ShortcutCategory = 'navigation' | 'editor' | 'workspace' | 'view';
 
 /**
  * A fully-described keyboard shortcut.
@@ -155,10 +151,17 @@ export const KEYBOARD_SHORTCUTS = [
   },
   {
     id: 'toggle-source-preview',
-    label: 'Toggle source / reading view',
+    label: 'Cycle edit mode (WYSIWYG / Source / Live Preview)',
     category: 'editor',
     scope: 'global',
     combo: { key: 'e', mod: true },
+  },
+  {
+    id: 'toggle-reading-mode',
+    label: 'Toggle reading mode',
+    category: 'editor',
+    scope: 'global',
+    combo: { key: 'e', mod: true, shift: true },
   },
   {
     id: 'workspace-switcher',
@@ -166,6 +169,21 @@ export const KEYBOARD_SHORTCUTS = [
     category: 'navigation',
     scope: 'global',
     combo: { key: 'w', mod: true, shift: true },
+  },
+  // --- Navigation history ---
+  {
+    id: 'navigate-back',
+    label: 'Navigate back',
+    category: 'navigation',
+    scope: 'global',
+    combo: { key: 'ArrowLeft', alt: true },
+  },
+  {
+    id: 'navigate-forward',
+    label: 'Navigate forward',
+    category: 'navigation',
+    scope: 'global',
+    combo: { key: 'ArrowRight', alt: true },
   },
   // --- Split pane ---
   {
@@ -181,6 +199,13 @@ export const KEYBOARD_SHORTCUTS = [
     category: 'workspace',
     scope: 'global',
     combo: { key: '\\', mod: true, shift: true },
+  },
+  {
+    id: 'toggle-theme',
+    label: 'Toggle dark/light theme',
+    category: 'view',
+    scope: 'global',
+    combo: { key: 'd', mod: true, shift: true },
   },
   // --- Editor-internal (TipTap handles these; listed for help panel only) ---
   {
@@ -288,8 +313,7 @@ export type ShortcutId = (typeof KEYBOARD_SHORTCUTS)[number]['id'];
  */
 export function matchesCombo(event: KeyboardEvent, combo: KeyCombo): boolean {
   const isMac =
-    typeof navigator !== 'undefined' &&
-    navigator.platform.toUpperCase().includes('MAC');
+    typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC');
 
   const modPressed = isMac ? event.metaKey : event.ctrlKey;
 
@@ -326,8 +350,7 @@ export function getGlobalShortcuts(): readonly KeyboardShortcut[] {
  */
 export function formatCombo(combo: KeyCombo): string {
   const isMac =
-    typeof navigator !== 'undefined' &&
-    navigator.platform.toUpperCase().includes('MAC');
+    typeof navigator !== 'undefined' && navigator.platform.toUpperCase().includes('MAC');
 
   const parts: string[] = [];
 

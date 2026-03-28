@@ -4,8 +4,12 @@ import { type ReactNode, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSidebarStore } from '@/shared/stores/sidebar-store';
 import { useWorkspaceStore } from '@/shared/stores/workspace-store';
+import { useLayoutStore } from '@/shared/stores/layout-store';
 import { useKeyboardShortcuts } from '@/shared/hooks/useKeyboardShortcuts';
 import { CommandPaletteDialog } from '@/features/workspace/CommandPaletteDialog';
+import { useNavigationHistoryStore } from '@/features/workspace/navigation-history-store';
+import { useEditorModeStore } from '@/features/editor/editor-mode-store';
+import { useTheme } from '@/shared/lib/providers/ThemeProvider';
 
 interface KeyboardShortcutsProviderProps {
   children: ReactNode;
@@ -27,9 +31,7 @@ interface KeyboardShortcutsProviderProps {
  * Editor-internal shortcuts (Bold, Italic, Headings, Undo/Redo, etc.) are
  * handled by TipTap extensions and do NOT go through this provider.
  */
-export function KeyboardShortcutsProvider({
-  children,
-}: KeyboardShortcutsProviderProps) {
+export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProviderProps) {
   const router = useRouter();
 
   // Sidebar actions from the persisted store
@@ -38,6 +40,23 @@ export function KeyboardShortcutsProvider({
 
   // Workspace context for note-creation navigation
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const activeNoteId = useWorkspaceStore((s) => s.activeNoteId);
+  const setActiveNote = useWorkspaceStore((s) => s.setActiveNote);
+
+  // Navigation history for back/forward
+  const goBack = useNavigationHistoryStore((s) => s.goBack);
+  const goForward = useNavigationHistoryStore((s) => s.goForward);
+
+  // Determine active tab ID for navigation history
+  const tabs = useLayoutStore((s) => s.currentLayout.tabs);
+  const activeTabId = tabs.find((t) => t.noteId === activeNoteId)?.id ?? tabs[0]?.id ?? 'default';
+
+  // Editor mode actions
+  const cycleEditMode = useEditorModeStore((s) => s.cycleEditMode);
+  const toggleReadingMode = useEditorModeStore((s) => s.toggleReadingMode);
+
+  // Theme toggle (Cmd+Shift+D)
+  const { preference, resolvedTheme, setPreference } = useTheme();
 
   // Dialog open/close state — one source of truth, co-located with the provider
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -92,14 +111,46 @@ export function KeyboardShortcutsProvider({
         // TODO(sprint-2): open TipTap find-replace panel when editor is focused
       },
 
-      // Cmd+E: toggle source / reading view.
+      // Cmd+E: cycle through edit modes (WYSIWYG -> Source -> Live Preview).
       'toggle-source-preview': () => {
-        // TODO(sprint-2): dispatch view mode toggle action
+        cycleEditMode();
+      },
+
+      // Cmd+Shift+E: toggle reading mode.
+      'toggle-reading-mode': () => {
+        toggleReadingMode();
+      },
+
+      // Cmd+Shift+D: toggle theme between dark and light
+      'toggle-theme': () => {
+        // If preference is 'system', toggle based on resolved theme.
+        // Otherwise toggle between dark and light directly.
+        const isDark =
+          preference === 'system'
+            ? resolvedTheme === 'dark'
+            : preference === 'dark' || preference === 'ayu-dark' || preference === 'nord';
+        setPreference(isDark ? 'light' : 'dark');
       },
 
       // Cmd+Shift+W: workspace switcher
       'workspace-switcher': () => {
         // TODO(sprint-2): open workspace switcher dialog
+      },
+
+      // Alt+Left: navigate back in tab history
+      'navigate-back': () => {
+        const noteId = goBack(activeTabId);
+        if (noteId !== null) {
+          setActiveNote(noteId);
+        }
+      },
+
+      // Alt+Right: navigate forward in tab history
+      'navigate-forward': () => {
+        const noteId = goForward(activeTabId);
+        if (noteId !== null) {
+          setActiveNote(noteId);
+        }
       },
     },
     !isAnyDialogOpen,
