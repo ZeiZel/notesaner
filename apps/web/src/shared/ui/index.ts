@@ -21,6 +21,9 @@ export { OfflineFallback, OfflinePage, useOnlineStatus } from './OfflineFallback
 // Accessibility — skip navigation link (WCAG 2.4.1)
 export { SkipNavigation } from './SkipNavigation';
 
+// Internationalization — locale switcher (auto-hides for single locale)
+export { LocaleSwitcher } from './LocaleSwitcher';
+
 // Virtualization
 export { VirtualList, type VirtualListProps, type VirtualListHandle } from './VirtualList';
 export {
@@ -30,6 +33,9 @@ export {
   type VirtualTreeProps,
   type VirtualTreeHandle,
 } from './VirtualTree';
+
+// CSS snippet injection (workspace-level snippet style tags)
+export { CssSnippetInjector } from './CssSnippetInjector';
 
 // Loading skeletons
 export {

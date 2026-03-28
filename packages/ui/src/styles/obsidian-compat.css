@@ -1,0 +1,428 @@
+/*
+ * Obsidian CSS Variable Compatibility Layer
+ * ==========================================
+ * Maps Obsidian's CSS custom properties to Notesaner's --ns-* design tokens.
+ *
+ * This enables Obsidian CSS snippets and community themes to work in Notesaner
+ * with minimal or no modification. Users can paste their existing Obsidian CSS
+ * snippets and they will resolve to the correct Notesaner tokens at runtime.
+ *
+ * Coverage:
+ *   - Foundation colors (backgrounds, text, accents)
+ *   - Typography (fonts, sizes, weights, line heights)
+ *   - Headings (h1-h6 size, weight, color)
+ *   - Spacing and layout
+ *   - Border radius
+ *   - Editor components (tables, lists, code blocks)
+ *   - Navigation / sidebar
+ *   - Form components (checkboxes, pills)
+ *   - Interactive states
+ *
+ * Reference: https://docs.obsidian.md/Reference/CSS+variables/CSS+variables
+ *
+ * Note: Obsidian uses HSL-based accent colors (--accent-h, --accent-s, --accent-l).
+ * Since Notesaner's primary color is already exposed as --ns-color-primary, we map
+ * the composite --interactive-accent directly rather than reconstructing from HSL.
+ */
+
+/* ================================================================
+   1. FOUNDATION — Backgrounds
+   ================================================================ */
+
+:root {
+  --background-primary: var(--ns-color-background);
+  --background-primary-alt: var(--ns-color-background-surface);
+  --background-secondary: var(--ns-color-background-surface);
+  --background-secondary-alt: var(--ns-color-background-elevated);
+  --background-modifier-hover: var(--ns-color-background-hover);
+  --background-modifier-active-hover: var(--ns-color-background-active);
+  --background-modifier-border: var(--ns-color-border);
+  --background-modifier-border-hover: var(--ns-color-border);
+  --background-modifier-border-focus: var(--ns-color-border-focus);
+  --background-modifier-error: var(--ns-color-error-muted);
+  --background-modifier-success: var(--ns-color-success-muted);
+  --background-modifier-message: var(--ns-color-info-muted);
+  --background-modifier-form-field: var(--ns-color-background-input);
+}
+
+/* ================================================================
+   2. FOUNDATION — Text / Foreground
+   ================================================================ */
+
+:root {
+  --text-normal: var(--ns-color-foreground);
+  --text-muted: var(--ns-color-foreground-secondary);
+  --text-faint: var(--ns-color-foreground-muted);
+  --text-on-accent: var(--ns-color-primary-foreground);
+  --text-on-accent-inverted: var(--ns-color-foreground);
+  --text-error: var(--ns-color-error);
+  --text-success: var(--ns-color-success);
+  --text-warning: var(--ns-color-warning);
+  --text-accent: var(--ns-color-primary);
+  --text-accent-hover: var(--ns-color-primary-hover);
+  --text-selection: var(--ns-color-primary-muted);
+}
+
+/* ================================================================
+   3. FOUNDATION — Interactive / Accent
+   ================================================================ */
+
+:root {
+  --interactive-normal: var(--ns-color-secondary);
+  --interactive-hover: var(--ns-color-secondary-hover);
+  --interactive-accent: var(--ns-color-primary);
+  --interactive-accent-hover: var(--ns-color-primary-hover);
+  --interactive-accent-focus: var(--ns-color-primary-active);
+  --interactive-success: var(--ns-color-success);
+}
+
+/* ================================================================
+   4. TYPOGRAPHY — Fonts
+   ================================================================ */
+
+:root {
+  --font-interface-theme: var(--ns-font-sans);
+  --font-text-theme: var(--ns-font-sans);
+  --font-monospace-theme: var(--ns-font-mono);
+
+  /* Obsidian's resolved font stacks — map to our tokens */
+  --font-interface: var(--ns-font-sans);
+  --font-text: var(--ns-font-sans);
+  --font-monospace: var(--ns-font-mono);
+}
+
+/* ================================================================
+   5. TYPOGRAPHY — Sizes & Weights
+   ================================================================ */
+
+:root {
+  --font-text-size: var(--ns-text-base);
+  --font-ui-small: var(--ns-text-xs);
+  --font-ui-smaller: var(--ns-text-2xs);
+  --font-ui-medium: var(--ns-text-sm);
+  --font-ui-large: var(--ns-text-md);
+
+  --font-normal: var(--ns-font-regular);
+  --font-medium: var(--ns-font-medium);
+  --font-semibold: var(--ns-font-semibold);
+  --font-bold: var(--ns-font-bold);
+
+  --line-height-normal: var(--ns-leading-normal);
+  --line-height-tight: var(--ns-leading-tight);
+
+  --bold-modifier: var(--ns-font-bold);
+  --italic-modifier: italic;
+}
+
+/* ================================================================
+   6. HEADINGS
+   ================================================================ */
+
+:root {
+  --h1-size: var(--ns-text-4xl);
+  --h2-size: var(--ns-text-3xl);
+  --h3-size: var(--ns-text-2xl);
+  --h4-size: var(--ns-text-xl);
+  --h5-size: var(--ns-text-lg);
+  --h6-size: var(--ns-text-md);
+
+  --h1-weight: var(--ns-font-bold);
+  --h2-weight: var(--ns-font-bold);
+  --h3-weight: var(--ns-font-semibold);
+  --h4-weight: var(--ns-font-semibold);
+  --h5-weight: var(--ns-font-semibold);
+  --h6-weight: var(--ns-font-semibold);
+
+  --h1-color: var(--ns-color-foreground);
+  --h2-color: var(--ns-color-foreground);
+  --h3-color: var(--ns-color-foreground);
+  --h4-color: var(--ns-color-foreground);
+  --h5-color: var(--ns-color-foreground);
+  --h6-color: var(--ns-color-foreground);
+
+  --h1-line-height: var(--ns-leading-tight);
+  --h2-line-height: var(--ns-leading-tight);
+  --h3-line-height: var(--ns-leading-tight);
+  --h4-line-height: var(--ns-leading-snug);
+  --h5-line-height: var(--ns-leading-snug);
+  --h6-line-height: var(--ns-leading-snug);
+
+  --heading-spacing: var(--ns-space-6);
+}
+
+/* ================================================================
+   7. SPACING & LAYOUT
+   ================================================================ */
+
+:root {
+  --size-2-1: var(--ns-space-0-5);
+  --size-2-2: var(--ns-space-1);
+  --size-2-3: var(--ns-space-1-5);
+  --size-4-1: var(--ns-space-1);
+  --size-4-2: var(--ns-space-2);
+  --size-4-3: var(--ns-space-3);
+  --size-4-4: var(--ns-space-4);
+  --size-4-5: var(--ns-space-5);
+  --size-4-6: var(--ns-space-6);
+  --size-4-8: var(--ns-space-8);
+  --size-4-9: var(--ns-space-10);
+  --size-4-12: var(--ns-space-12);
+  --size-4-16: var(--ns-space-16);
+  --size-4-18: var(--ns-space-20);
+
+  --border-width: 1px;
+  --page-width: var(--ns-max-width-prose);
+}
+
+/* ================================================================
+   8. BORDER RADIUS
+   ================================================================ */
+
+:root {
+  --radius-s: var(--ns-radius-sm);
+  --radius-m: var(--ns-radius-md);
+  --radius-l: var(--ns-radius-lg);
+  --radius-xl: var(--ns-radius-xl);
+}
+
+/* ================================================================
+   9. SHADOWS
+   ================================================================ */
+
+:root {
+  --shadow-s: var(--ns-shadow-xs);
+  --shadow-m: var(--ns-shadow-md);
+  --shadow-l: var(--ns-shadow-lg);
+}
+
+/* ================================================================
+   10. EDITOR — Tables
+   ================================================================ */
+
+:root {
+  --table-border-color: var(--ns-color-border);
+  --table-border-width: 1px;
+  --table-header-background: var(--ns-color-background-surface);
+  --table-header-background-hover: var(--ns-color-background-hover);
+  --table-header-border-color: var(--ns-color-border);
+  --table-header-border-width: 1px;
+  --table-header-color: var(--ns-color-foreground);
+  --table-header-font-weight: var(--ns-font-semibold);
+  --table-row-background-hover: var(--ns-color-background-hover);
+  --table-row-alt-background: var(--ns-color-background-surface);
+  --table-white-space: normal;
+}
+
+/* ================================================================
+   11. EDITOR — Lists
+   ================================================================ */
+
+:root {
+  --list-indent: var(--ns-space-6);
+  --list-spacing: var(--ns-space-1);
+  --list-marker-color: var(--ns-color-foreground-muted);
+  --list-marker-color-hover: var(--ns-color-foreground-secondary);
+  --list-marker-color-collapsed: var(--ns-color-primary);
+}
+
+/* ================================================================
+   12. EDITOR — Code Blocks
+   ================================================================ */
+
+:root {
+  --code-normal: var(--ns-color-foreground);
+  --code-background: var(--ns-color-background-surface);
+  --code-white-space: pre-wrap;
+  --code-size: var(--ns-text-sm);
+  --code-radius: var(--ns-radius-sm);
+}
+
+/* ================================================================
+   13. NAVIGATION / SIDEBAR
+   ================================================================ */
+
+:root {
+  --nav-item-color: var(--ns-color-sidebar-foreground);
+  --nav-item-color-hover: var(--ns-color-sidebar-foreground);
+  --nav-item-color-active: var(--ns-color-sidebar-foreground);
+  --nav-item-color-selected: var(--ns-color-sidebar-accent-foreground);
+  --nav-item-background-hover: var(--ns-color-background-hover);
+  --nav-item-background-active: var(--ns-color-background-active);
+  --nav-item-background-selected: var(--ns-color-sidebar-accent);
+  --nav-item-padding: var(--ns-space-1) var(--ns-space-2);
+  --nav-heading-color: var(--ns-color-foreground-secondary);
+  --nav-heading-weight: var(--ns-font-semibold);
+  --nav-indentation-guide-width: 1px;
+  --nav-indentation-guide-color: var(--ns-color-border-subtle);
+  --nav-collapse-icon-color: var(--ns-color-foreground-muted);
+  --nav-collapse-icon-color-collapsed: var(--ns-color-foreground-secondary);
+}
+
+/* ================================================================
+   14. FORM COMPONENTS — Checkboxes
+   ================================================================ */
+
+:root {
+  --checkbox-size: 16px;
+  --checkbox-radius: var(--ns-radius-sm);
+  --checkbox-color: var(--ns-color-primary);
+  --checkbox-color-hover: var(--ns-color-primary-hover);
+  --checkbox-border-color: var(--ns-color-border);
+  --checkbox-border-color-hover: var(--ns-color-primary);
+  --checkbox-marker-color: var(--ns-color-primary-foreground);
+}
+
+/* ================================================================
+   15. FORM COMPONENTS — Pills / Tags
+   ================================================================ */
+
+:root {
+  --pill-background: var(--ns-color-primary-muted);
+  --pill-background-hover: var(--ns-color-primary-muted);
+  --pill-color: var(--ns-color-primary);
+  --pill-border-color: transparent;
+  --pill-radius: var(--ns-radius-full);
+  --pill-weight: var(--ns-font-medium);
+}
+
+/* ================================================================
+   16. EDITOR — Properties / Metadata (Frontmatter)
+   ================================================================ */
+
+:root {
+  --metadata-background: var(--ns-color-background-surface);
+  --metadata-background-hover: var(--ns-color-background-hover);
+  --metadata-padding: var(--ns-space-3);
+  --metadata-property-background: transparent;
+  --metadata-property-background-hover: var(--ns-color-background-hover);
+  --metadata-property-background-active: var(--ns-color-background-active);
+  --metadata-property-padding: var(--ns-space-1) var(--ns-space-2);
+  --metadata-divider-color: var(--ns-color-border-subtle);
+  --metadata-label-font-size: var(--ns-text-xs);
+  --metadata-label-font-weight: var(--ns-font-medium);
+  --metadata-label-color: var(--ns-color-foreground-secondary);
+  --metadata-input-height: 28px;
+  --metadata-input-background: var(--ns-color-background-input);
+  --metadata-input-background-hover: var(--ns-color-background-hover);
+  --metadata-input-background-active: var(--ns-color-background-active);
+  --metadata-input-border-color: var(--ns-color-border);
+  --metadata-input-font-size: var(--ns-text-sm);
+}
+
+/* ================================================================
+   17. INPUT & FORM FIELDS
+   ================================================================ */
+
+:root {
+  --input-height: 32px;
+  --input-radius: var(--ns-radius-md);
+  --input-font-weight: var(--ns-font-regular);
+  --input-border-width: 1px;
+}
+
+/* ================================================================
+   18. SCROLLBARS (Obsidian-compatible)
+   ================================================================ */
+
+:root {
+  --scrollbar-active-thumb-bg: var(--ns-color-foreground-muted);
+  --scrollbar-bg: transparent;
+  --scrollbar-thumb-bg: var(--ns-color-border);
+}
+
+/* ================================================================
+   19. COLOR PALETTE (Obsidian base scale)
+   Maps Obsidian's --color-base-NN to approximate Notesaner equivalents.
+   Obsidian uses a 0-100 scale where 00 is lightest, 100 is darkest.
+   These values flip between light and dark themes.
+   ================================================================ */
+
+:root {
+  /* Dark theme: 00 = dark bg, 100 = light fg */
+  --color-base-00: var(--ns-color-background);
+  --color-base-10: var(--ns-color-background-surface);
+  --color-base-20: var(--ns-color-background-elevated);
+  --color-base-25: var(--ns-color-background-overlay);
+  --color-base-30: var(--ns-color-border);
+  --color-base-35: var(--ns-color-border);
+  --color-base-40: var(--ns-color-muted);
+  --color-base-50: var(--ns-color-foreground-muted);
+  --color-base-60: var(--ns-color-foreground-muted);
+  --color-base-70: var(--ns-color-foreground-secondary);
+  --color-base-100: var(--ns-color-foreground);
+
+  /* Semantic color aliases */
+  --color-red: var(--ns-color-red);
+  --color-orange: var(--ns-color-peach);
+  --color-yellow: var(--ns-color-yellow);
+  --color-green: var(--ns-color-green);
+  --color-cyan: var(--ns-color-teal);
+  --color-blue: var(--ns-color-blue);
+  --color-purple: var(--ns-color-mauve);
+  --color-pink: var(--ns-color-pink);
+}
+
+/* ================================================================
+   20. TAG COLORS
+   ================================================================ */
+
+:root {
+  --tag-background: var(--ns-color-primary-muted);
+  --tag-background-hover: var(--ns-color-primary-muted);
+  --tag-color: var(--ns-color-primary);
+  --tag-color-hover: var(--ns-color-primary-hover);
+  --tag-font-size: var(--ns-text-xs);
+  --tag-radius: var(--ns-radius-full);
+  --tag-padding-x: var(--ns-space-2);
+  --tag-padding-y: var(--ns-space-0-5);
+}
+
+/* ================================================================
+   21. LINK COLORS
+   ================================================================ */
+
+:root {
+  --link-color: var(--ns-color-primary);
+  --link-color-hover: var(--ns-color-primary-hover);
+  --link-decoration: none;
+  --link-decoration-hover: underline;
+  --link-external-color: var(--ns-color-primary);
+  --link-external-color-hover: var(--ns-color-primary-hover);
+  --link-unresolved-color: var(--ns-color-foreground-muted);
+  --link-unresolved-opacity: 0.7;
+}
+
+/* ================================================================
+   22. CALLOUT / ADMONITION
+   ================================================================ */
+
+:root {
+  --callout-radius: var(--ns-radius-md);
+  --callout-padding: var(--ns-space-3);
+  --callout-title-padding: var(--ns-space-2) 0;
+  --callout-title-size: var(--ns-text-sm);
+  --callout-content-padding: 0;
+}
+
+/* ================================================================
+   23. GRAPH VIEW
+   ================================================================ */
+
+:root {
+  --graph-line: var(--ns-color-border);
+  --graph-node: var(--ns-color-foreground-muted);
+  --graph-node-focused: var(--ns-color-primary);
+  --graph-node-tag: var(--ns-color-accent);
+  --graph-node-attachment: var(--ns-color-success);
+  --graph-node-unresolved: var(--ns-color-foreground-muted);
+}
+
+/* ================================================================
+   24. OBSIDIAN PUBLISH (for public vault compatibility)
+   ================================================================ */
+
+:root {
+  --page-title-font: var(--ns-font-sans);
+  --page-width: var(--ns-max-width-prose);
+  --page-side-padding: var(--ns-space-6);
+}
