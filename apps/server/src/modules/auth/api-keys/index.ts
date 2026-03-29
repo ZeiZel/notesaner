@@ -1,5 +1,6 @@
 export { UserApiKeyController } from './api-key.controller';
-export { UserApiKeyService, ValidatedUserApiKey } from './api-key.service';
+export { UserApiKeyService } from './api-key.service';
+export type { ValidatedUserApiKey } from './api-key.service';
 export {
   UserApiKeyGuard,
   getUserApiKey,

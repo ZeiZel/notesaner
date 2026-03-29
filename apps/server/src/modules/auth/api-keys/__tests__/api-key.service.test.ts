@@ -494,7 +494,7 @@ describe('UserApiKeyService', () => {
       const txCreate = vi.fn().mockResolvedValue(newRecord);
       const txUpdate = vi.fn().mockResolvedValue({});
 
-      vi.mocked(prisma.$transaction!).mockImplementation(
+      (prisma.$transaction as any).mockImplementation(
         async (cb: (tx: unknown) => Promise<unknown>) =>
           cb({ apiKey: { create: txCreate, update: txUpdate } }),
       );
