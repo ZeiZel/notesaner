@@ -3,10 +3,7 @@ import type { Job } from 'bullmq';
 import { AttachmentCleanupProcessor } from '../processors/attachment-cleanup.processor';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { FilesService } from '../../files/files.service';
-import {
-  JOB_CLEANUP_ATTACHMENTS,
-  QUEUE_ATTACHMENT_CLEANUP,
-} from '../jobs.constants';
+import { JOB_CLEANUP_ATTACHMENTS } from '../jobs.constants';
 import type { CleanupAttachmentsJobData } from '../jobs.types';
 
 // ---------------------------------------------------------------------------
@@ -116,10 +113,7 @@ describe('AttachmentCleanupProcessor', () => {
       const job = makeJob({ noteId: 'note-1', workspaceId: 'ws-1' });
       await processor.process(job);
 
-      expect(filesService.deleteFile).toHaveBeenCalledWith(
-        'ws-1',
-        attachment.path,
-      );
+      expect(filesService.deleteFile).toHaveBeenCalledWith('ws-1', attachment.path);
     });
 
     it('logs a warning but does not throw when filesystem delete fails', async () => {
@@ -167,7 +161,11 @@ describe('AttachmentCleanupProcessor', () => {
 
   describe('when noteId is absent (orphan scan)', () => {
     it('queries for orphans and removes them', async () => {
-      const orphan = { id: 'att-orphan', path: '.attachments/deleted-note/photo.png', workspace_id: 'ws-1' };
+      const orphan = {
+        id: 'att-orphan',
+        path: '.attachments/deleted-note/photo.png',
+        workspace_id: 'ws-1',
+      };
       prisma.$queryRaw.mockResolvedValue([orphan]);
 
       const job = makeJob({});

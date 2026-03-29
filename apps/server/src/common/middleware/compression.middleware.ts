@@ -179,7 +179,7 @@ export class CompressionMiddleware implements NestMiddleware {
       encodingOrCb?: BufferEncoding | ((err?: Error | null) => void),
       cb?: (err?: Error | null) => void,
     ): boolean {
-      const buf = toBuffer(chunk, encodingOrCb);
+      const buf = toBuffer(chunk, encodingOrCb as BufferEncoding | undefined);
 
       // Below threshold — skip compression even if encoding was negotiated.
       if (!headersSent && buf.length < COMPRESSION_THRESHOLD_BYTES) {
@@ -205,7 +205,7 @@ export class CompressionMiddleware implements NestMiddleware {
       cb?: () => void,
     ): Response {
       if (chunk) {
-        const buf = toBuffer(chunk, encodingOrCb);
+        const buf = toBuffer(chunk, encodingOrCb as BufferEncoding | undefined);
 
         if (!headersSent && buf.length < COMPRESSION_THRESHOLD_BYTES) {
           return originalEnd(chunk, encodingOrCb as BufferEncoding, cb);
@@ -217,7 +217,7 @@ export class CompressionMiddleware implements NestMiddleware {
 
         const callbackFn = typeof encodingOrCb === 'function' ? encodingOrCb : cb;
         if (compressor) {
-          compressor.end(buf, callbackFn as BufferEncoding);
+          compressor.end(buf, callbackFn as (() => void) | undefined);
         }
       } else {
         if (compressor && headersSent) {
@@ -247,10 +247,7 @@ function shouldSkipCompression(contentType: string | undefined): boolean {
   return false;
 }
 
-function toBuffer(
-  chunk: Buffer | string,
-  encodingOrCb?: BufferEncoding | ((...args: unknown[]) => void),
-): Buffer {
+function toBuffer(chunk: Buffer | string, encodingOrCb?: BufferEncoding | undefined): Buffer {
   if (Buffer.isBuffer(chunk)) return chunk;
   const enc = typeof encodingOrCb === 'string' ? encodingOrCb : 'utf8';
   return Buffer.from(chunk, enc);

@@ -14,5 +14,5 @@
       }
     }
   },
-  "tags": ["scope:pkg"]
+  "tags": ["scope:shared"]
 }

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { ComponentOverridesService } from '../component-overrides.service';
+import type { PrismaService } from '../../../prisma/prisma.service';
 
 // ── Prisma mock ──────────────────────────────────────────────────────────────
 
@@ -20,10 +21,6 @@ const mockPrisma = {
     findMany: vi.fn(),
   },
 };
-
-vi.mock('../../../prisma/prisma.service', () => ({
-  PrismaService: vi.fn().mockImplementation(() => mockPrisma),
-}));
 
 // getComponentMeta is a pure function — no mock needed unless testing unknown ids.
 
@@ -65,9 +62,7 @@ describe('ComponentOverridesService', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { PrismaService } = require('../../../prisma/prisma.service');
-    service = new ComponentOverridesService(new PrismaService());
+    service = new ComponentOverridesService(mockPrisma as unknown as PrismaService);
   });
 
   // ── assertAdminRole ──────────────────────────────────────────────────────
@@ -221,7 +216,7 @@ describe('ComponentOverridesService', () => {
     it('returns all 8 overridable components', async () => {
       const registry = await service.getRegistry();
       expect(registry).toHaveLength(8);
-      const ids = registry.map((c) => c.id);
+      const ids = registry.map((c: { id: string }) => c.id);
       expect(ids).toContain('NoteCard');
       expect(ids).toContain('CodeBlock');
       expect(ids).toContain('SearchResultItem');

@@ -25,6 +25,7 @@ describe('JobsService', () => {
   let freshnessCheckQueue: ReturnType<typeof createMockQueue>;
   let webhookDeliveryQueue: ReturnType<typeof createMockQueue>;
   let storageRecalculationQueue: ReturnType<typeof createMockQueue>;
+  let trashPurgeQueue: ReturnType<typeof createMockQueue>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -32,12 +33,14 @@ describe('JobsService', () => {
     freshnessCheckQueue = createMockQueue();
     webhookDeliveryQueue = createMockQueue();
     storageRecalculationQueue = createMockQueue();
+    trashPurgeQueue = createMockQueue();
 
     service = new JobsService(
       noteIndexQueue as never,
       freshnessCheckQueue as never,
       webhookDeliveryQueue as never,
       storageRecalculationQueue as never,
+      trashPurgeQueue as never,
     );
   });
 
@@ -174,6 +177,7 @@ describe('JobsService', () => {
       freshnessCheckQueue.getJob.mockResolvedValue(null);
       webhookDeliveryQueue.getJob.mockResolvedValue(null);
       storageRecalculationQueue.getJob.mockResolvedValue(null);
+      trashPurgeQueue.getJob.mockResolvedValue(null);
 
       const result = await service.getJobStatus('nonexistent-job');
       expect(result).toBeNull();

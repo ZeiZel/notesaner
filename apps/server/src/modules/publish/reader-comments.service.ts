@@ -4,8 +4,8 @@ import {
   Injectable,
   Logger,
   NotFoundException,
-  TooManyRequestsException,
 } from '@nestjs/common';
+import { TooManyRequestsException } from '../../common/exceptions/too-many-requests.exception';
 import { randomUUID } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
 import { ValkeyService } from '../valkey/valkey.service';
@@ -27,28 +27,18 @@ const DEFAULT_PAGE_SIZE = 20;
 
 // ─── Key helpers ──────────────────────────────────────────────────────────────
 
-/**
- * All comments for a note (sorted set, score = unix ms timestamp).
- * Used by the moderation queue.
- */
 function allCommentsKey(noteId: string): string {
   return `rc:${noteId}:all`;
 }
 
-/**
- * Approved comment IDs for a note (sorted set, score = unix ms timestamp).
- * Used for public listing.
- */
 function approvedCommentsKey(noteId: string): string {
   return `rc:${noteId}:approved`;
 }
 
-/** Individual comment hash. */
 function commentKey(commentId: string): string {
   return `rc:comment:${commentId}`;
 }
 
-/** Rate-limit counter: IP × note. */
 function rateLimitKey(ip: string, noteId: string): string {
   return `rc:rl:${ip}:${noteId}`;
 }
@@ -60,7 +50,6 @@ export interface ReaderCommentDto {
   noteId: string;
   content: string;
   authorName: string | null;
-  /** Deliberately omitted from public listing — only exposed in moderation queue. */
   authorEmail?: string | null;
   parentId: string | null;
   status: 'pending' | 'approved' | 'rejected';
@@ -73,7 +62,6 @@ export interface PublicReaderCommentDto {
   authorName: string | null;
   parentId: string | null;
   createdAt: string;
-  /** Inline replies (only populated at the root level when parentId=null). */
   replies: PublicReaderCommentDto[];
 }
 
@@ -91,8 +79,6 @@ export interface ModerationQueueResponse {
   total: number;
 }
 
-// ─── Stored shape (Redis hash fields) ─────────────────────────────────────────
-
 interface StoredComment {
   id: string;
   noteId: string;
@@ -104,8 +90,6 @@ interface StoredComment {
   createdAt: string;
 }
 
-// ─── Service ──────────────────────────────────────────────────────────────────
-
 @Injectable()
 export class ReaderCommentsService {
   private readonly logger = new Logger(ReaderCommentsService.name);
@@ -116,47 +100,26 @@ export class ReaderCommentsService {
     private readonly jobsService: JobsService,
   ) {}
 
-  // ─── Public: create comment ───────────────────────────────────────────────
-
-  /**
-   * Submit a reader comment on a published note.
-   *
-   * Guards:
-   *   1. Honeypot check — immediate 400 if filled
-   *   2. Note existence + published + comments enabled check
-   *   3. Per-IP rate limit (5 comments / hour per note)
-   *   4. Parent depth check — only 1 level of replies allowed
-   *
-   * Comments are stored with `status=pending` and require owner approval
-   * before becoming visible. An email notification is enqueued to alert
-   * the note owner.
-   */
   async createComment(
     publicSlug: string,
     notePath: string,
     dto: CreateReaderCommentDto,
     clientIp: string,
   ): Promise<ReaderCommentDto> {
-    // 1. Honeypot spam check
     if (dto.honeypot !== undefined && dto.honeypot !== '') {
       this.logger.warn(`Honeypot triggered for ${publicSlug}/${notePath} from ${clientIp}`);
-      // Return success to confuse bots, but do not store anything
       throw new ForbiddenException('Comment submission rejected');
     }
 
-    // 2. Resolve note
     const { note, workspace } = await this.resolvePublicNote(publicSlug, notePath);
 
-    // 3. Comments enabled check (workspace setting)
     const settings = (workspace.settings ?? {}) as Record<string, unknown>;
     if (settings['commentsEnabled'] === false) {
       throw new ForbiddenException('Comments are disabled for this vault');
     }
 
-    // 4. Rate limit
     await this.enforceRateLimit(clientIp, note.id);
 
-    // 5. Parent depth check — only 1 level of threading
     if (dto.parentId) {
       const parent = await this.getCommentById(dto.parentId);
       if (!parent) {
@@ -172,7 +135,6 @@ export class ReaderCommentsService {
       }
     }
 
-    // 6. Persist
     const commentId = randomUUID();
     const now = new Date();
     const comment: StoredComment = {
@@ -192,7 +154,6 @@ export class ReaderCommentsService {
       `New reader comment ${commentId} on note ${note.id} (${publicSlug}/${notePath}) — status=pending`,
     );
 
-    // 7. Email notification to note owner (fire-and-forget)
     void this.notifyNoteOwner(note, workspace, comment).catch((err) => {
       this.logger.error(`Failed to enqueue comment notification: ${err}`);
     });
@@ -200,12 +161,6 @@ export class ReaderCommentsService {
     return this.toReaderCommentDto(comment);
   }
 
-  // ─── Public: list approved comments ──────────────────────────────────────
-
-  /**
-   * Returns approved comments for a published note, threaded 1 level deep.
-   * Root comments (parentId=null) appear first, replies nested under parents.
-   */
   async listApprovedComments(
     publicSlug: string,
     notePath: string,
@@ -217,10 +172,8 @@ export class ReaderCommentsService {
     const client = this.valkeyService.getClient();
     const key = approvedCommentsKey(note.id);
 
-    // Get total count
     const total = await client.zcard(key);
 
-    // Pagination via ZRANGE (descending by score = most recent first)
     const offset = (page - 1) * pageSize;
     const ids = await client.zrange(key, offset, offset + pageSize - 1, 'REV');
 
@@ -228,10 +181,8 @@ export class ReaderCommentsService {
       return { comments: [], total };
     }
 
-    // Batch-fetch comment hashes
     const rawComments = await this.batchGetComments(ids);
 
-    // Build threaded structure — separate roots from replies
     const roots: PublicReaderCommentDto[] = [];
     const replyMap = new Map<string, PublicReaderCommentDto[]>();
 
@@ -246,7 +197,6 @@ export class ReaderCommentsService {
       }
     }
 
-    // Attach replies to their parent roots
     for (const root of roots) {
       root.replies = replyMap.get(root.id) ?? [];
     }
@@ -254,14 +204,7 @@ export class ReaderCommentsService {
     return { comments: roots, total };
   }
 
-  // ─── Moderation: list pending comments ───────────────────────────────────
-
-  /**
-   * Returns the full moderation queue (pending comments) for a workspace note.
-   * Only accessible to the workspace owner/admin.
-   */
   async getModerationQueue(workspaceId: string, noteId: string): Promise<ModerationQueueResponse> {
-    // Verify note belongs to workspace
     const note = await this.prisma.note.findFirst({
       where: { id: noteId, workspaceId },
     });
@@ -272,7 +215,6 @@ export class ReaderCommentsService {
     const client = this.valkeyService.getClient();
     const allKey = allCommentsKey(note.id);
 
-    // Fetch all comment IDs (newest first)
     const allIds = await client.zrange(allKey, 0, -1, 'REV');
 
     if (allIds.length === 0) {
@@ -287,15 +229,6 @@ export class ReaderCommentsService {
     return { pending, total: pending.length };
   }
 
-  // ─── Moderation: moderate a comment ──────────────────────────────────────
-
-  /**
-   * Approve or reject a pending comment.
-   * Called by the note owner after verifying workspace membership.
-   *
-   * Approval: moves comment ID from pending → approved sorted set.
-   * Rejection: updates status only, removes from public listing.
-   */
   async moderateComment(
     commentId: string,
     workspaceId: string,
@@ -306,7 +239,6 @@ export class ReaderCommentsService {
       throw new NotFoundException('Comment not found');
     }
 
-    // Verify the comment's note belongs to the caller's workspace
     const note = await this.prisma.note.findFirst({
       where: { id: comment.noteId, workspaceId },
     });
@@ -324,7 +256,6 @@ export class ReaderCommentsService {
       this.logger.log(`Comment ${commentId} approved`);
     } else {
       await client.hset(commentHashKey, 'status', 'rejected');
-      // Remove from public approved set if it was previously approved
       await client.zrem(approvedCommentsKey(comment.noteId), commentId);
       this.logger.log(`Comment ${commentId} rejected`);
     }
@@ -336,20 +267,12 @@ export class ReaderCommentsService {
     return this.toReaderCommentDto(updated, true);
   }
 
-  // ─── GDPR: delete a comment ───────────────────────────────────────────────
-
-  /**
-   * Permanently deletes a comment and all its replies.
-   * Called by the note owner for GDPR compliance.
-   * Also handles cascading deletion of replies when deleting a root comment.
-   */
   async deleteComment(commentId: string, workspaceId: string): Promise<void> {
     const comment = await this.getCommentById(commentId);
     if (!comment) {
       throw new NotFoundException('Comment not found');
     }
 
-    // Verify workspace ownership
     const note = await this.prisma.note.findFirst({
       where: { id: comment.noteId, workspaceId },
     });
@@ -359,7 +282,6 @@ export class ReaderCommentsService {
 
     const client = this.valkeyService.getClient();
 
-    // If this is a root comment, also delete all replies
     if (!comment.parentId) {
       const allIds = await client.zrange(allCommentsKey(comment.noteId), 0, -1);
       const replies = await this.batchGetComments(allIds);
@@ -375,12 +297,6 @@ export class ReaderCommentsService {
     this.logger.log(`Comment ${commentId} permanently deleted (GDPR) for workspace ${workspaceId}`);
   }
 
-  // ─── Comment count ────────────────────────────────────────────────────────
-
-  /**
-   * Returns the number of approved comments for a published note.
-   * Lightweight — uses ZCARD on the approved set.
-   */
   async getCommentCount(publicSlug: string, notePath: string): Promise<ReaderCommentCountDto> {
     const { note } = await this.resolvePublicNote(publicSlug, notePath);
     const client = this.valkeyService.getClient();
@@ -388,13 +304,6 @@ export class ReaderCommentsService {
     return { count };
   }
 
-  // ─── User-scoped moderation (resolves workspace from userId) ─────────────
-
-  /**
-   * Moderate a comment on behalf of an authenticated user.
-   * Resolves the user's workspace membership to find which workspace owns
-   * the comment's note, then delegates to moderateComment.
-   */
   async moderateCommentByUser(
     commentId: string,
     userId: string,
@@ -409,11 +318,6 @@ export class ReaderCommentsService {
     return this.moderateComment(commentId, workspaceId, action);
   }
 
-  /**
-   * Delete a comment on behalf of an authenticated user.
-   * Resolves the user's workspace membership to find which workspace owns
-   * the comment's note, then delegates to deleteComment.
-   */
   async deleteCommentByUser(commentId: string, userId: string): Promise<void> {
     const comment = await this.getCommentById(commentId);
     if (!comment) {
@@ -435,7 +339,6 @@ export class ReaderCommentsService {
       throw new NotFoundException('Note not found');
     }
 
-    // Verify the user is an ADMIN or OWNER of the workspace
     const membership = await this.prisma.workspaceMember.findFirst({
       where: {
         workspaceId: note.workspaceId,
@@ -494,7 +397,6 @@ export class ReaderCommentsService {
 
     const count = await client.incr(key);
 
-    // Set TTL on first increment
     if (count === 1) {
       await client.expire(key, RATE_LIMIT_WINDOW_SECONDS);
     }
@@ -511,7 +413,6 @@ export class ReaderCommentsService {
     const hashKey = commentKey(comment.id);
     const score = new Date(comment.createdAt).getTime();
 
-    // Store all fields in a single HSET call
     await client.hset(hashKey, {
       id: comment.id,
       noteId: comment.noteId,
@@ -523,7 +424,6 @@ export class ReaderCommentsService {
       createdAt: comment.createdAt,
     });
 
-    // Add to the all-comments sorted set (for moderation queue)
     await client.zadd(allCommentsKey(comment.noteId), score, comment.id);
   }
 
@@ -557,7 +457,6 @@ export class ReaderCommentsService {
     workspace: { id: string; name: string },
     comment: StoredComment,
   ): Promise<void> {
-    // Find the workspace owner to notify
     const owner = await this.prisma.workspaceMember.findFirst({
       where: { workspaceId: workspace.id, role: 'OWNER' },
       include: { user: { select: { email: true, displayName: true } } },

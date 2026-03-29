@@ -100,6 +100,16 @@ export interface TrashPurgeJobResult {
   durationMs: number;
 }
 
+// ─── Attachment cleanup ────────────────────────────────────────────────────
+
+/** Payload for the JOB_CLEANUP_ATTACHMENTS BullMQ job. */
+export interface CleanupAttachmentsJobData {
+  /** When provided, only clean up attachments for this note. */
+  noteId?: string;
+  /** When provided, scope the cleanup to this workspace. */
+  workspaceId?: string;
+}
+
 /** Stale note summary grouped by owner, used internally by the freshness processor. */
 export interface OwnerStaleNoteSummary {
   ownerId: string;

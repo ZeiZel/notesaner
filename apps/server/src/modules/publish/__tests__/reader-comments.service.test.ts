@@ -1,30 +1,10 @@
 /**
  * Unit tests for ReaderCommentsService
- *
- * All external dependencies (PrismaService, ValkeyService, JobsService) are
- * mocked so no real database, ValKey, or queue access occurs.
- *
- * Test coverage:
- *   - createComment: honeypot rejection, vault not found, note not found,
- *     comments disabled, rate limiting, parent depth validation, happy path,
- *     email notification
- *   - listApprovedComments: empty state, pagination, threaded replies,
- *     note not found
- *   - getModerationQueue: empty queue, pending-only filter, note not found
- *   - moderateComment: approve, reject, not found, wrong workspace
- *   - deleteComment: root + replies cascade, leaf comment, not found,
- *     wrong workspace
- *   - getCommentCount: zero and non-zero counts
- *   - moderateCommentByUser / deleteCommentByUser: user-scoped delegation
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import {
-  BadRequestException,
-  ForbiddenException,
-  NotFoundException,
-  TooManyRequestsException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import { TooManyRequestsException } from '../../../common/exceptions/too-many-requests.exception';
 import { ReaderCommentsService } from '../reader-comments.service';
 import type { PrismaService } from '../../../prisma/prisma.service';
 import type { ValkeyService } from '../../valkey/valkey.service';
@@ -33,12 +13,7 @@ import type { JobsService } from '../../jobs/jobs.service';
 // ─── Fixtures ─────────────────────────────────────────────────────────────────
 
 function makeWorkspace(overrides: Record<string, unknown> = {}) {
-  return {
-    id: 'ws-1',
-    name: 'Test Vault',
-    settings: {},
-    ...overrides,
-  };
+  return { id: 'ws-1', name: 'Test Vault', settings: {}, ...overrides };
 }
 
 function makeNote(overrides: Record<string, unknown> = {}) {
@@ -71,6 +46,11 @@ function makeApprovedComment(overrides: Record<string, unknown> = {}) {
   return makeStoredComment({ status: 'approved', ...overrides });
 }
 
+// ─── Module-level mock client ────────────────────────────────────────────────
+// This variable is reassigned by makeService() so that tests can reference
+// mockClient without destructuring it from every makeService() call.
+let mockClient: Record<string, ReturnType<typeof vi.fn>>;
+
 // ─── Service factory ──────────────────────────────────────────────────────────
 
 function makeService(
@@ -78,7 +58,7 @@ function makeService(
   valkeyClientOverrides: Record<string, unknown> = {},
   jobsOverrides: Record<string, unknown> = {},
 ) {
-  const mockClient = {
+  mockClient = {
     incr: vi.fn().mockResolvedValue(1),
     expire: vi.fn().mockResolvedValue(1),
     hset: vi.fn().mockResolvedValue(1),
@@ -92,16 +72,9 @@ function makeService(
   };
 
   const prisma = {
-    workspace: {
-      findFirst: vi.fn(),
-    },
-    note: {
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-    },
-    workspaceMember: {
-      findFirst: vi.fn(),
-    },
+    workspace: { findFirst: vi.fn() },
+    note: { findFirst: vi.fn(), findUnique: vi.fn() },
+    workspaceMember: { findFirst: vi.fn() },
     ...prismaOverrides,
   } as unknown as PrismaService;
 
@@ -124,12 +97,8 @@ function makeService(
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-/** Builds a valid CreateReaderCommentDto */
 function validDto(overrides: Record<string, unknown> = {}) {
-  return {
-    content: 'Great post!',
-    ...overrides,
-  };
+  return { content: 'Great post!', ...overrides };
 }
 
 // ─── Tests ────────────────────────────────────────────────────────────────────
@@ -138,8 +107,6 @@ describe('ReaderCommentsService', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
-
-  // ─── createComment ─────────────────────────────────────────────────────────
 
   describe('createComment', () => {
     it('should reject submission when honeypot field is non-empty', async () => {
@@ -161,14 +128,12 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
-
       const result = await service.createComment(
         'slug',
         'note.md',
         validDto({ honeypot: undefined }),
         '127.0.0.1',
       );
-
       expect(result.content).toBe('Great post!');
       expect(mockClient.hset).toHaveBeenCalled();
     });
@@ -178,21 +143,18 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
-
       const result = await service.createComment(
         'slug',
         'note.md',
         validDto({ honeypot: '' }),
         '127.0.0.1',
       );
-
       expect(result.content).toBe('Great post!');
     });
 
     it('should throw NotFoundException when public vault not found', async () => {
       const { service, prisma } = makeService();
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(null);
-
       await expect(
         service.createComment('ghost-slug', 'note.md', validDto(), '127.0.0.1'),
       ).rejects.toThrow(NotFoundException);
@@ -202,7 +164,6 @@ describe('ReaderCommentsService', () => {
       const { service, prisma } = makeService();
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(null);
-
       await expect(
         service.createComment('slug', 'nonexistent.md', validDto(), '127.0.0.1'),
       ).rejects.toThrow(NotFoundException);
@@ -214,52 +175,36 @@ describe('ReaderCommentsService', () => {
         makeWorkspace({ settings: { commentsEnabled: false } }) as never,
       );
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
-
       await expect(
         service.createComment('slug', 'note.md', validDto(), '127.0.0.1'),
       ).rejects.toThrow(ForbiddenException);
     });
 
     it('should throw TooManyRequestsException when rate limit exceeded', async () => {
-      const { service, prisma } = makeService(
-        {},
-        { incr: vi.fn().mockResolvedValue(6) }, // 6 > RATE_LIMIT_MAX_COMMENTS (5)
-      );
+      const { service, prisma } = makeService({}, { incr: vi.fn().mockResolvedValue(6) });
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
-
       await expect(
         service.createComment('slug', 'note.md', validDto(), '127.0.0.1'),
       ).rejects.toThrow(TooManyRequestsException);
     });
 
     it('should allow up to the rate limit boundary', async () => {
-      const { service, prisma } = makeService(
-        {},
-        { incr: vi.fn().mockResolvedValue(5) }, // exactly at limit
-      );
+      const { service, prisma } = makeService({}, { incr: vi.fn().mockResolvedValue(5) });
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
-
       const result = await service.createComment('slug', 'note.md', validDto(), '127.0.0.1');
-
       expect(result).toBeDefined();
       expect(mockClient.hset).toHaveBeenCalled();
     });
 
     it('should not set TTL on subsequent increments (only on first)', async () => {
-      const { service, prisma } = makeService(
-        {},
-        { incr: vi.fn().mockResolvedValue(3) }, // not first comment
-      );
+      const { service, prisma } = makeService({}, { incr: vi.fn().mockResolvedValue(3) });
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
-
       await service.createComment('slug', 'note.md', validDto(), '127.0.0.1');
-
-      // expire should NOT be called when count > 1
       expect(mockClient.expire).not.toHaveBeenCalled();
     });
 
@@ -267,9 +212,7 @@ describe('ReaderCommentsService', () => {
       const { service, prisma } = makeService();
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
-      // hgetall returns null → parent not found
       mockClient.hgetall = vi.fn().mockResolvedValue(null);
-
       await expect(
         service.createComment(
           'slug',
@@ -284,11 +227,9 @@ describe('ReaderCommentsService', () => {
       const { service, prisma } = makeService();
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
-      // Parent itself is a reply (has parentId)
       mockClient.hgetall = vi
         .fn()
         .mockResolvedValue(makeStoredComment({ id: 'parent-id', parentId: 'grandparent-id' }));
-
       await expect(
         service.createComment('slug', 'note.md', validDto({ parentId: 'parent-id' }), '127.0.0.1'),
       ).rejects.toThrow(BadRequestException);
@@ -303,7 +244,6 @@ describe('ReaderCommentsService', () => {
         .mockResolvedValue(
           makeStoredComment({ id: 'parent-id', noteId: 'other-note-id', parentId: '' }),
         );
-
       await expect(
         service.createComment('slug', 'note.md', validDto({ parentId: 'parent-id' }), '127.0.0.1'),
       ).rejects.toThrow(BadRequestException);
@@ -314,14 +254,12 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
-
       const result = await service.createComment(
         'slug',
         'note.md',
         validDto({ authorName: 'Bob', authorEmail: 'bob@example.com' }),
         '10.0.0.1',
       );
-
       expect(result.status).toBe('pending');
       expect(result.authorName).toBe('Bob');
       expect(mockClient.hset).toHaveBeenCalledWith(
@@ -338,12 +276,8 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue({
         user: { email: 'owner@example.com', displayName: 'Owner' },
       } as never);
-
       await service.createComment('slug', 'note.md', validDto(), '127.0.0.1');
-
-      // Allow the fire-and-forget to settle
       await new Promise((r) => setTimeout(r, 10));
-
       expect(jobsService.enqueueSendEmail).toHaveBeenCalledWith(
         'owner@example.com',
         'comment-mention',
@@ -356,7 +290,6 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
-
       await expect(
         service.createComment('slug', 'note.md', validDto(), '127.0.0.1'),
       ).resolves.toBeDefined();
@@ -367,13 +300,9 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
-
       await service.createComment('slug', 'test-note', validDto(), '127.0.0.1');
-
       expect(prisma.note.findFirst).toHaveBeenCalledWith(
-        expect.objectContaining({
-          where: expect.objectContaining({ path: 'test-note.md' }),
-        }),
+        expect.objectContaining({ where: expect.objectContaining({ path: 'test-note.md' }) }),
       );
     });
 
@@ -382,7 +311,6 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
-
       const longContent = 'A'.repeat(3000);
       await service.createComment(
         'slug',
@@ -390,14 +318,11 @@ describe('ReaderCommentsService', () => {
         validDto({ content: longContent }),
         '127.0.0.1',
       );
-
       const hsetCall = vi.mocked(mockClient.hset).mock.calls[0];
       const storedData = hsetCall?.[1] as Record<string, string>;
       expect(storedData['content']?.length).toBe(2000);
     });
   });
-
-  // ─── listApprovedComments ──────────────────────────────────────────────────
 
   describe('listApprovedComments', () => {
     it('should return empty list when no approved comments exist', async () => {
@@ -406,9 +331,7 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       mockClient.zcard = vi.fn().mockResolvedValue(0);
       mockClient.zrange = vi.fn().mockResolvedValue([]);
-
       const result = await service.listApprovedComments('slug', 'note.md');
-
       expect(result.comments).toHaveLength(0);
       expect(result.total).toBe(0);
     });
@@ -419,21 +342,13 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       mockClient.zcard = vi.fn().mockResolvedValue(2);
       mockClient.zrange = vi.fn().mockResolvedValue(['comment-1', 'comment-2']);
-
-      const rootComment = makeApprovedComment({ id: 'comment-1', parentId: '' });
-      const replyComment = makeApprovedComment({
-        id: 'comment-2',
-        parentId: 'comment-1',
-        content: 'Reply!',
-      });
-
       mockClient.hgetall = vi
         .fn()
-        .mockResolvedValueOnce(rootComment)
-        .mockResolvedValueOnce(replyComment);
-
+        .mockResolvedValueOnce(makeApprovedComment({ id: 'comment-1', parentId: '' }))
+        .mockResolvedValueOnce(
+          makeApprovedComment({ id: 'comment-2', parentId: 'comment-1', content: 'Reply!' }),
+        );
       const result = await service.listApprovedComments('slug', 'note.md');
-
       expect(result.comments).toHaveLength(1);
       expect(result.comments[0]?.id).toBe('comment-1');
       expect(result.comments[0]?.replies).toHaveLength(1);
@@ -449,16 +364,13 @@ describe('ReaderCommentsService', () => {
       mockClient.hgetall = vi
         .fn()
         .mockResolvedValue(makeApprovedComment({ authorEmail: 'private@example.com' }));
-
       const result = await service.listApprovedComments('slug', 'note.md');
-
       expect(result.comments[0]).not.toHaveProperty('authorEmail');
     });
 
     it('should throw NotFoundException for unknown public slug', async () => {
       const { service, prisma } = makeService();
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(null);
-
       await expect(service.listApprovedComments('unknown-slug', 'note.md')).rejects.toThrow(
         NotFoundException,
       );
@@ -470,23 +382,17 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       mockClient.zcard = vi.fn().mockResolvedValue(42);
       mockClient.zrange = vi.fn().mockResolvedValue([]);
-
       const result = await service.listApprovedComments('slug', 'note.md');
-
       expect(result.total).toBe(42);
     });
   });
-
-  // ─── getModerationQueue ────────────────────────────────────────────────────
 
   describe('getModerationQueue', () => {
     it('should return empty queue when no comments exist', async () => {
       const { service, prisma } = makeService();
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       mockClient.zrange = vi.fn().mockResolvedValue([]);
-
       const result = await service.getModerationQueue('ws-1', 'note-1');
-
       expect(result.pending).toHaveLength(0);
       expect(result.total).toBe(0);
     });
@@ -495,14 +401,11 @@ describe('ReaderCommentsService', () => {
       const { service, prisma } = makeService();
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       mockClient.zrange = vi.fn().mockResolvedValue(['comment-1', 'comment-2']);
-
       mockClient.hgetall = vi
         .fn()
         .mockResolvedValueOnce(makeStoredComment({ id: 'comment-1', status: 'pending' }))
         .mockResolvedValueOnce(makeApprovedComment({ id: 'comment-2' }));
-
       const result = await service.getModerationQueue('ws-1', 'note-1');
-
       expect(result.pending).toHaveLength(1);
       expect(result.pending[0]?.id).toBe('comment-1');
     });
@@ -514,35 +417,28 @@ describe('ReaderCommentsService', () => {
       mockClient.hgetall = vi
         .fn()
         .mockResolvedValue(makeStoredComment({ authorEmail: 'reader@example.com' }));
-
       const result = await service.getModerationQueue('ws-1', 'note-1');
-
       expect(result.pending[0]?.authorEmail).toBe('reader@example.com');
     });
 
     it('should throw NotFoundException when note does not exist in workspace', async () => {
       const { service, prisma } = makeService();
       vi.mocked(prisma.note.findFirst).mockResolvedValue(null);
-
       await expect(service.getModerationQueue('ws-1', 'ghost-note')).rejects.toThrow(
         NotFoundException,
       );
     });
   });
 
-  // ─── moderateComment ───────────────────────────────────────────────────────
-
   describe('moderateComment', () => {
     it('should approve a pending comment and add to approved set', async () => {
       const { service, prisma } = makeService();
       mockClient.hgetall = vi
         .fn()
-        .mockResolvedValueOnce(makeStoredComment()) // initial getCommentById
-        .mockResolvedValueOnce(makeStoredComment({ status: 'approved' })); // after update
+        .mockResolvedValueOnce(makeStoredComment())
+        .mockResolvedValueOnce(makeStoredComment({ status: 'approved' }));
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
-
       const result = await service.moderateComment('comment-1', 'ws-1', 'approve');
-
       expect(mockClient.hset).toHaveBeenCalledWith(
         expect.stringContaining('rc:comment:comment-1'),
         'status',
@@ -563,9 +459,7 @@ describe('ReaderCommentsService', () => {
         .mockResolvedValueOnce(makeStoredComment({ status: 'approved' }))
         .mockResolvedValueOnce(makeStoredComment({ status: 'rejected' }));
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
-
       const result = await service.moderateComment('comment-1', 'ws-1', 'reject');
-
       expect(mockClient.hset).toHaveBeenCalledWith(
         expect.stringContaining('rc:comment:comment-1'),
         'status',
@@ -579,9 +473,8 @@ describe('ReaderCommentsService', () => {
     });
 
     it('should throw NotFoundException when comment does not exist', async () => {
-      const { service, mockClient } = makeService();
-      mockClient.hgetall = vi.fn().mockResolvedValue(null);
-
+      const { service, mockClient: mc } = makeService();
+      mc.hgetall = vi.fn().mockResolvedValue(null);
       await expect(service.moderateComment('ghost-comment', 'ws-1', 'approve')).rejects.toThrow(
         NotFoundException,
       );
@@ -590,35 +483,26 @@ describe('ReaderCommentsService', () => {
     it('should throw ForbiddenException when comment belongs to different workspace', async () => {
       const { service, prisma } = makeService();
       mockClient.hgetall = vi.fn().mockResolvedValue(makeStoredComment());
-      vi.mocked(prisma.note.findFirst).mockResolvedValue(null); // note not in this workspace
-
+      vi.mocked(prisma.note.findFirst).mockResolvedValue(null);
       await expect(service.moderateComment('comment-1', 'other-ws', 'approve')).rejects.toThrow(
         ForbiddenException,
       );
     });
   });
 
-  // ─── deleteComment ─────────────────────────────────────────────────────────
-
   describe('deleteComment', () => {
     it('should delete a root comment and cascade-delete its replies', async () => {
       const { service, prisma } = makeService();
       const rootComment = makeStoredComment({ id: 'comment-1', parentId: '' });
       const reply = makeStoredComment({ id: 'reply-1', parentId: 'comment-1' });
-
       mockClient.hgetall = vi.fn().mockImplementation((key: string) => {
         if (key.includes('comment-1')) return Promise.resolve(rootComment);
         if (key.includes('reply-1')) return Promise.resolve(reply);
         return Promise.resolve(null);
       });
-
-      // zrange returns all comment IDs
       mockClient.zrange = vi.fn().mockResolvedValue(['comment-1', 'reply-1']);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
-
       await service.deleteComment('comment-1', 'ws-1');
-
-      // Both the reply and the root should be deleted
       expect(mockClient.del).toHaveBeenCalledWith(expect.stringContaining('rc:comment:reply-1'));
       expect(mockClient.del).toHaveBeenCalledWith(expect.stringContaining('rc:comment:comment-1'));
     });
@@ -626,21 +510,16 @@ describe('ReaderCommentsService', () => {
     it('should delete a leaf reply without cascading', async () => {
       const { service, prisma } = makeService();
       const reply = makeStoredComment({ id: 'reply-1', parentId: 'parent-id' });
-
       mockClient.hgetall = vi.fn().mockResolvedValue(reply);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
-
       await service.deleteComment('reply-1', 'ws-1');
-
-      // Should not call zrange for cascading (no parentId === '' check triggered)
       expect(mockClient.zrange).not.toHaveBeenCalled();
       expect(mockClient.del).toHaveBeenCalledWith(expect.stringContaining('rc:comment:reply-1'));
     });
 
     it('should throw NotFoundException when comment does not exist', async () => {
-      const { service, mockClient } = makeService();
-      mockClient.hgetall = vi.fn().mockResolvedValue(null);
-
+      const { service, mockClient: mc } = makeService();
+      mc.hgetall = vi.fn().mockResolvedValue(null);
       await expect(service.deleteComment('ghost-comment', 'ws-1')).rejects.toThrow(
         NotFoundException,
       );
@@ -650,7 +529,6 @@ describe('ReaderCommentsService', () => {
       const { service, prisma } = makeService();
       mockClient.hgetall = vi.fn().mockResolvedValue(makeStoredComment());
       vi.mocked(prisma.note.findFirst).mockResolvedValue(null);
-
       await expect(service.deleteComment('comment-1', 'other-ws')).rejects.toThrow(
         ForbiddenException,
       );
@@ -662,9 +540,7 @@ describe('ReaderCommentsService', () => {
         .fn()
         .mockResolvedValue(makeStoredComment({ parentId: 'some-parent' }));
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
-
       await service.deleteComment('comment-1', 'ws-1');
-
       expect(mockClient.zrem).toHaveBeenCalledWith(
         expect.stringContaining('rc:note-1:all'),
         'comment-1',
@@ -676,17 +552,13 @@ describe('ReaderCommentsService', () => {
     });
   });
 
-  // ─── getCommentCount ───────────────────────────────────────────────────────
-
   describe('getCommentCount', () => {
     it('should return zero when no approved comments', async () => {
       const { service, prisma } = makeService();
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       mockClient.zcard = vi.fn().mockResolvedValue(0);
-
       const result = await service.getCommentCount('slug', 'note.md');
-
       expect(result.count).toBe(0);
     });
 
@@ -695,9 +567,7 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       mockClient.zcard = vi.fn().mockResolvedValue(7);
-
       const result = await service.getCommentCount('slug', 'note.md');
-
       expect(result.count).toBe(7);
     });
 
@@ -706,9 +576,7 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       mockClient.zcard = vi.fn().mockResolvedValue(3);
-
       await service.getCommentCount('slug', 'note.md');
-
       expect(mockClient.zcard).toHaveBeenCalledWith(expect.stringContaining('approved'));
     });
 
@@ -716,35 +584,28 @@ describe('ReaderCommentsService', () => {
       const { service, prisma } = makeService();
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(null);
-
       await expect(service.getCommentCount('slug', 'ghost.md')).rejects.toThrow(NotFoundException);
     });
   });
-
-  // ─── moderateCommentByUser ─────────────────────────────────────────────────
 
   describe('moderateCommentByUser', () => {
     it('should resolve workspace from note and moderate', async () => {
       const { service, prisma } = makeService();
       mockClient.hgetall = vi
         .fn()
-        .mockResolvedValueOnce(makeStoredComment()) // getCommentById (first call)
-        .mockResolvedValueOnce(makeStoredComment()) // inside moderateComment → getCommentById
-        .mockResolvedValueOnce(makeStoredComment({ status: 'approved' })); // updated state
-
+        .mockResolvedValueOnce(makeStoredComment())
+        .mockResolvedValueOnce(makeStoredComment())
+        .mockResolvedValueOnce(makeStoredComment({ status: 'approved' }));
       vi.mocked(prisma.note.findUnique).mockResolvedValue({ workspaceId: 'ws-1' } as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue({ role: 'OWNER' } as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
-
       const result = await service.moderateCommentByUser('comment-1', 'user-1', 'approve');
-
       expect(result.status).toBe('approved');
     });
 
     it('should throw NotFoundException when comment not found', async () => {
-      const { service, mockClient } = makeService();
-      mockClient.hgetall = vi.fn().mockResolvedValue(null);
-
+      const { service, mockClient: mc } = makeService();
+      mc.hgetall = vi.fn().mockResolvedValue(null);
       await expect(service.moderateCommentByUser('ghost', 'user-1', 'approve')).rejects.toThrow(
         NotFoundException,
       );
@@ -754,15 +615,12 @@ describe('ReaderCommentsService', () => {
       const { service, prisma } = makeService();
       mockClient.hgetall = vi.fn().mockResolvedValue(makeStoredComment());
       vi.mocked(prisma.note.findUnique).mockResolvedValue({ workspaceId: 'ws-1' } as never);
-      vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null); // no membership
-
+      vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
       await expect(service.moderateCommentByUser('comment-1', 'user-1', 'approve')).rejects.toThrow(
         ForbiddenException,
       );
     });
   });
-
-  // ─── deleteCommentByUser ───────────────────────────────────────────────────
 
   describe('deleteCommentByUser', () => {
     it('should resolve workspace from note and delete', async () => {
@@ -771,48 +629,35 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.note.findUnique).mockResolvedValue({ workspaceId: 'ws-1' } as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue({ role: 'ADMIN' } as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
-
       await expect(service.deleteCommentByUser('comment-1', 'user-1')).resolves.toBeUndefined();
-
       expect(mockClient.del).toHaveBeenCalled();
     });
 
     it('should throw NotFoundException when comment not found', async () => {
-      const { service, mockClient } = makeService();
-      mockClient.hgetall = vi.fn().mockResolvedValue(null);
-
+      const { service, mockClient: mc } = makeService();
+      mc.hgetall = vi.fn().mockResolvedValue(null);
       await expect(service.deleteCommentByUser('ghost', 'user-1')).rejects.toThrow(
         NotFoundException,
       );
     });
   });
 
-  // ─── edge cases ───────────────────────────────────────────────────────────
-
   describe('edge cases', () => {
     it('should set TTL only on first rate limit increment', async () => {
-      const { service, prisma } = makeService(
-        {},
-        { incr: vi.fn().mockResolvedValue(1) }, // first comment
-      );
+      const { service, prisma } = makeService({}, { incr: vi.fn().mockResolvedValue(1) });
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
-
       await service.createComment('slug', 'note.md', validDto(), '127.0.0.1');
-
       expect(mockClient.expire).toHaveBeenCalledOnce();
     });
 
-    it('should use x-forwarded-for header for client IP extraction (tested via createComment)', async () => {
-      // This test verifies the rate limit key differs per IP
+    it('should use x-forwarded-for header for client IP extraction', async () => {
       const { service, prisma } = makeService();
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
-
       await service.createComment('slug', 'note.md', validDto(), '192.168.1.1');
-
       expect(mockClient.incr).toHaveBeenCalledWith(expect.stringContaining('192.168.1.1'));
     });
 
@@ -821,16 +666,13 @@ describe('ReaderCommentsService', () => {
       vi.mocked(prisma.workspace.findFirst).mockResolvedValue(makeWorkspace() as never);
       vi.mocked(prisma.note.findFirst).mockResolvedValue(makeNote() as never);
       vi.mocked(prisma.workspaceMember.findFirst).mockResolvedValue(null);
-
       mockClient.hset = vi.fn().mockImplementation(() => Promise.resolve(1));
-
       const result = await service.createComment(
         'slug',
         'note.md',
         validDto({ authorName: undefined }),
         '127.0.0.1',
       );
-
       expect(result.authorName).toBeNull();
     });
   });

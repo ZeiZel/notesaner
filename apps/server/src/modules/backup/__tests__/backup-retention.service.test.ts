@@ -47,7 +47,7 @@ describe('BackupRetentionService', () => {
     it('should return empty result when no backups to clean', async () => {
       mockPrisma.backupLog.findMany.mockResolvedValue([]);
 
-      await service.enforce();
+      const result = await service.enforce();
 
       expect(result.deleted).toBe(0);
       expect(result.details).toHaveLength(0);
@@ -72,7 +72,7 @@ describe('BackupRetentionService', () => {
         .mockResolvedValueOnce([]) // Pass 2: MONTHLY category
         .mockResolvedValueOnce([]); // Pass 3: failed backups
 
-      await service.enforce();
+      const result = await service.enforce();
 
       expect(result.details).toHaveLength(1);
       expect(result.details[0]).toMatchObject({
@@ -107,7 +107,7 @@ describe('BackupRetentionService', () => {
         .mockResolvedValueOnce([]) // Pass 2: MONTHLY
         .mockResolvedValueOnce([]); // Pass 3: no failed
 
-      await service.enforce();
+      const result = await service.enforce();
 
       // 3 backups should be scheduled for deletion (10 - 7 = 3)
       expect(result.details).toHaveLength(3);
@@ -172,7 +172,7 @@ describe('BackupRetentionService', () => {
         .mockResolvedValueOnce([]) // Pass 2: MONTHLY
         .mockResolvedValueOnce([oldFailedBackup]); // Pass 3: failed
 
-      await service.enforce();
+      const result = await service.enforce();
 
       expect(result.details).toHaveLength(1);
       expect(result.details[0]).toMatchObject({

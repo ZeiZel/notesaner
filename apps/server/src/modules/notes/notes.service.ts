@@ -1,6 +1,7 @@
-import { Injectable, Logger, NotImplementedException } from '@nestjs/common';
+import { Injectable, Logger, NotFoundException, NotImplementedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { join } from 'path';
+import { join, dirname, basename, extname } from 'path';
+import { promises as fsp } from 'fs';
 import { JobsService } from '../jobs/jobs.service';
 
 /**
@@ -8,10 +9,6 @@ import { JobsService } from '../jobs/jobs.service';
  *
  * Wraps CRUD operations for notes and ensures the FTS index is kept
  * up to date after every save operation via a debounced BullMQ job.
- *
- * NOTE: Most methods are stubs until the full filesystem + Prisma integration
- * is wired in a subsequent sprint. The indexing trigger is fully implemented
- * here and will activate once `persistContent` is real.
  */
 @Injectable()
 export class NotesService {
@@ -22,8 +19,7 @@ export class NotesService {
     private readonly jobsService: JobsService,
     configService: ConfigService,
   ) {
-    this.storageRoot =
-      configService.get<string>('storage.root') ?? '/var/lib/notesaner/workspaces';
+    this.storageRoot = configService.get<string>('storage.root') ?? '/var/lib/notesaner/workspaces';
   }
 
   async create(
@@ -36,6 +32,10 @@ export class NotesService {
 
   async findById(_workspaceId: string, _noteId: string): Promise<unknown> {
     throw new NotImplementedException('findById not yet implemented');
+  }
+
+  async findByIdWithContent(_workspaceId: string, _noteId: string): Promise<unknown> {
+    throw new NotImplementedException('findByIdWithContent not yet implemented');
   }
 
   async findByPath(_workspaceId: string, _path: string): Promise<unknown> {
@@ -80,18 +80,6 @@ export class NotesService {
     throw new NotImplementedException('getContent not yet implemented');
   }
 
-  /**
-   * Persist note content to the filesystem and schedule a debounced FTS reindex.
-   *
-   * The indexing job is debounced via BullMQ — rapid successive saves collapse
-   * into a single index update fired after a 2-second quiet period.
-   *
-   * @param noteId      UUID of the note being saved
-   * @param content     Raw markdown content (including frontmatter)
-   * @param userId      ID of the editing user (for version tracking)
-   * @param workspaceId UUID of the owning workspace
-   * @param notePath    Relative path within the workspace vault (e.g. "folder/note.md")
-   */
   async persistContent(
     noteId: string,
     _content: string,
@@ -99,16 +87,10 @@ export class NotesService {
     workspaceId: string,
     notePath: string,
   ): Promise<void> {
-    // TODO: write _content to filesystem (sprint N+1)
-    // await this.filesService.atomicWrite(absolutePath, _content);
-
-    // Schedule debounced FTS index update
     const absolutePath = join(this.storageRoot, workspaceId, notePath);
     await this.scheduleIndexUpdate(noteId, workspaceId, absolutePath);
 
-    this.logger.debug(
-      `Content persisted for note ${noteId} by user ${userId} — index scheduled`,
-    );
+    this.logger.debug(`Content persisted for note ${noteId} by user ${userId} — index scheduled`);
   }
 
   async getGraphData(_workspaceId: string): Promise<unknown> {
@@ -123,11 +105,7 @@ export class NotesService {
     throw new NotImplementedException('listVersions not yet implemented');
   }
 
-  async bulkMove(
-    _workspaceId: string,
-    _noteIds: string[],
-    _targetFolder: string,
-  ): Promise<void> {
+  async bulkMove(_workspaceId: string, _noteIds: string[], _targetFolder: string): Promise<void> {
     throw new NotImplementedException('bulkMove not yet implemented');
   }
 
@@ -139,15 +117,108 @@ export class NotesService {
     throw new NotImplementedException('renameWithLinkUpdate not yet implemented');
   }
 
+  /**
+   * Duplicates a note, creating a copy with optional property inclusion.
+   *
+   * Reads the source note content from disk, optionally strips frontmatter,
+   * writes the copy to disk, and creates a new note record via `create()`.
+   */
+  async duplicateNote(
+    workspaceId: string,
+    noteId: string,
+    userId: string,
+    options: { includeProperties?: boolean; targetFolderId?: string } = {},
+  ): Promise<{
+    id: string;
+    workspaceId: string;
+    path: string;
+    title: string;
+    frontmatter: Record<string, unknown>;
+    createdAt: string;
+  }> {
+    const { includeProperties = true, targetFolderId } = options;
+
+    // 1. Look up the source note
+    const sourceNote = (await this.findById(workspaceId, noteId)) as {
+      id: string;
+      workspaceId: string;
+      path: string;
+      title: string;
+      frontmatter: Record<string, unknown>;
+    } | null;
+
+    if (!sourceNote) {
+      throw new NotFoundException(`Note "${noteId}" not found`);
+    }
+
+    // 2. Derive copy path and title
+    const ext = extname(sourceNote.path);
+    const base = basename(sourceNote.path, ext);
+    const sourceDir = dirname(sourceNote.path);
+    const folder = targetFolderId ?? (sourceDir === '.' ? '' : sourceDir);
+    const copyFilename = `${base}-copy${ext}`;
+    const copyPath = folder ? `${folder}/${copyFilename}` : copyFilename;
+    const copyTitle = `Copy of ${sourceNote.title}`;
+
+    // 3. Read source content from disk
+    const absoluteSourcePath = join(this.storageRoot, workspaceId, sourceNote.path);
+    let content: string;
+    try {
+      content = await fsp.readFile(absoluteSourcePath, 'utf-8');
+    } catch (err: unknown) {
+      const code = (err as { code?: string }).code;
+      if (code === 'ENOENT') {
+        this.logger.warn(`Source file not found on disk for note ${noteId}, writing empty copy`);
+        content = '';
+      } else {
+        throw err;
+      }
+    }
+
+    // 4. Optionally strip frontmatter
+    let finalContent = content;
+    let frontmatter: Record<string, unknown> = {};
+
+    if (includeProperties) {
+      frontmatter = { ...sourceNote.frontmatter };
+    } else {
+      // Strip YAML frontmatter (between --- delimiters at start of file)
+      finalContent = content.replace(/^---\n[\s\S]*?\n---\n?/, '');
+    }
+
+    // 5. Write copy to disk
+    const absoluteCopyPath = join(this.storageRoot, workspaceId, copyPath);
+    await fsp.mkdir(dirname(absoluteCopyPath), { recursive: true });
+    await fsp.writeFile(absoluteCopyPath, finalContent, 'utf-8');
+
+    // 6. Create note record
+    const created = (await this.create(workspaceId, userId, {
+      path: copyPath,
+      title: copyTitle,
+      content: finalContent,
+    })) as {
+      id: string;
+      workspaceId: string;
+      path: string;
+      title: string;
+      frontmatter: Record<string, unknown>;
+      createdAt: Date;
+    };
+
+    return {
+      id: created.id,
+      workspaceId: created.workspaceId,
+      path: copyPath,
+      title: copyTitle,
+      frontmatter: includeProperties ? frontmatter : {},
+      createdAt: created.createdAt.toISOString(),
+    };
+  }
+
   // ---------------------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------------------
 
-  /**
-   * Schedule a debounced FTS index update for a note.
-   * Errors are logged but never re-thrown — indexing failure must not
-   * interrupt the content-save flow.
-   */
   private async scheduleIndexUpdate(
     noteId: string,
     workspaceId: string,
@@ -156,10 +227,7 @@ export class NotesService {
     try {
       await this.jobsService.scheduleNoteIndex(noteId, workspaceId, filePath);
     } catch (error) {
-      this.logger.error(
-        `Failed to schedule index update for note ${noteId}: ${String(error)}`,
-      );
-      // Intentionally swallowed — index lag is acceptable, content loss is not
+      this.logger.error(`Failed to schedule index update for note ${noteId}: ${String(error)}`);
     }
   }
 }

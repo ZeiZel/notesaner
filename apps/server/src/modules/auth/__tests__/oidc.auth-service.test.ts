@@ -6,7 +6,9 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { ForbiddenException } from '@nestjs/common';
 import { AuthService } from '../auth.service';
 import type { PrismaService } from '../../../prisma/prisma.service';
-import type { JwtService } from '@nestjs/jwt';
+import type { ValkeyService } from '../../valkey/valkey.service';
+import type { EmailService } from '../../email/email.service';
+import type { ConfigService } from '@nestjs/config';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,21 +47,23 @@ function buildService() {
     },
   } as unknown as PrismaService;
 
-  const jwtService = {
-    sign: vi.fn().mockReturnValue('mock-access-token'),
-  } as unknown as JwtService;
+  const valkey = {
+    get: vi.fn().mockResolvedValue(null),
+    getClient: vi.fn().mockReturnValue({
+      incr: vi.fn().mockResolvedValue(1),
+      expire: vi.fn().mockResolvedValue(true),
+    }),
+  } as unknown as ValkeyService;
 
-  // The main repo's AuthService constructor requires ConfigService and TotpService too.
-  // We provide minimal mocks for those dependencies.
+  const emailService = {} as unknown as EmailService;
+
   const configService = {
-    get: vi.fn((key: string, defaultValue?: unknown) => defaultValue),
-  };
+    get: vi.fn((_key: string, defaultValue?: unknown) => defaultValue),
+  } as unknown as ConfigService;
 
-  const totpService = {} as unknown as { verifyToken: () => boolean };
+  const service = new AuthService(prisma, valkey, emailService, configService);
 
-  const service = new AuthService(prisma, jwtService, configService as any, totpService as any);
-
-  return { service, prisma, jwtService };
+  return { service, prisma };
 }
 
 // ---------------------------------------------------------------------------
@@ -95,7 +99,7 @@ describe('AuthService.loginOrProvisionOidcUser', () => {
     });
 
     expect(result.user.email).toBe('alice@example.com');
-    expect(result.accessToken).toBe('mock-access-token');
+    expect(result.accessToken).toBeDefined();
     expect(result.refreshToken).toBeDefined();
     expect(typeof result.expiresIn).toBe('number');
   });

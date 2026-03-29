@@ -1,4 +1,4 @@
-import { Injectable, NestMiddleware, Logger } from '@nestjs/common';
+import { Injectable, NestMiddleware } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 import { resolveCachePolicyForPath, DEFAULT_CACHE_CONTROL } from '../../config/cache-policy';
 
@@ -19,8 +19,6 @@ import { resolveCachePolicyForPath, DEFAULT_CACHE_CONTROL } from '../../config/c
  */
 @Injectable()
 export class CacheControlMiddleware implements NestMiddleware {
-  private readonly logger = new Logger(CacheControlMiddleware.name);
-
   use(req: Request, res: Response, next: NextFunction): void {
     // Mutating methods must never be cached
     if (req.method !== 'GET' && req.method !== 'HEAD') {

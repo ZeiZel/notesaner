@@ -8,11 +8,11 @@
  */
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { Resource } from '@opentelemetry/resources';
+import { resourceFromAttributes } from '@opentelemetry/resources';
 import {
   ATTR_SERVICE_NAME,
   ATTR_SERVICE_VERSION,
-  ATTR_DEPLOYMENT_ENVIRONMENT_NAME,
+  SEMRESATTRS_DEPLOYMENT_ENVIRONMENT,
 } from '@opentelemetry/semantic-conventions';
 import { HttpInstrumentation } from '@opentelemetry/instrumentation-http';
 import { ExpressInstrumentation } from '@opentelemetry/instrumentation-express';
@@ -35,10 +35,10 @@ if (OTEL_ENABLED) {
     url: `${OTEL_EXPORTER_ENDPOINT}/v1/traces`,
   });
 
-  const resource = new Resource({
+  const resource = resourceFromAttributes({
     [ATTR_SERVICE_NAME]: SERVICE_NAME,
     [ATTR_SERVICE_VERSION]: SERVICE_VERSION,
-    [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: NODE_ENV,
+    [SEMRESATTRS_DEPLOYMENT_ENVIRONMENT]: NODE_ENV,
   });
 
   sdk = new NodeSDK({

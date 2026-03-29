@@ -5,7 +5,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
-import { getComponentMeta } from '@notesaner/component-sdk';
 import type { CreateOverrideDto, UpdateOverrideDto } from './dto';
 
 /** Allowed workspace roles for admin operations. */
@@ -53,6 +52,7 @@ export class ComponentOverridesService {
   async create(workspaceId: string, dto: CreateOverrideDto, userId: string) {
     await this.assertAdminRole(workspaceId, userId);
 
+    const { getComponentMeta } = await import('@notesaner/component-sdk');
     const meta = getComponentMeta(dto.componentId as Parameters<typeof getComponentMeta>[0]);
     if (!meta) {
       throw new BadRequestException(`Unknown component id: "${dto.componentId}".`);

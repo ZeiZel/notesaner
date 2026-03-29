@@ -6,13 +6,11 @@
   "tags": ["type:app", "platform:server", "scope:app"],
   "targets": {
     "build": {
-      "executor": "@nx/js:tsc",
-      "outputs": ["{options.outputPath}"],
+      "executor": "nx:run-commands",
+      "outputs": ["{workspaceRoot}/dist/apps/server"],
       "options": {
-        "outputPath": "dist/apps/server",
-        "tsConfig": "apps/server/tsconfig.json",
-        "main": "apps/server/src/main.ts",
-        "assets": []
+        "command": "tsc -p tsconfig.build.json",
+        "cwd": "apps/server"
       }
     },
     "serve": {

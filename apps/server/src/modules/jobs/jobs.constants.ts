@@ -74,3 +74,11 @@ export const TRASH_PURGE_JOB = 'trash-daily-purge';
 
 /** Cron expression for the daily trash purge (every day at 02:00 UTC). */
 export const TRASH_PURGE_CRON = '0 2 * * *';
+
+// ─── Attachment cleanup ────────────────────────────────────────────────────
+
+/** BullMQ queue name for attachment cleanup jobs. */
+export const QUEUE_ATTACHMENT_CLEANUP = 'attachment-cleanup';
+
+/** Job name for cleaning up orphaned attachment records and files. */
+export const JOB_CLEANUP_ATTACHMENTS = 'cleanup-attachments';

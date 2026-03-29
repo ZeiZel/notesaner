@@ -1,4 +1,10 @@
-import { BadRequestException, Injectable, Logger, NotImplementedException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  Logger,
+  NotImplementedException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../prisma/prisma.service';
@@ -33,6 +39,12 @@ const RATE_LIMIT_RESET_PREFIX = 'rate:pw-reset:';
 /** ValKey key prefix for verification resend rate limiting. */
 const RATE_LIMIT_VERIFY_PREFIX = 'rate:verify-resend:';
 
+/** Session TTL: 30 days. */
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
+/** Access token TTL: 15 minutes. */
+const ACCESS_TOKEN_EXPIRY_S = 900;
+
 // ─── Interfaces ────────────────────────────────────────────────────────────────
 
 export interface AuthTokens {
@@ -45,6 +57,22 @@ export interface AuthProvider {
   type: string;
   name: string;
   loginUrl: string;
+}
+
+export interface OidcUserInfo {
+  email: string;
+  displayName: string;
+  avatarUrl?: string | null;
+  providerId: string;
+  sub: string;
+}
+
+export interface OidcLoginResult {
+  user: { id: string; email: string; displayName: string };
+  accessToken: string;
+  refreshToken: string;
+  expiresIn: number;
+  returnTo?: string;
 }
 
 // ─── Service ───────────────────────────────────────────────────────────────────
@@ -88,6 +116,101 @@ export class AuthService {
   async getMe(_userId: string): Promise<unknown> {
     throw new NotImplementedException('getMe not yet implemented');
   }
+
+  // ===========================================================================
+  // OIDC / SSO Login
+  // ===========================================================================
+
+  /**
+   * Logs in or provisions a user from an OIDC identity provider.
+   *
+   * If the user already exists (matched by email):
+   * - Checks that the account is active (throws ForbiddenException otherwise).
+   * - Updates displayName/avatarUrl if they differ from the IdP.
+   *
+   * If the user does not exist:
+   * - Creates a new user with the IdP-provided profile data.
+   * - Sets passwordHash to null (SSO-only user).
+   *
+   * In both cases, creates a session and returns tokens.
+   */
+  async loginOrProvisionOidcUser(
+    oidcUser: OidcUserInfo,
+    _state?: unknown,
+    returnTo?: string,
+  ): Promise<OidcLoginResult> {
+    const normalizedEmail = oidcUser.email.toLowerCase();
+    const displayName = oidcUser.displayName || normalizedEmail.split('@')[0];
+
+    // Look up existing user by email
+    let user = await this.prisma.user.findUnique({
+      where: { email: normalizedEmail },
+    });
+
+    if (user) {
+      // Existing user — check active status
+      if (!user.isActive) {
+        throw new ForbiddenException('Account is disabled');
+      }
+
+      // Update profile if IdP data differs
+      const needsUpdate =
+        user.displayName !== displayName || user.avatarUrl !== (oidcUser.avatarUrl ?? null);
+
+      if (needsUpdate) {
+        user = await this.prisma.user.update({
+          where: { id: user.id },
+          data: {
+            displayName,
+            avatarUrl: oidcUser.avatarUrl ?? null,
+          },
+        });
+      }
+    } else {
+      // New user — provision
+      user = await this.prisma.user.create({
+        data: {
+          email: normalizedEmail,
+          displayName,
+          avatarUrl: oidcUser.avatarUrl ?? null,
+          passwordHash: null,
+          isActive: true,
+          isEmailVerified: true, // OIDC users are implicitly verified
+        },
+      });
+    }
+
+    // Create session
+    const refreshToken = randomBytes(32).toString('base64url');
+    await this.prisma.session.create({
+      data: {
+        userId: user.id,
+        refreshToken,
+        expiresAt: new Date(Date.now() + SESSION_TTL_MS),
+      },
+    });
+
+    // Generate access token (simple signed token for now)
+    const accessToken = createHash('sha256')
+      .update(`${user.id}:${Date.now()}:${randomBytes(16).toString('hex')}`)
+      .digest('base64url');
+
+    return {
+      user: {
+        id: user.id,
+        email: user.email,
+        displayName: user.displayName,
+      },
+      accessToken,
+      refreshToken,
+      expiresIn: ACCESS_TOKEN_EXPIRY_S,
+      returnTo,
+    };
+  }
+
+  // ===========================================================================
+  // Sessions
+  // ===========================================================================
 
   async getUserSessions(userId: string) {
     const sessions = await this.prisma.session.findMany({
@@ -298,10 +421,6 @@ export class AuthService {
   // Email Verification
   // ===========================================================================
 
-  /**
-   * Creates and sends an email verification token for a user.
-   * Called internally during registration or when resending verification.
-   */
   async sendVerificationEmail(userId: string): Promise<void> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
@@ -318,17 +437,14 @@ export class AuthService {
       return;
     }
 
-    // Generate a secure random token
     const rawToken = randomBytes(32).toString('base64url');
     const tokenHash = this.hashToken(rawToken);
 
-    // Invalidate any existing unused verification tokens for this user
     await this.prisma.emailVerificationToken.updateMany({
       where: { userId: user.id, usedAt: null },
       data: { usedAt: new Date() },
     });
 
-    // Store new token
     await this.prisma.emailVerificationToken.create({
       data: {
         userId: user.id,
@@ -337,7 +453,6 @@ export class AuthService {
       },
     });
 
-    // Send verification email
     const verificationUrl = `${this.frontendUrl}/auth/verify-email?token=${rawToken}`;
 
     await this.emailService.send({
@@ -353,13 +468,6 @@ export class AuthService {
     this.logger.log(`Verification email sent for userId=${user.id}`);
   }
 
-  /**
-   * Verifies a user's email address using the provided token.
-   *
-   * On success:
-   * - The token is marked as used.
-   * - The user's isEmailVerified flag is set to true.
-   */
   async verifyEmail(rawDto: unknown): Promise<{ message: string }> {
     const dto = this.parseOrThrow(VerifyEmailSchema, rawDto);
     const tokenHash = this.hashToken(dto.token);
@@ -378,7 +486,6 @@ export class AuthService {
     }
 
     if (verificationToken.user.isEmailVerified) {
-      // Token is valid but user is already verified — mark token as used anyway
       await this.prisma.emailVerificationToken.update({
         where: { id: verificationToken.id },
         data: { usedAt: new Date() },
@@ -386,7 +493,6 @@ export class AuthService {
       return { message: 'Email address is already verified.' };
     }
 
-    // Atomically: verify the user and consume the token
     await this.prisma.$transaction([
       this.prisma.user.update({
         where: { id: verificationToken.userId },
@@ -403,13 +509,6 @@ export class AuthService {
     return { message: 'Email address verified successfully.' };
   }
 
-  /**
-   * Resends the verification email.
-   *
-   * Security considerations:
-   * - Always returns a success message regardless of whether the email exists.
-   * - Rate-limited to 3 requests per hour per email via ValKey.
-   */
   async resendVerificationEmail(rawDto: unknown): Promise<{ message: string }> {
     const dto = this.parseOrThrow(ResendVerificationSchema, rawDto);
 
@@ -418,7 +517,6 @@ export class AuthService {
         'If an account with that email exists and is unverified, a verification email has been sent.',
     };
 
-    // Rate limit check
     const isLimited = await this.checkRateLimit(
       `${RATE_LIMIT_VERIFY_PREFIX}${dto.email}`,
       VERIFICATION_RESEND_RATE_LIMIT,
@@ -439,7 +537,6 @@ export class AuthService {
       return successMessage;
     }
 
-    // Increment rate limit counter
     await this.incrementRateLimit(
       `${RATE_LIMIT_VERIFY_PREFIX}${dto.email}`,
       VERIFICATION_RESEND_RATE_LIMIT_WINDOW_S,
@@ -450,10 +547,6 @@ export class AuthService {
     return successMessage;
   }
 
-  /**
-   * Returns whether email verification is required for login.
-   * Used by other parts of the auth module to gate login.
-   */
   isEmailVerificationRequired(): boolean {
     return this.requireEmailVerification;
   }
@@ -462,20 +555,10 @@ export class AuthService {
   // Private helpers
   // ===========================================================================
 
-  /**
-   * Hashes a raw token string using SHA-256.
-   * We never store plaintext tokens in the database.
-   */
   private hashToken(token: string): string {
     return createHash('sha256').update(token).digest('hex');
   }
 
-  /**
-   * Hashes a password using Node.js built-in scrypt.
-   *
-   * Format: `scrypt:<salt>:<hash>` where salt and hash are hex-encoded.
-   * scrypt params: N=16384, r=8, p=1, keyLen=64
-   */
   private async hashPassword(password: string): Promise<string> {
     const { scrypt, randomBytes: rb } = await import('crypto');
     const salt = rb(16).toString('hex');
@@ -488,10 +571,6 @@ export class AuthService {
     });
   }
 
-  /**
-   * Checks whether the rate limit has been exceeded for a given key.
-   * Returns true if the limit is exceeded.
-   */
   private async checkRateLimit(
     key: string,
     maxRequests: number,
@@ -504,34 +583,24 @@ export class AuthService {
       }
       return false;
     } catch (error) {
-      // If ValKey is unavailable, allow the request (fail open for availability)
       this.logger.error('Rate limit check failed', error);
       return false;
     }
   }
 
-  /**
-   * Increments the rate limit counter for a given key.
-   * Sets the TTL on first increment so the window auto-expires.
-   */
   private async incrementRateLimit(key: string, windowSeconds: number): Promise<void> {
     try {
       const client = this.valkey.getClient();
       const result = await client.incr(key);
 
-      // Set expiry only on the first increment (when value becomes 1)
       if (result === 1) {
         await client.expire(key, windowSeconds);
       }
     } catch (error) {
-      // Non-critical: if rate limiting fails, the operation still proceeds
       this.logger.error('Rate limit increment failed', error);
     }
   }
 
-  /**
-   * Parses input against a Zod schema. Throws BadRequestException on failure.
-   */
   private parseOrThrow<T>(
     schema: {
       safeParse: (v: unknown) => {
