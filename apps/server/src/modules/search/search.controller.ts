@@ -23,7 +23,8 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SearchRateLimit } from '../../common/decorators/throttle.decorator';
 import { SearchService } from './search.service';
-import { FuzzyQueryDto, SearchQueryDto, SuggestQueryDto } from './dto';
+import { SemanticSearchService } from './semantic-search.service';
+import { FuzzyQueryDto, SearchQueryDto, SemanticQueryDto, SuggestQueryDto } from './dto';
 
 /**
  * Search REST API.
@@ -36,7 +37,10 @@ import { FuzzyQueryDto, SearchQueryDto, SuggestQueryDto } from './dto';
 @SearchRateLimit()
 @Controller('workspaces/:workspaceId/search')
 export class SearchController {
-  constructor(private readonly searchService: SearchService) {}
+  constructor(
+    private readonly searchService: SearchService,
+    private readonly semanticSearchService: SemanticSearchService,
+  ) {}
 
   @Roles('VIEWER', 'EDITOR', 'ADMIN', 'OWNER')
   @Get()
@@ -120,5 +124,30 @@ export class SearchController {
     @CurrentUser() user: JwtPayload,
   ): Promise<void> {
     await this.searchService.clearRecentSearches(user.sub, workspaceId);
+  }
+
+  @Roles('VIEWER', 'EDITOR', 'ADMIN', 'OWNER')
+  @Get('semantic')
+  @ApiOperation({
+    summary: 'Semantic search using embedding vectors',
+    description:
+      'Natural language search using OpenAI embedding vectors and pgvector cosine similarity. ' +
+      'Automatically falls back to full-text search when embeddings are not configured. ' +
+      'Minimum role: VIEWER.',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiOkResponse({
+    description: 'Ranked results with similarity scores. isFallback=true indicates FTS was used.',
+  })
+  @ApiForbiddenResponse({ description: 'Insufficient role.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  async semanticSearch(
+    @Param('workspaceId') workspaceId: string,
+    @Query() query: SemanticQueryDto,
+  ) {
+    return this.semanticSearchService.semanticSearch(workspaceId, {
+      q: query.q,
+      limit: query.limit,
+    });
   }
 }

@@ -82,6 +82,24 @@ export interface StorageRecalculationJobResult {
   durationMs: number;
 }
 
+// ─── Trash purge ───────────────────────────────────────────────────────────
+
+/** Payload for the TRASH_PURGE_JOB BullMQ job. */
+export interface TrashPurgeJobData {
+  /**
+   * Optional override for the retention period.
+   * When omitted, the processor uses the default (30 days).
+   */
+  retentionDays?: number;
+}
+
+/** Structured result returned by the trash purge processor. */
+export interface TrashPurgeJobResult {
+  purgedCount: number;
+  retentionDays: number;
+  durationMs: number;
+}
+
 /** Stale note summary grouped by owner, used internally by the freshness processor. */
 export interface OwnerStaleNoteSummary {
   ownerId: string;

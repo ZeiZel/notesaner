@@ -20,9 +20,14 @@ export type {
   PublicShareAccessResponse,
   SharePermission,
 } from './share.dto';
-export { ExportFormat, ExportQuerySchema, BatchExportSchema } from './export.dto';
-export type { ExportQueryDto, BatchExportDto } from './export.dto';
-export { ImportSource, ImportOptionsSchema } from './import.dto';
+export {
+  ExportFormat,
+  ExportQuerySchema,
+  BatchExportSchema,
+  WorkspaceExportSchema,
+} from './export.dto';
+export type { ExportQueryDto, BatchExportDto, WorkspaceExportDto } from './export.dto';
+export { ImportSource, ImportOptionsSchema, ConflictStrategy } from './import.dto';
 export type {
   ImportOptionsDto,
   ImportPreviewNote,
@@ -30,4 +35,6 @@ export type {
   ImportProgressEvent,
   ImportError,
   ImportResult,
+  ParsedFrontmatter,
+  ObsidianWorkspaceConfig,
 } from './import.dto';

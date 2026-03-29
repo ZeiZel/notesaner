@@ -32,6 +32,7 @@ import { RolesGuard } from '../../common/guards/roles.guard';
 import { UploadRateLimit } from '../../common/decorators/throttle.decorator';
 import { AttachmentService } from './attachment.service';
 import type { AttachmentRecord } from './attachment.service';
+import { ImageServeService } from './image-serve.service';
 
 /**
  * Workspace-scoped attachment routes -- require workspace membership.
@@ -134,7 +135,10 @@ export class AttachmentController {
 @ApiTags('Attachments')
 @Controller('attachments')
 export class PublicAttachmentController {
-  constructor(private readonly attachmentService: AttachmentService) {}
+  constructor(
+    private readonly attachmentService: AttachmentService,
+    private readonly imageServeService: ImageServeService,
+  ) {}
 
   @Get(':attachmentId')
   @ApiOperation({
@@ -163,5 +167,62 @@ export class PublicAttachmentController {
     res.setHeader('Cache-Control', 'public, max-age=3600');
 
     return stream;
+  }
+
+  @Get(':attachmentId/thumbnail')
+  @ApiOperation({
+    summary: 'Serve the thumbnail of an image attachment',
+    description:
+      'Returns the 300×300 WebP thumbnail generated during upload optimization. ' +
+      'Falls back to the 150×150 thumbnail if the larger size is unavailable, ' +
+      'and further falls back to the original file for non-image attachments. ' +
+      'No authentication required.',
+  })
+  @ApiParam({ name: 'attachmentId', description: 'Attachment ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Thumbnail streamed as image/webp.' })
+  @ApiNotFoundResponse({ description: 'Attachment not found.' })
+  async serveThumbnail(
+    @Param('attachmentId') attachmentId: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<import('@nestjs/common').StreamableFile> {
+    const result = await this.imageServeService.serveThumbnail(attachmentId);
+
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(result.filename)}"`,
+    );
+    res.setHeader('Content-Length', result.size.toString());
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
+    return result.stream;
+  }
+
+  @Get(':attachmentId/optimized')
+  @ApiOperation({
+    summary: 'Serve the optimized WebP variant of an image attachment',
+    description:
+      'Returns the full-resolution WebP variant generated during upload optimization. ' +
+      'Falls back to the original file for non-image attachments or when ' +
+      'optimization has not yet run. No authentication required.',
+  })
+  @ApiParam({ name: 'attachmentId', description: 'Attachment ID (UUID)', type: String })
+  @ApiOkResponse({ description: 'Optimized image streamed as image/webp.' })
+  @ApiNotFoundResponse({ description: 'Attachment not found.' })
+  async serveOptimized(
+    @Param('attachmentId') attachmentId: string,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<import('@nestjs/common').StreamableFile> {
+    const result = await this.imageServeService.serveOptimized(attachmentId);
+
+    res.setHeader('Content-Type', result.contentType);
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(result.filename)}"`,
+    );
+    res.setHeader('Content-Length', result.size.toString());
+    res.setHeader('Cache-Control', 'public, max-age=86400');
+
+    return result.stream;
   }
 }

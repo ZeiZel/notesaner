@@ -5,6 +5,7 @@ import {
   FRESHNESS_CHECK_QUEUE,
   NOTE_INDEX_QUEUE,
   STORAGE_RECALCULATION_QUEUE,
+  TRASH_PURGE_QUEUE,
   WEBHOOK_DELIVERY_QUEUE,
 } from './jobs.constants';
 import { JobsService } from './jobs.service';
@@ -13,6 +14,7 @@ import { NoteIndexingProcessor } from './processors/note-indexing.processor';
 import { FreshnessCheckProcessor } from './processors/freshness-check.processor';
 import { WebhookDeliveryProcessor } from './processors/webhook-delivery.processor';
 import { StorageRecalculationProcessor } from './processors/storage-recalculation.processor';
+import { TrashPurgeProcessor } from './processors/trash-purge.processor';
 import { EmailModule } from '../email/email.module';
 import { NotesModule } from '../notes/notes.module';
 import { WorkspacesModule } from '../workspaces/workspaces.module';
@@ -63,6 +65,13 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
         backoff: { type: 'fixed', delay: 60_000 },
       },
     }),
+    BullModule.registerQueue({
+      name: TRASH_PURGE_QUEUE,
+      defaultJobOptions: {
+        attempts: 2,
+        backoff: { type: 'fixed', delay: 30_000 },
+      },
+    }),
   ],
   controllers: [JobsController],
   providers: [
@@ -82,6 +91,10 @@ import { WorkspacesModule } from '../workspaces/workspaces.module';
     {
       provide: StorageRecalculationProcessor,
       useClass: StorageRecalculationProcessor,
+    },
+    {
+      provide: TrashPurgeProcessor,
+      useClass: TrashPurgeProcessor,
     },
   ],
   exports: [JobsService],

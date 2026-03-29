@@ -5,14 +5,18 @@ import {
   NotFoundException,
   StreamableFile,
 } from '@nestjs/common';
+import { InjectQueue } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
+import { Queue } from 'bullmq';
 import * as path from 'path';
-import * as fs from 'fs';
 import { createReadStream } from 'fs';
 import * as fsPromises from 'fs/promises';
 import { PrismaService } from '../../prisma/prisma.service';
 import { FilesService } from './files.service';
 import type { AppConfiguration } from '../../config/configuration';
+import { IMAGE_OPTIMIZE_QUEUE, OPTIMIZE_IMAGE_JOB } from './image-optimizer.constants';
+import { OPTIMIZABLE_MIME_TYPES } from './image-optimizer.service';
+import type { OptimizeImageJobData } from './image-optimizer.types';
 
 /**
  * Whitelist of allowed upload MIME types.
@@ -32,12 +36,12 @@ export const ALLOWED_MIME_TYPES = new Set([
   'text/markdown',
   // Office documents (Open XML)
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document', // .docx
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',       // .xlsx
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
   'application/vnd.openxmlformats-officedocument.presentationml.presentation', // .pptx
   // Legacy Office formats
-  'application/msword',                                                        // .doc
-  'application/vnd.ms-excel',                                                  // .xls
-  'application/vnd.ms-powerpoint',                                             // .ppt
+  'application/msword', // .doc
+  'application/vnd.ms-excel', // .xls
+  'application/vnd.ms-powerpoint', // .ppt
   // Archives
   'application/zip',
   'application/x-zip-compressed',
@@ -66,6 +70,8 @@ export class AttachmentService {
     private readonly prisma: PrismaService,
     private readonly filesService: FilesService,
     private readonly config: ConfigService<AppConfiguration>,
+    @InjectQueue(IMAGE_OPTIMIZE_QUEUE)
+    private readonly imageOptimizeQueue: Queue<OptimizeImageJobData>,
   ) {
     const maxMb = this.config.get<number>('upload.maxFileSizeMb', { infer: true }) ?? 50;
     this.maxFileSizeBytes = maxMb * 1024 * 1024;
@@ -76,6 +82,9 @@ export class AttachmentService {
   /**
    * Stores an uploaded file in the workspace's `.attachments` directory and
    * records the metadata in the database.
+   *
+   * After persisting the record, enqueues an IMAGE_OPTIMIZE job for raster
+   * image types so thumbnails and a WebP variant are generated asynchronously.
    *
    * @param workspaceId - The owning workspace.
    * @param noteId      - The note the attachment belongs to.
@@ -120,11 +129,7 @@ export class AttachmentService {
     // Build a storage path: .attachments/<noteId>/<sanitizedFilename>
     // Using noteId as a sub-directory groups an attachment with its note and
     // avoids filename collisions across notes.
-    const relativeStoragePath = path.join(
-      ATTACHMENTS_DIR,
-      noteId,
-      sanitizedFilename,
-    );
+    const relativeStoragePath = path.join(ATTACHMENTS_DIR, noteId, sanitizedFilename);
 
     // Resolve the absolute path and guard against traversal
     const absolutePath = this.filesService.resolveSafePath(workspaceId, relativeStoragePath);
@@ -149,6 +154,23 @@ export class AttachmentService {
     this.logger.log(
       `Attachment ${attachment.id} uploaded for note ${noteId}: ${sanitizedFilename} (${file.size} bytes)`,
     );
+
+    // Enqueue image optimization for raster image types — fire-and-forget.
+    // Non-image uploads are silently skipped by the processor.
+    if (OPTIMIZABLE_MIME_TYPES.has(file.mimetype)) {
+      await this.imageOptimizeQueue.add(
+        OPTIMIZE_IMAGE_JOB,
+        { attachmentId: attachment.id },
+        {
+          jobId: `optimize-image:${attachment.id}`,
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5_000 },
+          removeOnComplete: { count: 100 },
+          removeOnFail: { count: 50 },
+        },
+      );
+      this.logger.debug(`Enqueued image optimization for attachment ${attachment.id}`);
+    }
 
     return attachment;
   }
@@ -179,10 +201,7 @@ export class AttachmentService {
       throw new NotFoundException(`Parent note for attachment ${attachmentId} not found`);
     }
 
-    const absolutePath = this.filesService.resolveSafePath(
-      note.workspaceId,
-      attachment.path,
-    );
+    const absolutePath = this.filesService.resolveSafePath(note.workspaceId, attachment.path);
 
     // Verify the physical file is still present
     try {
@@ -204,10 +223,7 @@ export class AttachmentService {
   /**
    * Returns all attachment records for a given note in the workspace.
    */
-  async listByNote(
-    workspaceId: string,
-    noteId: string,
-  ): Promise<AttachmentRecord[]> {
+  async listByNote(workspaceId: string, noteId: string): Promise<AttachmentRecord[]> {
     // Verify the note belongs to the workspace
     const note = await this.prisma.note.findUnique({
       where: { id: noteId },
@@ -231,10 +247,7 @@ export class AttachmentService {
    * Uses "delete-then-cleanup" order: DB first, then filesystem.
    * This ensures we don't leave orphaned DB records if the FS delete fails.
    */
-  async delete(
-    workspaceId: string,
-    attachmentId: string,
-  ): Promise<void> {
+  async delete(workspaceId: string, attachmentId: string): Promise<void> {
     const attachment = await this.findById(attachmentId);
 
     // Verify the attachment belongs to the given workspace

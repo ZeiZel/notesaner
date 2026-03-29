@@ -128,17 +128,19 @@ model UserPreference {
 // ==========================================
 
 model ApiKey {
-  id         String        @id @default(uuid())
-  userId     String
-  user       User          @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name       String // human-readable label (e.g. "CI Pipeline")
-  keyHash    String        @unique // SHA-256 hash of the full key
-  prefix     String // first 8 characters of the key for identification
-  scopes     ApiKeyScope[] // granted scopes
-  expiresAt  DateTime? // null = never expires
-  lastUsedAt DateTime?
-  revokedAt  DateTime? // soft-delete: set when key is revoked
-  createdAt  DateTime      @default(now())
+  id           String        @id @default(uuid())
+  userId       String
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name         String // human-readable label (e.g. "CI Pipeline")
+  keyHash      String        @unique // SHA-256 hash of the full key
+  prefix       String // first 8 characters of the key for identification
+  scopes       ApiKeyScope[] // granted scopes
+  expiresAt    DateTime? // null = never expires
+  lastUsedAt   DateTime?
+  requestCount Int           @default(0) // cumulative count of successful validations
+  revokedAt    DateTime? // soft-delete: set when key is revoked
+  rotatedToId  String? // ID of the replacement key created during rotation (audit trail)
+  createdAt    DateTime      @default(now())
 
   @@index([userId])
   @@index([keyHash])

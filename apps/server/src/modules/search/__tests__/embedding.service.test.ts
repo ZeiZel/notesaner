@@ -99,30 +99,26 @@ describe('EmbeddingService', () => {
 
   describe('embed', () => {
     it('returns a vector for a single text input', async () => {
-      const mockCreate = await getOpenAIMockCreate();
-      mockCreate.mockResolvedValue(buildMockOpenAIResponse([[0.1, 0.2, 0.3]]));
+      mockEmbeddingsCreate.mockResolvedValue(buildMockOpenAIResponse([[0.1, 0.2, 0.3]]));
 
       const vector = await service.embed('hello world');
 
       expect(vector).toEqual([0.1, 0.2, 0.3]);
-      expect(mockCreate).toHaveBeenCalledOnce();
+      expect(mockEmbeddingsCreate).toHaveBeenCalledOnce();
     });
 
     it('returns cached vector without calling the API', async () => {
       const cachedVector = [0.5, 0.6, 0.7];
       mockValkeyService.get.mockResolvedValue(JSON.stringify(cachedVector));
 
-      const mockCreate = await getOpenAIMockCreate();
-
       const vector = await service.embed('cached text');
 
       expect(vector).toEqual(cachedVector);
-      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockEmbeddingsCreate).not.toHaveBeenCalled();
     });
 
     it('stores freshly generated vector in cache', async () => {
-      const mockCreate = await getOpenAIMockCreate();
-      mockCreate.mockResolvedValue(buildMockOpenAIResponse([[0.1, 0.2, 0.3]]));
+      mockEmbeddingsCreate.mockResolvedValue(buildMockOpenAIResponse([[0.1, 0.2, 0.3]]));
 
       await service.embed('new text');
 
@@ -145,8 +141,7 @@ describe('EmbeddingService', () => {
     });
 
     it('propagates API errors', async () => {
-      const mockCreate = await getOpenAIMockCreate();
-      mockCreate.mockRejectedValue(new Error('API rate limit'));
+      mockEmbeddingsCreate.mockRejectedValue(new Error('API rate limit'));
 
       await expect(service.embed('error text')).rejects.toThrow('API rate limit');
     });
@@ -163,9 +158,8 @@ describe('EmbeddingService', () => {
     });
 
     it('returns results in the same order as inputs', async () => {
-      const mockCreate = await getOpenAIMockCreate();
       // Return in reversed order to verify sorting by index
-      mockCreate.mockResolvedValue({
+      mockEmbeddingsCreate.mockResolvedValue({
         data: [
           { index: 1, embedding: [0.4, 0.5] },
           { index: 0, embedding: [0.1, 0.2] },
@@ -183,13 +177,12 @@ describe('EmbeddingService', () => {
         .mockResolvedValueOnce(JSON.stringify([1, 2, 3]))
         .mockResolvedValueOnce(JSON.stringify([4, 5, 6]));
 
-      const mockCreate = await getOpenAIMockCreate();
       const results = await service.embedBatch(['text1', 'text2']);
 
       expect(results).toHaveLength(2);
       expect(results[0]?.fromCache).toBe(true);
       expect(results[1]?.fromCache).toBe(true);
-      expect(mockCreate).not.toHaveBeenCalled();
+      expect(mockEmbeddingsCreate).not.toHaveBeenCalled();
     });
 
     it('calls API only for uncached items in a mixed batch', async () => {
@@ -198,8 +191,7 @@ describe('EmbeddingService', () => {
         .mockResolvedValueOnce(JSON.stringify([1, 2, 3]))
         .mockResolvedValueOnce(null);
 
-      const mockCreate = await getOpenAIMockCreate();
-      mockCreate.mockResolvedValue(buildMockOpenAIResponse([[4, 5, 6]]));
+      mockEmbeddingsCreate.mockResolvedValue(buildMockOpenAIResponse([[4, 5, 6]]));
 
       const results = await service.embedBatch(['cached-text', 'new-text']);
 
@@ -209,7 +201,7 @@ describe('EmbeddingService', () => {
       expect(results[1]?.vector).toEqual([4, 5, 6]);
 
       // API called once for the single uncached item
-      expect(mockCreate).toHaveBeenCalledOnce();
+      expect(mockEmbeddingsCreate).toHaveBeenCalledOnce();
     });
   });
 

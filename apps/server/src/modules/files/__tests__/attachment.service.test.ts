@@ -32,7 +32,7 @@ const STORAGE_ROOT = '/var/notesaner';
 
 function makeConfigService(maxMb = 50): ConfigService {
   return {
-    get: vi.fn((key: string, opts?: { infer?: boolean }) => {
+    get: vi.fn((key: string, _opts?: { infer?: boolean }) => {
       if (key === 'upload.maxFileSizeMb') return maxMb;
       if (key === 'storage.root') return STORAGE_ROOT;
       return undefined;
@@ -42,9 +42,7 @@ function makeConfigService(maxMb = 50): ConfigService {
 
 function makeFilesService() {
   return {
-    resolveSafePath: vi.fn((wsId: string, relPath: string) =>
-      `${STORAGE_ROOT}/${wsId}/${relPath}`,
-    ),
+    resolveSafePath: vi.fn((wsId: string, relPath: string) => `${STORAGE_ROOT}/${wsId}/${relPath}`),
     deleteFile: vi.fn().mockResolvedValue(undefined),
   };
 }
@@ -92,16 +90,24 @@ function makeAttachmentRecord(overrides = {}) {
   };
 }
 
+function makeImageOptimizeQueue() {
+  return {
+    add: vi.fn().mockResolvedValue({ id: 'job-1' }),
+  };
+}
+
 function makeService(prisma?: ReturnType<typeof makePrismaService>, maxMb = 50) {
   const prismaService = prisma ?? makePrismaService();
   const filesService = makeFilesService();
   const configService = makeConfigService(maxMb);
+  const imageOptimizeQueue = makeImageOptimizeQueue();
   const service = new AttachmentService(
     prismaService as never,
     filesService as never,
     configService,
+    imageOptimizeQueue as never,
   );
-  return { service, prismaService, filesService, configService };
+  return { service, prismaService, filesService, configService, imageOptimizeQueue };
 }
 
 // ---------------------------------------------------------------------------
@@ -165,7 +171,7 @@ describe('AttachmentService', () => {
 
   describe('upload', () => {
     it('stores the file and creates a DB record for a valid upload', async () => {
-      const { service, prismaService, filesService } = makeService();
+      const { service, prismaService } = makeService();
 
       prismaService.note.findUnique.mockResolvedValue({ id: NOTE_ID, workspaceId: WORKSPACE_ID });
       vi.mocked(fsMock.mkdir).mockResolvedValue(undefined as never);
@@ -178,10 +184,9 @@ describe('AttachmentService', () => {
       const result = await service.upload(WORKSPACE_ID, NOTE_ID, file);
 
       expect(result).toEqual(record);
-      expect(fsMock.mkdir).toHaveBeenCalledWith(
-        expect.stringContaining(NOTE_ID),
-        { recursive: true },
-      );
+      expect(fsMock.mkdir).toHaveBeenCalledWith(expect.stringContaining(NOTE_ID), {
+        recursive: true,
+      });
       expect(fsMock.writeFile).toHaveBeenCalledWith(
         expect.stringContaining('test-image.png'),
         file.buffer,
@@ -224,9 +229,7 @@ describe('AttachmentService', () => {
       prismaService.note.findUnique.mockResolvedValue(null);
 
       const file = makeMulterFile();
-      await expect(service.upload(WORKSPACE_ID, NOTE_ID, file)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.upload(WORKSPACE_ID, NOTE_ID, file)).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when note belongs to a different workspace', async () => {
@@ -237,9 +240,7 @@ describe('AttachmentService', () => {
       });
 
       const file = makeMulterFile();
-      await expect(service.upload(WORKSPACE_ID, NOTE_ID, file)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.upload(WORKSPACE_ID, NOTE_ID, file)).rejects.toThrow(NotFoundException);
     });
 
     it('sanitizes the filename before saving', async () => {
@@ -247,7 +248,9 @@ describe('AttachmentService', () => {
       prismaService.note.findUnique.mockResolvedValue({ id: NOTE_ID, workspaceId: WORKSPACE_ID });
       vi.mocked(fsMock.mkdir).mockResolvedValue(undefined as never);
       vi.mocked(fsMock.writeFile).mockResolvedValue(undefined as never);
-      prismaService.attachment.create.mockResolvedValue(makeAttachmentRecord({ filename: 'passwd' }));
+      prismaService.attachment.create.mockResolvedValue(
+        makeAttachmentRecord({ filename: 'passwd' }),
+      );
 
       const file = makeMulterFile({ originalname: '../../../etc/passwd', mimetype: 'text/plain' });
       await service.upload(WORKSPACE_ID, NOTE_ID, file);
@@ -280,10 +283,7 @@ describe('AttachmentService', () => {
 
       expect(result.attachment).toEqual(record);
       expect(result.stream).toBeInstanceOf(StreamableFile);
-      expect(filesService.resolveSafePath).toHaveBeenCalledWith(
-        WORKSPACE_ID,
-        record.path,
-      );
+      expect(filesService.resolveSafePath).toHaveBeenCalledWith(WORKSPACE_ID, record.path);
     });
 
     it('throws NotFoundException when attachment ID does not exist', async () => {
@@ -321,9 +321,7 @@ describe('AttachmentService', () => {
       const { service, prismaService } = makeService();
       prismaService.note.findUnique.mockResolvedValue(null);
 
-      await expect(service.listByNote(WORKSPACE_ID, NOTE_ID)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.listByNote(WORKSPACE_ID, NOTE_ID)).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when note belongs to a different workspace', async () => {
@@ -333,9 +331,7 @@ describe('AttachmentService', () => {
         workspaceId: 'wrong-workspace',
       });
 
-      await expect(service.listByNote(WORKSPACE_ID, NOTE_ID)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.listByNote(WORKSPACE_ID, NOTE_ID)).rejects.toThrow(NotFoundException);
     });
   });
 
@@ -355,19 +351,14 @@ describe('AttachmentService', () => {
       expect(prismaService.attachment.delete).toHaveBeenCalledWith({
         where: { id: ATTACHMENT_ID },
       });
-      expect(filesService.deleteFile).toHaveBeenCalledWith(
-        WORKSPACE_ID,
-        record.path,
-      );
+      expect(filesService.deleteFile).toHaveBeenCalledWith(WORKSPACE_ID, record.path);
     });
 
     it('throws NotFoundException when attachment does not exist', async () => {
       const { service, prismaService } = makeService();
       prismaService.attachment.findUnique.mockResolvedValue(null);
 
-      await expect(service.delete(WORKSPACE_ID, 'nonexistent')).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.delete(WORKSPACE_ID, 'nonexistent')).rejects.toThrow(NotFoundException);
     });
 
     it('throws NotFoundException when attachment belongs to a different workspace', async () => {
@@ -375,9 +366,7 @@ describe('AttachmentService', () => {
       prismaService.attachment.findUnique.mockResolvedValue(makeAttachmentRecord());
       prismaService.note.findUnique.mockResolvedValue({ workspaceId: 'wrong-workspace' });
 
-      await expect(service.delete(WORKSPACE_ID, ATTACHMENT_ID)).rejects.toThrow(
-        NotFoundException,
-      );
+      await expect(service.delete(WORKSPACE_ID, ATTACHMENT_ID)).rejects.toThrow(NotFoundException);
     });
 
     it('still removes DB record even if filesystem delete fails', async () => {

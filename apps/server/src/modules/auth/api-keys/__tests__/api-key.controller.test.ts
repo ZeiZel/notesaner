@@ -4,7 +4,11 @@ import { UserApiKeyController } from '../api-key.controller';
 import { UserApiKeyService } from '../api-key.service';
 import { UserApiKeyScope } from '../dto/create-api-key.dto';
 import type { JwtPayload } from '../../../../common/decorators/current-user.decorator';
-import type { CreatedApiKeyResponseDto, UserApiKeyResponseDto } from '../dto/list-api-keys.dto';
+import type {
+  CreatedApiKeyResponseDto,
+  RotatedApiKeyResponseDto,
+  UserApiKeyResponseDto,
+} from '../dto/list-api-keys.dto';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -28,6 +32,7 @@ function makeCreatedKeyResponse(
     scopes: [UserApiKeyScope.READ],
     expiresAt: null,
     lastUsedAt: null,
+    requestCount: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
     key: 'nts_aB3dEf7gHi9jKlMnOpQrStUvWxYz0123456789',
     ...overrides,
@@ -44,7 +49,18 @@ function makeListKeyResponse(
     scopes: [UserApiKeyScope.READ],
     expiresAt: null,
     lastUsedAt: null,
+    requestCount: 0,
     createdAt: '2026-01-01T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
+function makeRotatedKeyResponse(
+  overrides: Partial<RotatedApiKeyResponseDto> = {},
+): RotatedApiKeyResponseDto {
+  return {
+    revokedKeyId: 'key-uuid-1',
+    newKey: makeCreatedKeyResponse({ id: 'key-uuid-new', prefix: 'nts_newp' }),
     ...overrides,
   };
 }
@@ -53,6 +69,8 @@ function makeMockService() {
   return {
     create: vi.fn(),
     list: vi.fn(),
+    getById: vi.fn(),
+    rotate: vi.fn(),
     revoke: vi.fn(),
   } as unknown as UserApiKeyService;
 }
@@ -146,7 +164,105 @@ describe('UserApiKeyController', () => {
 
       const result = await controller.list(makeMockUser());
 
-      expect((result[0] as Record<string, unknown>)['key']).toBeUndefined();
+      expect((result[0] as unknown as Record<string, unknown>)['key']).toBeUndefined();
+    });
+
+    it('should include requestCount in list results', async () => {
+      const keys = [makeListKeyResponse({ requestCount: 15 })];
+      vi.mocked(service.list).mockResolvedValue(keys);
+
+      const result = await controller.list(makeMockUser());
+
+      expect(result[0].requestCount).toBe(15);
+    });
+  });
+
+  // ── getById ───────────────────────────────────────────────────────────────
+
+  describe('getById', () => {
+    it('should return a single API key by ID', async () => {
+      const user = makeMockUser();
+      const key = makeListKeyResponse({ requestCount: 7 });
+
+      vi.mocked(service.getById).mockResolvedValue(key);
+
+      const result = await controller.getById(user, 'key-uuid-1');
+
+      expect(service.getById).toHaveBeenCalledWith('user-uuid-1', 'key-uuid-1');
+      expect(result.id).toBe('key-uuid-1');
+      expect(result.requestCount).toBe(7);
+    });
+
+    it('should propagate NotFoundException from service', async () => {
+      vi.mocked(service.getById).mockRejectedValue(
+        new NotFoundException('API key not found or already revoked'),
+      );
+
+      await expect(controller.getById(makeMockUser(), 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should not expose raw key in getById result', async () => {
+      vi.mocked(service.getById).mockResolvedValue(makeListKeyResponse());
+
+      const result = await controller.getById(makeMockUser(), 'key-uuid-1');
+
+      expect((result as unknown as Record<string, unknown>)['key']).toBeUndefined();
+    });
+  });
+
+  // ── rotate ────────────────────────────────────────────────────────────────
+
+  describe('rotate', () => {
+    it('should rotate an API key and return the rotation response', async () => {
+      const user = makeMockUser();
+      const rotated = makeRotatedKeyResponse();
+
+      vi.mocked(service.rotate).mockResolvedValue(rotated);
+
+      const result = await controller.rotate(user, 'key-uuid-1');
+
+      expect(service.rotate).toHaveBeenCalledWith('user-uuid-1', 'key-uuid-1');
+      expect(result.revokedKeyId).toBe('key-uuid-1');
+      expect(result.newKey.key).toBeDefined();
+    });
+
+    it('should pass user ID from JWT payload to service', async () => {
+      const user = makeMockUser({ sub: 'other-user-id' });
+      vi.mocked(service.rotate).mockResolvedValue(makeRotatedKeyResponse());
+
+      await controller.rotate(user, 'key-uuid-1');
+
+      expect(service.rotate).toHaveBeenCalledWith('other-user-id', 'key-uuid-1');
+    });
+
+    it('should propagate NotFoundException from service', async () => {
+      vi.mocked(service.rotate).mockRejectedValue(
+        new NotFoundException('API key not found or already revoked'),
+      );
+
+      await expect(controller.rotate(makeMockUser(), 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should expose the raw key of the new key in the rotation response', async () => {
+      const rotated = makeRotatedKeyResponse();
+      vi.mocked(service.rotate).mockResolvedValue(rotated);
+
+      const result = await controller.rotate(makeMockUser(), 'key-uuid-1');
+
+      expect(result.newKey.key).toMatch(/^nts_/);
+    });
+
+    it('should include revokedKeyId pointing to the old key', async () => {
+      const rotated = makeRotatedKeyResponse({ revokedKeyId: 'old-key-id' });
+      vi.mocked(service.rotate).mockResolvedValue(rotated);
+
+      const result = await controller.rotate(makeMockUser(), 'old-key-id');
+
+      expect(result.revokedKeyId).toBe('old-key-id');
     });
   });
 

@@ -9,6 +9,7 @@ import {
   Put,
   Res,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -27,6 +28,9 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { SuperAdminGuard } from '../../common/guards/super-admin.guard';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { Audited } from '../audit/audit.decorator';
+import { AuditInterceptor } from '../audit/audit.interceptor';
+import { AuditAction } from '../audit/audit.types';
 import { StorageQuotaService } from './storage-quota.service';
 
 // ── DTOs ────────────────────────────────────────────────────────────────────
@@ -64,6 +68,7 @@ class TriggerRecalculationDto {
 @ApiTags('Storage Quota')
 @ApiBearerAuth('bearer')
 @Controller('workspaces')
+@UseInterceptors(AuditInterceptor)
 export class StorageQuotaController {
   constructor(private readonly storageQuotaService: StorageQuotaService) {}
 
@@ -108,6 +113,7 @@ export class StorageQuotaController {
 
   @Put(':workspaceId/storage/limits')
   @UseGuards(JwtAuthGuard, SuperAdminGuard)
+  @Audited(AuditAction.STORAGE_QUOTA_CHANGED)
   @ApiOperation({
     summary: 'Set per-workspace storage limits (admin override)',
     description:

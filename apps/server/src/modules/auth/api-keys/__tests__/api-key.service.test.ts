@@ -5,6 +5,7 @@ import {
   NotFoundException,
   UnauthorizedException,
 } from '@nestjs/common';
+import { ApiKeyScope } from '@prisma/client';
 import { UserApiKeyService } from '../api-key.service';
 import { UserApiKeyScope } from '../dto/create-api-key.dto';
 import type { PrismaService } from '../../../../prisma/prisma.service';
@@ -13,15 +14,24 @@ import type { ValkeyService } from '../../../valkey/valkey.service';
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function makeMockPrisma(): Partial<PrismaService> {
+  const mockApiKey = {
+    count: vi.fn().mockResolvedValue(0),
+    create: vi.fn(),
+    findMany: vi.fn().mockResolvedValue([]),
+    findFirst: vi.fn(),
+    findUnique: vi.fn(),
+    update: vi.fn().mockResolvedValue({}),
+  };
+
   return {
-    apiKey: {
-      count: vi.fn().mockResolvedValue(0),
-      create: vi.fn(),
-      findMany: vi.fn().mockResolvedValue([]),
-      findFirst: vi.fn(),
-      findUnique: vi.fn(),
-      update: vi.fn().mockResolvedValue({}),
-    },
+    apiKey: mockApiKey,
+    // Default $transaction: passes a callback invoked with a minimal tx object.
+    // Tests that need custom behaviour override this mock via setupRotationTransaction.
+    $transaction: vi
+      .fn()
+      .mockImplementation(async (cb: (tx: unknown) => Promise<unknown>) =>
+        cb({ apiKey: { create: vi.fn(), update: vi.fn() } }),
+      ),
   } as unknown as Partial<PrismaService>;
 }
 
@@ -43,10 +53,12 @@ function makeApiKeyRecord(overrides: Record<string, unknown> = {}) {
     name: 'Test Key',
     keyHash: 'somehash',
     prefix: 'nts_a1b2',
-    scopes: ['READ'],
-    expiresAt: null,
-    lastUsedAt: null,
-    revokedAt: null,
+    scopes: [ApiKeyScope.READ] as ApiKeyScope[],
+    expiresAt: null as Date | null,
+    lastUsedAt: null as Date | null,
+    requestCount: 0,
+    revokedAt: null as Date | null,
+    rotatedToId: null as string | null,
     createdAt: new Date('2026-01-01'),
     ...overrides,
   };
@@ -154,7 +166,16 @@ describe('UserApiKeyService', () => {
       vi.mocked(prisma.apiKey!.create).mockResolvedValue(record);
 
       const result = await service.create('user-uuid-1', { name: 'x' });
-      expect((result as Record<string, unknown>)['keyHash']).toBeUndefined();
+      expect((result as unknown as Record<string, unknown>)['keyHash']).toBeUndefined();
+    });
+
+    it('should return requestCount as 0 on creation', async () => {
+      const record = makeApiKeyRecord();
+      vi.mocked(prisma.apiKey!.count).mockResolvedValue(0);
+      vi.mocked(prisma.apiKey!.create).mockResolvedValue(record);
+
+      const result = await service.create('user-uuid-1', { name: 'New Key' });
+      expect(result.requestCount).toBe(0);
     });
   });
 
@@ -182,7 +203,7 @@ describe('UserApiKeyService', () => {
     it('should not include raw key in list results', async () => {
       vi.mocked(prisma.apiKey!.findMany).mockResolvedValue([makeApiKeyRecord()]);
       const result = await service.list('user-uuid-1');
-      expect((result[0] as Record<string, unknown>)['key']).toBeUndefined();
+      expect((result[0] as unknown as Record<string, unknown>)['key']).toBeUndefined();
     });
 
     it('should format dates as ISO strings', async () => {
@@ -193,6 +214,17 @@ describe('UserApiKeyService', () => {
 
       const result = await service.list('user-uuid-1');
       expect(result[0].lastUsedAt).toBe(date.toISOString());
+    });
+
+    it('should include requestCount in list results', async () => {
+      vi.mocked(prisma.apiKey!.findMany).mockResolvedValue([
+        makeApiKeyRecord({ id: 'k1', requestCount: 42 }),
+        makeApiKeyRecord({ id: 'k2', requestCount: 0 }),
+      ]);
+
+      const result = await service.list('user-uuid-1');
+      expect(result[0].requestCount).toBe(42);
+      expect(result[1].requestCount).toBe(0);
     });
   });
 
@@ -217,6 +249,49 @@ describe('UserApiKeyService', () => {
 
       await expect(service.revoke('user-uuid-1', 'nonexistent')).rejects.toThrow();
       expect(prisma.apiKey!.update).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── getById ────────────────────────────────────────────────────────────────
+
+  describe('getById', () => {
+    it('should return a single key DTO when key exists', async () => {
+      const record = makeApiKeyRecord({ requestCount: 7 });
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(record);
+
+      const result = await service.getById('user-uuid-1', 'key-uuid-1');
+
+      expect(result.id).toBe('key-uuid-1');
+      expect(result.requestCount).toBe(7);
+      expect((result as unknown as Record<string, unknown>)['key']).toBeUndefined();
+    });
+
+    it('should throw NotFoundException when key does not exist', async () => {
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(null);
+
+      await expect(service.getById('user-uuid-1', 'nonexistent')).rejects.toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('should query with correct userId and revokedAt:null filter', async () => {
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(null);
+
+      await expect(service.getById('user-uuid-1', 'key-uuid-1')).rejects.toThrow();
+
+      expect(prisma.apiKey!.findFirst).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ userId: 'user-uuid-1', revokedAt: null }),
+        }),
+      );
+    });
+
+    it('should not include the raw key in the response', async () => {
+      const record = makeApiKeyRecord();
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(record);
+
+      const result = await service.getById('user-uuid-1', 'key-uuid-1');
+      expect((result as unknown as Record<string, unknown>)['key']).toBeUndefined();
     });
   });
 
@@ -271,6 +346,39 @@ describe('UserApiKeyService', () => {
       // Should not propagate the update failure
       const result = await service.validate(rawKey);
       expect(result.userId).toBe('user-uuid-1');
+    });
+
+    it('should atomically increment requestCount on successful validation', async () => {
+      vi.mocked(prisma.apiKey!.findUnique).mockResolvedValue(
+        makeApiKeyRecord({ keyHash: UserApiKeyService.hashKey(rawKey) }),
+      );
+
+      await service.validate(rawKey);
+
+      // The fire-and-forget update should include atomic increment
+      expect(prisma.apiKey!.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          data: expect.objectContaining({
+            requestCount: { increment: 1 },
+          }),
+        }),
+      );
+    });
+
+    it('should not call update for invalid key (no requestCount increment)', async () => {
+      vi.mocked(prisma.apiKey!.findUnique).mockResolvedValue(null);
+
+      await expect(service.validate(rawKey)).rejects.toThrow(UnauthorizedException);
+      expect(prisma.apiKey!.update).not.toHaveBeenCalled();
+    });
+
+    it('should not call update for expired key (no requestCount increment)', async () => {
+      vi.mocked(prisma.apiKey!.findUnique).mockResolvedValue(
+        makeApiKeyRecord({ expiresAt: new Date('2020-01-01') }),
+      );
+
+      await expect(service.validate(rawKey)).rejects.toThrow(UnauthorizedException);
+      expect(prisma.apiKey!.update).not.toHaveBeenCalled();
     });
   });
 
@@ -361,6 +469,160 @@ describe('UserApiKeyService', () => {
 
       await service.checkRateLimit('key-1');
       expect(mockClient.expire).not.toHaveBeenCalled();
+    });
+  });
+
+  // ── rotate ─────────────────────────────────────────────────────────────────
+
+  describe('rotate', () => {
+    /**
+     * Sets up the $transaction mock to invoke the callback with a tx object
+     * whose apiKey.create returns newRecord and apiKey.update does nothing.
+     *
+     * Returns references to the tx mocks so callers can assert on them.
+     */
+    function setupRotationTransaction(oldRecord: ReturnType<typeof makeApiKeyRecord>) {
+      const newRecord = makeApiKeyRecord({
+        id: 'key-uuid-new',
+        name: oldRecord.name,
+        prefix: 'nts_newp',
+        scopes: oldRecord.scopes,
+        createdAt: new Date('2026-06-01'),
+        requestCount: 0,
+      });
+
+      const txCreate = vi.fn().mockResolvedValue(newRecord);
+      const txUpdate = vi.fn().mockResolvedValue({});
+
+      vi.mocked(prisma.$transaction!).mockImplementation(
+        async (cb: (tx: unknown) => Promise<unknown>) =>
+          cb({ apiKey: { create: txCreate, update: txUpdate } }),
+      );
+
+      return { newRecord, txCreate, txUpdate };
+    }
+
+    it('should create a new key and revoke the old one in a transaction', async () => {
+      const oldKey = makeApiKeyRecord({
+        scopes: [ApiKeyScope.READ, ApiKeyScope.WRITE] as ApiKeyScope[],
+      });
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(oldKey);
+      const { newRecord, txCreate, txUpdate } = setupRotationTransaction(oldKey);
+
+      const result = await service.rotate('user-uuid-1', 'key-uuid-1');
+
+      expect(result.revokedKeyId).toBe('key-uuid-1');
+      expect(result.newKey.id).toBe(newRecord.id);
+      expect(result.newKey.key).toMatch(/^nts_/);
+      expect(txCreate).toHaveBeenCalledOnce();
+      expect(txUpdate).toHaveBeenCalledOnce();
+    });
+
+    it('should return the raw key only in the rotation response', async () => {
+      const oldKey = makeApiKeyRecord();
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(oldKey);
+      setupRotationTransaction(oldKey);
+
+      const result = await service.rotate('user-uuid-1', 'key-uuid-1');
+
+      expect(result.newKey.key).toBeDefined();
+      expect(result.newKey.key).toMatch(/^nts_/);
+    });
+
+    it('should set rotatedToId on the old key to point to the new key', async () => {
+      const oldKey = makeApiKeyRecord();
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(oldKey);
+      const { txUpdate, newRecord } = setupRotationTransaction(oldKey);
+
+      await service.rotate('user-uuid-1', 'key-uuid-1');
+
+      expect(txUpdate).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: 'key-uuid-1' },
+          data: expect.objectContaining({ rotatedToId: newRecord.id }),
+        }),
+      );
+    });
+
+    it('should throw NotFoundException when key does not exist', async () => {
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(null);
+
+      await expect(service.rotate('user-uuid-1', 'nonexistent')).rejects.toThrow(NotFoundException);
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('should not call $transaction when key is not found', async () => {
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(null);
+
+      await expect(service.rotate('user-uuid-1', 'nonexistent')).rejects.toThrow();
+      expect(prisma.$transaction).not.toHaveBeenCalled();
+    });
+
+    it('should not inherit expiresAt from the old key', async () => {
+      const oldKey = makeApiKeyRecord({ expiresAt: new Date('2027-01-01') });
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(oldKey);
+      const { txCreate } = setupRotationTransaction(oldKey);
+
+      await service.rotate('user-uuid-1', 'key-uuid-1');
+
+      const createCall = vi.mocked(txCreate).mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(createCall?.data?.expiresAt).toBeUndefined();
+    });
+
+    it('should preserve the same scopes as the old key', async () => {
+      const oldKey = makeApiKeyRecord({
+        scopes: [ApiKeyScope.READ, ApiKeyScope.WRITE, ApiKeyScope.ADMIN] as ApiKeyScope[],
+      });
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(oldKey);
+      const { txCreate } = setupRotationTransaction(oldKey);
+
+      await service.rotate('user-uuid-1', 'key-uuid-1');
+
+      const createCall = vi.mocked(txCreate).mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(createCall?.data?.scopes).toEqual(['READ', 'WRITE', 'ADMIN']);
+    });
+
+    it('should generate a unique raw key for each rotation call', async () => {
+      const oldKey1 = makeApiKeyRecord({ id: 'key-uuid-1' });
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(oldKey1);
+      setupRotationTransaction(oldKey1);
+      const r1 = await service.rotate('user-uuid-1', 'key-uuid-1');
+
+      vi.clearAllMocks();
+
+      const oldKey2 = makeApiKeyRecord({ id: 'key-uuid-2' });
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(oldKey2);
+      setupRotationTransaction(oldKey2);
+      const r2 = await service.rotate('user-uuid-1', 'key-uuid-2');
+
+      expect(r1.newKey.key).not.toBe(r2.newKey.key);
+    });
+
+    it('should initialise requestCount at 0 for the new key (not inherited)', async () => {
+      const oldKey = makeApiKeyRecord({ requestCount: 150 });
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(oldKey);
+      setupRotationTransaction(oldKey);
+
+      const result = await service.rotate('user-uuid-1', 'key-uuid-1');
+
+      expect(result.newKey.requestCount).toBe(0);
+    });
+
+    it('should set revokedAt on the old key during transaction', async () => {
+      const oldKey = makeApiKeyRecord();
+      vi.mocked(prisma.apiKey!.findFirst).mockResolvedValue(oldKey);
+      const { txUpdate } = setupRotationTransaction(oldKey);
+
+      await service.rotate('user-uuid-1', 'key-uuid-1');
+
+      const updateCall = vi.mocked(txUpdate).mock.calls[0]?.[0] as {
+        data: Record<string, unknown>;
+      };
+      expect(updateCall?.data?.revokedAt).toBeInstanceOf(Date);
     });
   });
 });
