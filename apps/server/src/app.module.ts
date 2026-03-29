@@ -41,6 +41,7 @@ import { PreferencesModule } from './modules/preferences/preferences.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ActivityModule } from './modules/activity/activity.module';
 import { ApiV1Module } from './modules/api-v1/api-v1.module';
+import { ComponentOverridesModule } from './modules/component-overrides/component-overrides.module';
 
 @Module({
   imports: [
@@ -92,6 +93,7 @@ import { ApiV1Module } from './modules/api-v1/api-v1.module';
     PreferencesModule,
     NotificationsModule,
     ActivityModule,
+    ComponentOverridesModule,
     // Public REST API v1 — API key + JWT webhook management
     ApiV1Module,
   ],

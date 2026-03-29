@@ -169,14 +169,15 @@ model Workspace {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  members       WorkspaceMember[]
-  notes         Note[]
-  tags          Tag[]
-  authProviders AuthProvider[]
-  plugins       InstalledPlugin[]
-  layouts       Layout[]
-  activityLogs  ActivityLog[]
-  storageStats  WorkspaceStorageStats?
+  members            WorkspaceMember[]
+  notes              Note[]
+  tags               Tag[]
+  authProviders      AuthProvider[]
+  plugins            InstalledPlugin[]
+  layouts            Layout[]
+  activityLogs       ActivityLog[]
+  storageStats       WorkspaceStorageStats?
+  componentOverrides ComponentOverride[]
 
   @@map("workspaces")
 }
@@ -446,6 +447,65 @@ model InstalledPlugin {
 
   @@unique([workspaceId, pluginId])
   @@map("installed_plugins")
+}
+
+// ==========================================
+// COMPONENT OVERRIDES
+// ==========================================
+
+enum OverrideStatus {
+  draft
+  active
+  error
+  reverted
+}
+
+enum OverrideAuditAction {
+  created
+  updated
+  activated
+  reverted
+  deleted
+}
+
+model ComponentOverride {
+  id                String        @id @default(uuid())
+  workspaceId       String
+  workspace         Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  componentId       String        // e.g. "NoteCard" — from OverridableComponentId
+  sourceCode        String        // TSX source written by admin
+  compiledCode      String?       // esbuild JS bundle; null until compiled
+  pinnedBaseVersion String        // semver of base component at creation time
+  status            OverrideStatus @default(draft)
+  compileError      String?       // populated when status = error
+  createdByUserId   String
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  auditLogs OverrideAuditLog[]
+
+  @@unique([workspaceId, componentId])
+  @@index([workspaceId])
+  @@index([componentId])
+  @@map("component_overrides")
+}
+
+model OverrideAuditLog {
+  id             String              @id @default(uuid())
+  overrideId     String
+  override       ComponentOverride   @relation(fields: [overrideId], references: [id], onDelete: Cascade)
+  workspaceId    String
+  componentId    String
+  action         OverrideAuditAction
+  actorUserId    String
+  sourceSnapshot String?             // snapshot of source at time of action
+  previousStatus OverrideStatus?
+  newStatus      OverrideStatus
+  createdAt      DateTime            @default(now())
+
+  @@index([overrideId])
+  @@index([workspaceId, createdAt])
+  @@map("override_audit_logs")
 }
 
 // ==========================================
