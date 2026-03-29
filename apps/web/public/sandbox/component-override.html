@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Component Override Sandbox</title>
+  <!--
+    CSP: restrict to scripts only.
+    - default-src 'none' — block all by default
+    - script-src 'unsafe-eval' 'unsafe-inline' — needed for dynamic component eval
+    - style-src 'unsafe-inline' — allow inline styles from override components
+    NO: connect-src (no network), storage-src (no storage), frame-src (no nested frames)
+  -->
+  <meta
+    http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'unsafe-eval' 'unsafe-inline'; style-src 'unsafe-inline';"
+  />
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 8px; font-family: system-ui, sans-serif; }
+    #root { min-height: 32px; }
+    #error-banner {
+      display: none;
+      padding: 8px 12px;
+      background: #fff1f0;
+      border: 1px solid #ffccc7;
+      border-radius: 4px;
+      font-size: 12px;
+      color: #cf1322;
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+  <div id="error-banner"></div>
+  <div id="root"></div>
+
+  <!--
+    React 18 UMD builds — loaded from the same origin (or bundled with the app).
+    In production these would be served from /sandbox/vendor/.
+  -->
+  <script>
+    // Minimal React shim so overrides that import React work without a real bundler.
+    // The host injects compiledCode as an IIFE that calls React.createElement.
+    window.React = {
+      createElement: function(type, props) {
+        var args = Array.prototype.slice.call(arguments, 2);
+        var children = args.length === 1 ? args[0] : args;
+        return { type: type, props: Object.assign({}, props, children.length ? { children: children } : {}), key: null };
+      },
+      Fragment: Symbol('Fragment'),
+      useState: function(init) {
+        // Minimal useState stub for sandbox; re-renders not supported without ReactDOM.
+        var val = typeof init === 'function' ? init() : init;
+        return [val, function() {}];
+      },
+      useEffect: function() {},
+      useCallback: function(fn) { return fn; },
+      useRef: function(init) { return { current: init }; },
+      useMemo: function(fn) { return fn(); },
+    };
+
+    var _compiledCode = null;
+    var _componentId = null;
+    var _props = {};
+    var _ctx = {};
+
+    function renderToDOM(vnode, container) {
+      // Very minimal vdom renderer — enough to verify structure in preview.
+      container.innerHTML = '';
+      try {
+        container.appendChild(vnodeToDOM(vnode));
+      } catch(e) {
+        throw new Error('Render failed: ' + e.message);
+      }
+    }
+
+    function vnodeToDOM(node) {
+      if (node === null || node === undefined || node === false) {
+        return document.createTextNode('');
+      }
+      if (typeof node === 'string' || typeof node === 'number') {
+        return document.createTextNode(String(node));
+      }
+      if (Array.isArray(node)) {
+        var frag = document.createDocumentFragment();
+        node.forEach(function(child) { frag.appendChild(vnodeToDOM(child)); });
+        return frag;
+      }
+      if (typeof node === 'object' && node.type) {
+        if (typeof node.type === 'symbol') {
+          // Fragment
+          var frag2 = document.createDocumentFragment();
+          var children = node.props && node.props.children;
+          if (children) {
+            (Array.isArray(children) ? children : [children]).forEach(function(c) {
+              frag2.appendChild(vnodeToDOM(c));
+            });
+          }
+          return frag2;
+        }
+        if (typeof node.type === 'string') {
+          var el = document.createElement(node.type);
+          var props = node.props || {};
+          Object.keys(props).forEach(function(k) {
+            if (k === 'children') return;
+            if (k === 'className') { el.className = props[k]; return; }
+            if (k === 'style' && typeof props[k] === 'object') {
+              Object.assign(el.style, props[k]);
+              return;
+            }
+            if (k.startsWith('on') && typeof props[k] === 'function') {
+              el.addEventListener(k.slice(2).toLowerCase(), props[k]);
+              return;
+            }
+            if (k === 'dangerouslySetInnerHTML' && props[k] && props[k].__html != null) {
+              el.innerHTML = props[k].__html;
+              return;
+            }
+            try { el.setAttribute(k, props[k]); } catch(e) {}
+          });
+          var ch = props.children;
+          if (ch !== undefined && ch !== null) {
+            (Array.isArray(ch) ? ch : [ch]).forEach(function(c) {
+              el.appendChild(vnodeToDOM(c));
+            });
+          }
+          return el;
+        }
+        if (typeof node.type === 'function') {
+          // Functional component
+          var result = node.type(node.props || {});
+          return vnodeToDOM(result);
+        }
+      }
+      return document.createTextNode('');
+    }
+
+    function executeOverride() {
+      if (!_compiledCode || !_componentId) return;
+      try {
+        // Clear previous evaluation
+        var globalKey = '__override_' + _componentId;
+        delete window[globalKey];
+
+        // Execute the IIFE bundle
+        // eslint-disable-next-line no-new-func
+        var fn = new Function(_compiledCode);
+        fn();
+
+        var mod = window[globalKey];
+        if (!mod || !mod.default) {
+          throw new Error('Override must export a default function component.');
+        }
+
+        var ComponentFn = mod.default;
+        var vnode = ComponentFn(Object.assign({}, _props, { sdk: _ctx }));
+
+        renderToDOM(vnode, document.getElementById('root'));
+        document.getElementById('error-banner').style.display = 'none';
+        parent.postMessage({ type: 'RENDER_OK' }, '*');
+      } catch (err) {
+        var msg = err instanceof Error ? err.message : String(err);
+        document.getElementById('error-banner').style.display = 'block';
+        document.getElementById('error-banner').textContent = msg;
+        parent.postMessage({ type: 'RENDER_ERROR', error: msg }, '*');
+      }
+    }
+
+    window.addEventListener('message', function(event) {
+      if (event.source !== window.parent) return;
+      var msg = event.data;
+      if (!msg || !msg.type) return;
+
+      switch (msg.type) {
+        case 'RENDER':
+          _compiledCode = msg.compiledCode;
+          _componentId = msg.componentId;
+          _props = msg.props || {};
+          _ctx = msg.ctx || {};
+          executeOverride();
+          break;
+        case 'UPDATE_PROPS':
+          _props = msg.props || {};
+          executeOverride();
+          break;
+        case 'UPDATE_CTX':
+          _ctx = msg.ctx || {};
+          executeOverride();
+          break;
+      }
+    });
+
+    // Signal ready
+    parent.postMessage({ type: 'READY' }, '*');
+  </script>
+</body>
+</html>
