@@ -4,6 +4,7 @@ import { PrismaService } from '../../prisma/prisma.service';
 import { JobsService } from '../jobs/jobs.service';
 import { WEBHOOK_MAX_PER_WORKSPACE } from '../jobs/jobs.constants';
 import { CreateWebhookDto, WebhookEvent } from './dto/create-webhook.dto';
+import { UpdateWebhookDto } from './dto/update-webhook.dto';
 
 // ─── Shapes ───────────────────────────────────────────────────────────────────
 
@@ -36,6 +37,17 @@ export interface WebhookDeliveryDto {
   createdAt: string;
 }
 
+export interface WebhookDeliveryStatsDto {
+  totalDeliveries: number;
+  successfulDeliveries: number;
+  failedDeliveries: number;
+  lastDeliveryAt: string | null;
+}
+
+export interface WebhookWithStatsDto extends WebhookDto {
+  deliveryStats: WebhookDeliveryStatsDto;
+}
+
 // ─── Raw DB row shapes ────────────────────────────────────────────────────────
 
 interface WebhookRow {
@@ -61,6 +73,13 @@ interface WebhookDeliveryRow {
   attempts: number;
   delivered_at: Date | null;
   created_at: Date;
+}
+
+interface WebhookDeliveryStatsRow {
+  total_deliveries: bigint;
+  successful_deliveries: bigint;
+  failed_deliveries: bigint;
+  last_delivery_at: Date | null;
 }
 
 /**
@@ -174,6 +193,91 @@ export class WebhookService {
     `;
 
     this.logger.log(`Webhook ${webhookId} deactivated in workspace ${workspaceId}`);
+  }
+
+  /**
+   * Update mutable fields of a webhook subscription.
+   *
+   * - url: new destination URL
+   * - events: replacement list of event subscriptions
+   * - active: enable/disable toggle (re-enabling resets failure counter)
+   *
+   * Any combination of fields may be provided; unchanged fields retain
+   * their current values.
+   */
+  async update(workspaceId: string, webhookId: string, dto: UpdateWebhookDto): Promise<WebhookDto> {
+    const rows = await this.prisma.$queryRaw<WebhookRow[]>`
+      SELECT id, workspace_id, url, events, secret_hash, is_active, failure_count, created_at, updated_at
+      FROM webhooks
+      WHERE id = ${webhookId} AND workspace_id = ${workspaceId}
+    `;
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Webhook not found');
+    }
+
+    const current = rows[0];
+    const newUrl = dto.url ?? current.url;
+    const newEvents = dto.events ?? (current.events as WebhookEvent[]);
+
+    // When re-enabling, reset failure counter for a fresh start
+    const newIsActive = dto.active !== undefined ? dto.active : current.is_active;
+    const newFailureCount = dto.active === true && !current.is_active ? 0 : current.failure_count;
+
+    const updated = await this.prisma.$queryRaw<WebhookRow[]>`
+      UPDATE webhooks
+      SET url            = ${newUrl},
+          events         = ${newEvents},
+          is_active      = ${newIsActive},
+          failure_count  = ${newFailureCount},
+          updated_at     = now()
+      WHERE id = ${webhookId}
+      RETURNING id, workspace_id, url, events, secret_hash, is_active, failure_count, created_at, updated_at
+    `;
+
+    this.logger.log(`Webhook ${webhookId} updated in workspace ${workspaceId}`);
+
+    return this.mapRowToDto(updated[0]);
+  }
+
+  /**
+   * Get a single webhook with aggregated delivery statistics.
+   *
+   * Delivery stats include total/successful/failed delivery counts and the
+   * timestamp of the most recent delivery attempt.
+   */
+  async findByIdWithStats(workspaceId: string, webhookId: string): Promise<WebhookWithStatsDto> {
+    const rows = await this.prisma.$queryRaw<WebhookRow[]>`
+      SELECT id, workspace_id, url, events, secret_hash, is_active, failure_count, created_at, updated_at
+      FROM webhooks
+      WHERE id = ${webhookId} AND workspace_id = ${workspaceId}
+    `;
+
+    if (rows.length === 0) {
+      throw new NotFoundException('Webhook not found');
+    }
+
+    const statsRows = await this.prisma.$queryRaw<WebhookDeliveryStatsRow[]>`
+      SELECT
+        COUNT(*)::bigint                               AS total_deliveries,
+        COUNT(*) FILTER (WHERE success = true)::bigint  AS successful_deliveries,
+        COUNT(*) FILTER (WHERE success = false)::bigint AS failed_deliveries,
+        MAX(created_at)                                AS last_delivery_at
+      FROM webhook_deliveries
+      WHERE webhook_id = ${webhookId}
+    `;
+
+    const stats = statsRows[0];
+
+    return {
+      ...this.mapRowToDto(rows[0]),
+      deliveryStats: {
+        totalDeliveries: Number(stats?.total_deliveries ?? 0),
+        successfulDeliveries: Number(stats?.successful_deliveries ?? 0),
+        failedDeliveries: Number(stats?.failed_deliveries ?? 0),
+        lastDeliveryAt: stats?.last_delivery_at?.toISOString() ?? null,
+      },
+    };
   }
 
   // ── Enable / Disable ───────────────────────────────────────────────────────
