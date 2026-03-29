@@ -40,6 +40,7 @@ export default defineConfig({
       '@notesaner/sync-engine': resolve(root, 'libs/sync-engine/src/index.ts'),
       '@notesaner/markdown': resolve(root, 'libs/markdown/src/index.ts'),
       '@notesaner/plugin-sdk': resolve(root, 'libs/plugin-sdk/src/index.ts'),
+      '@notesaner/component-sdk': resolve(root, 'packages/component-sdk/src/index.ts'),
     },
   },
 });

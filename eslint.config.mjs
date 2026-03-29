@@ -53,6 +53,7 @@ export default tseslint.config(
             'libs/*/vitest.config.ts',
             'packages/*/vitest.config.ts',
             'packages/component-sdk/src/__tests__/*.ts',
+            'apps/server/vitest.config.ts',
             'apps/server/prisma/seed.ts',
             'apps/server/prisma/fixtures/index.ts',
             'apps/server/prisma/fixtures/notes.ts',
