@@ -13,6 +13,7 @@ import { useKeyboardShortcuts } from '@/shared/hooks/useKeyboardShortcuts';
 import { CommandPaletteDialog } from '@/features/workspace/ui/CommandPaletteDialog';
 import { useNavigationHistoryStore } from '@/features/workspace/model/navigation-history-store';
 import { useEditorModeStore } from '@/features/editor';
+import { useFocusModeStore } from '@/features/editor/model/focus-mode-store';
 import { useTheme } from '@/shared/lib/providers/ThemeProvider';
 
 interface KeyboardShortcutsProviderProps {
@@ -58,6 +59,9 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
   // Editor mode actions
   const cycleEditMode = useEditorModeStore((s) => s.cycleEditMode);
   const toggleReadingMode = useEditorModeStore((s) => s.toggleReadingMode);
+
+  // Focus mode toggle (Ctrl+Shift+F)
+  const toggleFocusMode = useFocusModeStore((s) => s.toggleFocusMode);
 
   // Theme toggle (Cmd+Shift+D)
   const { preference, resolvedTheme, setPreference } = useTheme();
@@ -123,6 +127,11 @@ export function KeyboardShortcutsProvider({ children }: KeyboardShortcutsProvide
       // Cmd+Shift+E: toggle reading mode.
       'toggle-reading-mode': () => {
         toggleReadingMode();
+      },
+
+      // Ctrl+Shift+F: toggle distraction-free focus mode.
+      'toggle-focus-mode': () => {
+        toggleFocusMode();
       },
 
       // Cmd+Shift+D: toggle theme between dark and light

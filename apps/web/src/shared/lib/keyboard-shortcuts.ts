@@ -171,6 +171,15 @@ export const KEYBOARD_SHORTCUTS = [
     combo: { key: 'e', mod: true, shift: true },
   },
   {
+    id: 'toggle-focus-mode',
+    label: 'Toggle focus (distraction-free) mode',
+    category: 'view',
+    scope: 'global',
+    // Uses explicit ctrl (not mod) to avoid conflict with global-search
+    // which is bound to mod+shift+f (Cmd+Shift+F on macOS).
+    combo: { key: 'f', ctrl: true, shift: true },
+  },
+  {
     id: 'quick-capture',
     label: 'Quick capture',
     category: 'workspace',

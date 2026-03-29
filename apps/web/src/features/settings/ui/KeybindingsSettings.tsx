@@ -340,7 +340,9 @@ export function KeybindingsSettings() {
   // ---- Save overrides to server ----
   const handleSaveToServer = useCallback(async () => {
     try {
-      await apiClient.put('/api/user/preferences/keybindings', { overrides });
+      // Uses the generic key-value preferences API so that overrides survive
+      // across devices when the user is signed in.
+      await apiClient.patch('/api/users/me/preferences/keybindings', { value: overrides });
       messageApi.success('Keybindings saved to your account');
     } catch {
       messageApi.error('Failed to save keybindings. Changes are preserved locally.');
