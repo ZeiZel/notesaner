@@ -10,6 +10,8 @@ export type { SettingsDialogProps } from './ui/SettingsDialog';
 export { ProfileSettings } from './ui/ProfileSettings';
 export { EditorSettings } from './ui/EditorSettings';
 export { ThemeSettingsTab } from './ui/ThemeSettingsTab';
+export { ThemeToggle } from './ui/ThemeToggle';
+export type { ThemeToggleProps } from './ui/ThemeToggle';
 export { KeybindingSettings } from './ui/KeybindingSettings';
 export { KeybindingsSettings } from './ui/KeybindingsSettings';
 export { PluginSettings } from './ui/PluginSettings';
@@ -32,3 +34,5 @@ export type {
   EditorFontFamily,
 } from './model/settings-store';
 export { useWorkspaceSettingsStore } from './model/workspace-settings-store';
+export { useThemeStore, getSystemColorScheme, resolveThemeMode } from './model/theme-store';
+export type { ThemePreference } from './model/theme-store';

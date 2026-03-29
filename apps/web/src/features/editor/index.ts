@@ -49,6 +49,9 @@ export type { DiffViewerProps, DiffChange, DiffViewMode } from './ui/DiffViewer'
 export { ExportDialog } from './ui/ExportDialog';
 export type { ExportDialogProps, ExportFormat, ExportMode } from './ui/ExportDialog';
 
+export { PrintView } from './ui/PrintView';
+export type { PrintViewProps } from './ui/PrintView';
+
 export { HistoryPanel } from './ui/HistoryPanel';
 export type { HistoryPanelProps } from './ui/HistoryPanel';
 
@@ -73,6 +76,16 @@ export type { UndoRedoToolbarProps } from './ui/UndoRedoToolbar';
 
 export { VersionHistory } from './ui/VersionHistory';
 export type { VersionHistoryProps } from './ui/VersionHistory';
+
+export { FocusMode, FocusModeButton } from './ui/FocusMode';
+export type { FocusModeProps, FocusModeButtonProps } from './ui/FocusMode';
+
+export {
+  MermaidToolbarButton,
+  MermaidExtensionWarning,
+  MermaidStandalonePreview,
+} from './ui/MermaidPreview';
+export type { MermaidToolbarButtonProps, MermaidStandalonePreviewProps } from './ui/MermaidPreview';
 
 // ---------------------------------------------------------------------------
 // Model (stores, types, selectors)
@@ -115,6 +128,9 @@ export {
 } from './model/history.store';
 export type { HistoryActionType, HistoryEntry, HistoryState } from './model/history.store';
 
+export { useFocusModeStore } from './model/focus-mode-store';
+export type { FocusModeState } from './model/focus-mode-store';
+
 // ---------------------------------------------------------------------------
 // Lib (parser, utilities)
 // ---------------------------------------------------------------------------
@@ -142,8 +158,45 @@ export type { CollaborationUser, CollaborationCursorOptions } from './lib/collab
 
 export { useNoteCssClass } from './lib/use-note-css-class';
 
+export { usePrint, usePrintShortcut } from './lib/use-print';
+export type { UsePrintOptions, UsePrintReturn, UsePrintShortcutOptions } from './lib/use-print';
+
 export { CommentMark, COMMENT_MARK_CSS } from './lib/comment-mark';
 export type { CommentMarkAttributes } from './lib/comment-mark';
+
+export {
+  DropUploadExtension,
+  isAcceptedDropFile,
+  extractImageFilesFromClipboard,
+  getFileExtension,
+} from './lib/drop-upload-extension';
+export type { DropUploadOptions } from './lib/drop-upload-extension';
+
+export { EditorDropZone } from './ui/EditorDropZone';
+export type {
+  EditorDropZoneProps,
+  UploadEntry,
+  UploadStatus,
+  EditorDropZoneFilesHandler,
+} from './ui/EditorDropZone';
+
+export {
+  createMermaidExtension,
+  insertMermaidBlock,
+  hasMermaidExtension,
+  MERMAID_TOOLBAR_ITEMS,
+  getMermaidStarter,
+  detectDiagramType,
+  resolveMermaidTheme,
+  MERMAID_DIAGRAM_TYPES,
+  MERMAID_STARTERS,
+} from './lib/mermaid-extension';
+export type {
+  MermaidBlockOptions,
+  MermaidDiagramType,
+  MermaidTheme,
+  MermaidToolbarItem,
+} from './lib/mermaid-extension';
 
 // ---------------------------------------------------------------------------
 // Hooks
