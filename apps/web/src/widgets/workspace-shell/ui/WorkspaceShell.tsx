@@ -35,6 +35,7 @@ import { TabBar } from '@/widgets/tab-bar';
 import { Ribbon } from '@/widgets/ribbon';
 import { NotificationBell, useNotificationWebSocket } from '@/features/notifications';
 import { FavoritesPanel, useFavoriteShortcut } from '@/features/favorites';
+import { ThemeToggle } from '@/features/settings';
 
 interface WorkspaceShellProps {
   children: ReactNode;
@@ -347,6 +348,9 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                   <div className="ml-auto flex items-center gap-1">
                     {/* Notification bell */}
                     <NotificationBell />
+
+                    {/* Theme toggle -- compact three-way segmented control */}
+                    <ThemeToggle variant="compact" size="small" />
 
                     {/* Layout preset manager */}
                     {isDesktop && <LayoutPresetButton />}

@@ -1,0 +1,34 @@
+{{!-- subject --}}
+{{inviterName}} shared "{{noteTitle}}" with you on Notesaner
+{{!-- /subject --}}
+
+{{!-- html --}}
+<h1>A note has been shared with you</h1>
+<p>Hi {{displayName}},</p>
+<p><strong>{{inviterName}}</strong> has shared the note <strong>{{noteTitle}}</strong> with you{{#if workspaceName}} from the workspace <strong>{{workspaceName}}</strong>{{/if}}.</p>
+{{#if message}}
+<blockquote style="border-left: 3px solid #5b50f0; margin: 16px 0; padding: 8px 16px; background: #f8f7ff; border-radius: 0 4px 4px 0;">
+  <p style="margin: 0; font-style: italic;">{{message}}</p>
+</blockquote>
+{{/if}}
+<a href="{{{noteUrl}}}" class="btn">Open note</a>
+<hr class="divider" />
+<p class="muted">You can view this note with {{permission}} access. If you were not expecting this invitation, you can safely ignore this email.</p>
+{{!-- /html --}}
+
+{{!-- text --}}
+{{inviterName}} shared "{{noteTitle}}" with you on Notesaner
+
+Hi {{displayName}},
+
+{{inviterName}} has shared the note "{{noteTitle}}" with you{{#if workspaceName}} from the workspace "{{workspaceName}}"{{/if}}.
+{{#if message}}
+Message from {{inviterName}}:
+  "{{message}}"
+{{/if}}
+Open note: {{{noteUrl}}}
+
+You can view this note with {{permission}} access.
+
+— The Notesaner team
+{{!-- /text --}}

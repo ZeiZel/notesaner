@@ -1,8 +1,8 @@
 import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { join } from 'path';
-import { readFile } from 'fs/promises';
-import type { ExportFormat } from './dto/export.dto';
+import { join, relative, posix } from 'path';
+import { readFile, readdir } from 'fs/promises';
+import type { BatchExportDto, ExportFormat, WorkspaceExportDto } from './dto/export.dto';
 import { NotesService } from './notes.service';
 
 /**
@@ -34,6 +34,18 @@ interface NoteData {
   title: string;
   path: string;
   content: string;
+}
+
+interface ZipExportOptions {
+  preserveFolderStructure: boolean;
+  includeAttachments: boolean;
+  rewriteInternalLinks: boolean;
+}
+
+interface ZipEntry {
+  /** Path inside the ZIP archive. */
+  zipPath: string;
+  buffer: Buffer;
 }
 
 // ---------------------------------------------------------------------------
@@ -153,11 +165,22 @@ export class ExportService {
 
   /**
    * Export multiple notes as a ZIP archive.
+   *
+   * When `preserveFolderStructure` is true the original vault paths are mirrored
+   * inside the ZIP (e.g. `journal/2024/my-note.md`). When false all files are
+   * placed flat in the root of the archive.
+   *
+   * When `includeAttachments` is true each note's attachments are copied into an
+   * `.attachments/<note-folder>/` subdirectory next to the note.
+   *
+   * When `rewriteInternalLinks` is true `[[wiki links]]` and markdown links that
+   * reference other notes in the batch are rewritten to relative file paths.
    */
   async exportBatch(
     workspaceId: string,
     noteIds: string[],
     format: ExportFormat,
+    options?: Partial<Omit<BatchExportDto, 'noteIds' | 'format'>>,
   ): Promise<ExportedFile> {
     if (noteIds.length === 0) {
       throw new BadRequestException('At least one note ID is required');
@@ -167,11 +190,157 @@ export class ExportService {
       throw new BadRequestException('Cannot export more than 100 notes at once');
     }
 
+    const zipOptions: ZipExportOptions = {
+      preserveFolderStructure: options?.preserveFolderStructure ?? true,
+      includeAttachments: options?.includeAttachments ?? true,
+      rewriteInternalLinks: options?.rewriteInternalLinks ?? true,
+    };
+
     const notes = await Promise.all(noteIds.map((id) => this.loadNoteData(workspaceId, id)));
 
-    const exportedFiles = await Promise.all(notes.map((note) => this.convertNote(note, format)));
+    return this.buildZipExport(workspaceId, notes, format, zipOptions);
+  }
 
-    return this.createZipArchive(exportedFiles, format);
+  /**
+   * Export an entire workspace as a ZIP archive.
+   *
+   * Enumerates all notes in the workspace (optionally excluding trashed notes),
+   * converts them to the requested format, and bundles everything — including
+   * attachments — into a single ZIP file.
+   */
+  async exportWorkspace(workspaceId: string, dto: WorkspaceExportDto): Promise<ExportedFile> {
+    const zipOptions: ZipExportOptions = {
+      preserveFolderStructure: dto.preserveFolderStructure,
+      includeAttachments: dto.includeAttachments,
+      rewriteInternalLinks: dto.rewriteInternalLinks,
+    };
+
+    const notes = await this.loadAllWorkspaceNotes(workspaceId, dto.excludeTrashed);
+
+    if (notes.length === 0) {
+      // Return an empty-ish archive rather than throwing — the workspace may be new.
+      this.logger.warn(`Workspace ${workspaceId} has no notes to export`);
+    }
+
+    return this.buildZipExport(workspaceId, notes, dto.format, zipOptions);
+  }
+
+  // -----------------------------------------------------------------------
+  // Core ZIP assembly
+  // -----------------------------------------------------------------------
+
+  /**
+   * Converts a set of notes and optionally their attachments into a ZIP archive.
+   */
+  private async buildZipExport(
+    workspaceId: string,
+    notes: NoteData[],
+    format: ExportFormat,
+    options: ZipExportOptions,
+  ): Promise<ExportedFile> {
+    // Build lookup tables from title and path-stem to ZIP path so link rewriting
+    // can resolve targets before converting content.
+    const noteZipPathByTitle = new Map<string, string>();
+    const noteZipPathByPath = new Map<string, string>();
+
+    const notePaths = notes.map((note) => {
+      const zipPath = this.noteToZipPath(note, format, options.preserveFolderStructure);
+      noteZipPathByTitle.set(note.title.toLowerCase(), zipPath);
+      const stem = note.path.replace(/\.md$/i, '');
+      noteZipPathByPath.set(stem.toLowerCase(), zipPath);
+      return zipPath;
+    });
+
+    const entries: ZipEntry[] = [];
+
+    for (let i = 0; i < notes.length; i++) {
+      const note = notes[i];
+      const zipPath = notePaths[i];
+
+      let content = note.content;
+
+      // Rewrite internal links only for markdown format; other formats render
+      // from the (already-rewritten) markdown content anyway.
+      if (options.rewriteInternalLinks && format === 'md') {
+        content = this.rewriteInternalLinksInContent(
+          content,
+          zipPath,
+          noteZipPathByTitle,
+          noteZipPathByPath,
+        );
+      }
+
+      const noteForConversion: NoteData = { ...note, content };
+      const exported = await this.convertNote(noteForConversion, format);
+
+      entries.push({ zipPath, buffer: exported.buffer });
+    }
+
+    if (options.includeAttachments) {
+      const attachmentEntries = await this.loadAttachmentsForNotes(
+        workspaceId,
+        notes,
+        options.preserveFolderStructure,
+      );
+      entries.push(...attachmentEntries);
+    }
+
+    const timestamp = Date.now();
+    return this.createZipArchive(entries, `notesaner-export-${timestamp}.zip`);
+  }
+
+  // -----------------------------------------------------------------------
+  // Internal link rewriting
+  // -----------------------------------------------------------------------
+
+  /**
+   * Rewrites `[[wiki links]]` and markdown links `[text](target)` in markdown
+   * content so they point to the correct relative paths inside the ZIP.
+   *
+   * Only rewrites links whose targets are present in the exported set.
+   * Unknown links are left unchanged so they remain identifiable.
+   */
+  private rewriteInternalLinksInContent(
+    content: string,
+    currentZipPath: string,
+    noteZipPathByTitle: Map<string, string>,
+    noteZipPathByPath: Map<string, string>,
+  ): string {
+    const currentDir = posix.dirname(currentZipPath.replace(/\\/g, '/'));
+
+    const resolveTarget = (target: string): string | null => {
+      const lower = target.toLowerCase();
+      return noteZipPathByTitle.get(lower) ?? noteZipPathByPath.get(lower) ?? null;
+    };
+
+    const toRelative = (targetZipPath: string): string => {
+      const targetPosix = targetZipPath.replace(/\\/g, '/');
+      const rel = posix.relative(currentDir, targetPosix);
+      return rel === '' ? posix.basename(targetPosix) : rel;
+    };
+
+    // Rewrite [[wiki links]] and [[wiki links|alias]]
+    let result = content.replace(
+      /\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]/g,
+      (match, target: string, alias: string | undefined) => {
+        const resolved = resolveTarget(target.trim());
+        if (!resolved) return match;
+        const rel = toRelative(resolved);
+        const display = alias ?? target.trim();
+        return `[${display}](${rel})`;
+      },
+    );
+
+    // Rewrite plain markdown links [text](target) where target looks like an
+    // internal note title (no protocol, no external domain, no anchor-only).
+    result = result.replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text: string, href: string) => {
+      if (/^https?:\/\/|^mailto:|^#/.test(href)) return match;
+      const resolved = resolveTarget(href.trim());
+      if (!resolved) return match;
+      return `[${text}](${toRelative(resolved)})`;
+    });
+
+    return result;
   }
 
   // -----------------------------------------------------------------------
@@ -620,34 +789,241 @@ export class ExportService {
     };
   }
 
+  /**
+   * Load every note in a workspace by scanning the vault directory.
+   *
+   * Since `NotesService.list()` is not yet implemented, we fall back to
+   * a recursive filesystem scan of the workspace root. Trashed notes are
+   * identified by the presence of a `.trash/` directory segment.
+   */
+  private async loadAllWorkspaceNotes(
+    workspaceId: string,
+    excludeTrashed: boolean,
+  ): Promise<NoteData[]> {
+    const workspaceRoot = join(this.storageRoot, workspaceId);
+    const notes: NoteData[] = [];
+
+    let allMdPaths: string[];
+    try {
+      allMdPaths = await this.findMarkdownFiles(workspaceRoot);
+    } catch (error) {
+      this.logger.error(`Failed to scan workspace directory ${workspaceRoot}: ${String(error)}`);
+      return [];
+    }
+
+    for (const absolutePath of allMdPaths) {
+      // Derive the path relative to workspace root (using forward slashes)
+      const relPath = relative(workspaceRoot, absolutePath).replace(/\\/g, '/');
+
+      // Skip the attachments system directory
+      if (relPath.startsWith('.attachments/')) continue;
+
+      // Skip trashed notes when requested
+      if (excludeTrashed && (relPath.startsWith('.trash/') || relPath.includes('/.trash/'))) {
+        continue;
+      }
+
+      let content: string;
+      try {
+        content = await readFile(absolutePath, 'utf-8');
+      } catch (error) {
+        this.logger.warn(`Skipping unreadable file ${absolutePath}: ${String(error)}`);
+        continue;
+      }
+
+      const title = this.extractTitle(content, relPath);
+
+      notes.push({
+        id: relPath, // Use relative path as a stable identifier when UUIDs are unavailable
+        title,
+        path: relPath,
+        content,
+      });
+    }
+
+    return notes;
+  }
+
+  /**
+   * Recursively collect all `.md` file paths under a directory.
+   */
+  private async findMarkdownFiles(dir: string): Promise<string[]> {
+    const results: string[] = [];
+    let entries: Awaited<ReturnType<typeof readdir>>;
+
+    try {
+      entries = await readdir(dir, { withFileTypes: true });
+    } catch {
+      return results;
+    }
+
+    for (const entry of entries) {
+      const fullPath = join(dir, entry.name);
+      if (entry.isDirectory()) {
+        const nested = await this.findMarkdownFiles(fullPath);
+        results.push(...nested);
+      } else if (entry.isFile() && entry.name.endsWith('.md')) {
+        results.push(fullPath);
+      }
+    }
+
+    return results;
+  }
+
+  /**
+   * Extract a human-readable title from the note content or file path.
+   *
+   * Priority order:
+   * 1. `title:` field in YAML frontmatter
+   * 2. First ATX heading (`# Heading`)
+   * 3. Filename stem (last path segment without the `.md` extension)
+   */
+  private extractTitle(content: string, relativePath: string): string {
+    // 1. Frontmatter title
+    const fmMatch = /^---\n([\s\S]*?)\n---\n/.exec(content);
+    if (fmMatch) {
+      const titleMatch = /^title:\s*['"]?(.+?)['"]?\s*$/m.exec(fmMatch[1]);
+      if (titleMatch) return titleMatch[1].trim();
+    }
+
+    // 2. First H1
+    const h1Match = /^#\s+(.+)$/m.exec(content);
+    if (h1Match) return h1Match[1].trim();
+
+    // 3. Filename stem
+    const base = relativePath.split('/').pop() ?? relativePath;
+    return base.replace(/\.md$/i, '');
+  }
+
+  // -----------------------------------------------------------------------
+  // Attachment loading
+  // -----------------------------------------------------------------------
+
+  /**
+   * Load attachment files for a batch of notes and return them as ZIP entries.
+   *
+   * Attachments are stored under `.attachments/<noteId>/` relative to the
+   * workspace root. Each attachment is placed in the ZIP at:
+   *   - with folder structure: `<note-dir>/.attachments/<filename>`
+   *   - without folder structure: `.attachments/<filename>`
+   */
+  private async loadAttachmentsForNotes(
+    workspaceId: string,
+    notes: NoteData[],
+    preserveFolderStructure: boolean,
+  ): Promise<ZipEntry[]> {
+    const entries: ZipEntry[] = [];
+    const workspaceRoot = join(this.storageRoot, workspaceId);
+
+    for (const note of notes) {
+      const attachmentsDir = join(workspaceRoot, '.attachments', note.id);
+
+      let files: string[];
+      try {
+        const dirEntries = await readdir(attachmentsDir, { withFileTypes: true });
+        files = dirEntries.filter((e) => e.isFile()).map((e) => join(attachmentsDir, e.name));
+      } catch {
+        // No attachments directory for this note — silently skip.
+        continue;
+      }
+
+      for (const filePath of files) {
+        let buffer: Buffer;
+        try {
+          const raw = await readFile(filePath);
+          buffer = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBufferLike);
+        } catch (error) {
+          this.logger.warn(`Failed to read attachment ${filePath}: ${String(error)}`);
+          continue;
+        }
+
+        const filename = filePath.split('/').pop() ?? filePath.split('\\').pop() ?? 'attachment';
+
+        let zipPath: string;
+        if (preserveFolderStructure) {
+          const noteDir = posix.dirname(note.path.replace(/\\/g, '/'));
+          zipPath =
+            noteDir === '.' ? `.attachments/${filename}` : `${noteDir}/.attachments/${filename}`;
+        } else {
+          zipPath = `.attachments/${filename}`;
+        }
+
+        entries.push({ zipPath, buffer });
+      }
+    }
+
+    return entries;
+  }
+
+  // -----------------------------------------------------------------------
+  // ZIP path helpers
+  // -----------------------------------------------------------------------
+
+  /**
+   * Compute the path a note will occupy inside the ZIP archive.
+   *
+   * With folder structure: mirrors the original vault path with the target
+   * format extension (e.g. `journal/2024/daily.md`).
+   *
+   * Without folder structure: sanitized flat filename at the archive root
+   * (e.g. `daily.md`).
+   */
+  private noteToZipPath(
+    note: NoteData,
+    format: ExportFormat,
+    preserveFolderStructure: boolean,
+  ): string {
+    const ext = this.formatExtension(format);
+
+    if (!preserveFolderStructure) {
+      return this.sanitizeFilename(note.title) + ext;
+    }
+
+    // Replace the .md extension with the target format extension,
+    // keeping the directory structure intact and normalizing to POSIX slashes.
+    const withNewExt = note.path.replace(/\.md$/i, '') + ext;
+    return withNewExt.replace(/\\/g, '/');
+  }
+
+  private formatExtension(format: ExportFormat): string {
+    switch (format) {
+      case 'md':
+        return '.md';
+      case 'html':
+        return '.html';
+      case 'pdf':
+        return '.pdf';
+      case 'docx':
+        return '.docx';
+    }
+  }
+
   // -----------------------------------------------------------------------
   // ZIP creation
   // -----------------------------------------------------------------------
 
   /**
-   * Create a ZIP archive from multiple exported files.
+   * Create a ZIP archive from an array of entries.
    *
-   * Uses a minimal ZIP implementation to avoid adding heavy dependencies.
-   * For a production system, consider using archiver or jszip.
+   * Uses `archiver` if available, otherwise falls back to a plain-text
+   * concatenation suitable for development environments.
    */
   private async createZipArchive(
-    files: ExportedFile[],
-    format: ExportFormat,
+    entries: ZipEntry[],
+    archiveFilename: string,
   ): Promise<ExportedFile> {
     try {
-      // Attempt to use the archiver package if available
       const archiverFn = tryRequire('archiver');
       if (!archiverFn) throw new Error('archiver is not installed');
-      return await this.createZipWithArchiver(files, format, archiverFn);
+      return await this.createZipWithArchiver(entries, archiveFilename, archiverFn);
     } catch {
-      // Fallback: create a basic ZIP using Node.js zlib
-      return this.createBasicZip(files, format);
+      return this.createBasicZip(entries, archiveFilename);
     }
   }
 
   private async createZipWithArchiver(
-    files: ExportedFile[],
-    _format: ExportFormat,
+    entries: ZipEntry[],
+    archiveFilename: string,
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     archiverFn: any,
   ): Promise<ExportedFile> {
@@ -659,25 +1035,27 @@ export class ExportService {
       archive.on('data', (chunk: Buffer) => chunks.push(chunk));
       archive.on('end', () => {
         resolve({
-          filename: `notesaner-export-${Date.now()}.zip`,
+          filename: archiveFilename,
           contentType: 'application/zip',
           buffer: Buffer.concat(chunks),
         });
       });
       archive.on('error', reject);
 
-      // Ensure unique filenames by tracking duplicates
-      const usedNames = new Map<string, number>();
-      for (const file of files) {
-        let name = file.filename;
-        const count = usedNames.get(name) ?? 0;
+      // Ensure unique ZIP paths by deduplicating with a counter suffix.
+      const usedPaths = new Map<string, number>();
+      for (const entry of entries) {
+        let zipPath = entry.zipPath;
+        const count = usedPaths.get(zipPath) ?? 0;
         if (count > 0) {
-          const ext = name.lastIndexOf('.');
-          name =
-            ext >= 0 ? `${name.slice(0, ext)} (${count})${name.slice(ext)}` : `${name} (${count})`;
+          const dot = zipPath.lastIndexOf('.');
+          zipPath =
+            dot >= 0
+              ? `${zipPath.slice(0, dot)} (${count})${zipPath.slice(dot)}`
+              : `${zipPath} (${count})`;
         }
-        usedNames.set(file.filename, count + 1);
-        archive.append(file.buffer, { name });
+        usedPaths.set(entry.zipPath, count + 1);
+        archive.append(entry.buffer, { name: zipPath });
       }
 
       void archive.finalize();
@@ -689,7 +1067,7 @@ export class ExportService {
    * concatenated file with a manifest. Not a real ZIP, but serves
    * as a graceful degradation.
    */
-  private createBasicZip(files: ExportedFile[], _format: ExportFormat): ExportedFile {
+  private createBasicZip(entries: ZipEntry[], archiveFilename: string): ExportedFile {
     // Without a proper ZIP library, we concatenate files with a separator.
     // This is a development fallback; production should have archiver installed.
     this.logger.warn('archiver not available, creating concatenated export instead of ZIP');
@@ -697,20 +1075,23 @@ export class ExportService {
     const parts: string[] = [
       `# Notesaner Batch Export`,
       `# Exported: ${new Date().toISOString()}`,
-      `# Files: ${files.length}`,
+      `# Files: ${entries.length}`,
       '',
     ];
 
-    for (const file of files) {
+    for (const entry of entries) {
       parts.push(`${'='.repeat(72)}`);
-      parts.push(`# File: ${file.filename}`);
+      parts.push(`# File: ${entry.zipPath}`);
       parts.push(`${'='.repeat(72)}`);
-      parts.push(file.buffer.toString('utf-8'));
+      parts.push(entry.buffer.toString('utf-8'));
       parts.push('');
     }
 
+    // Use .txt extension to signal it is not a real ZIP.
+    const fallbackFilename = archiveFilename.replace(/\.zip$/, '.txt');
+
     return {
-      filename: `notesaner-export-${Date.now()}.txt`,
+      filename: fallbackFilename,
       contentType: 'text/plain; charset=utf-8',
       buffer: Buffer.from(parts.join('\n'), 'utf-8'),
     };

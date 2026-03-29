@@ -19,6 +19,8 @@ import {
   useNoteCssClass,
 } from '@/features/editor';
 import { ErrorBoundary } from '@/shared/ui/ErrorBoundary';
+import { NoteBreadcrumb } from '@/features/workspace/ui/NoteBreadcrumb';
+import { useWorkspaceStore } from '@/shared/stores/workspace-store';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -85,6 +87,7 @@ export function NoteEditorPage({
   const mode = useEditorModeStore((s) => s.mode);
   const markdown = useEditorModeStore((s) => s.markdown);
   const setMarkdown = useEditorModeStore((s) => s.setMarkdown);
+  const activeWorkspace = useWorkspaceStore((s) => s.activeWorkspace);
 
   // Derive CSS class from frontmatter `cssClass` / `cssclass` property.
   // Applied to the editor container for per-note styling.
@@ -101,21 +104,22 @@ export function NoteEditorPage({
   const breadcrumb = ['Workspace', 'Untitled note'];
   const isReading = mode === 'reading';
 
+  // Demo note path — will be replaced with real note data when server integration lands.
+  const demoNotePath = 'Untitled note';
+  const workspaceName = activeWorkspace?.name ?? 'Workspace';
+
   return (
     <div className={`flex h-full flex-col${noteCssClass ? ` ${noteCssClass}` : ''}`}>
       {/* Breadcrumb toolbar — hidden in reading mode (ReadingModeView has its own) */}
       {!isReading && (
         <div className="flex h-11 items-center justify-between border-b border-border px-4">
-          <nav
-            aria-label="Note path"
-            className="flex items-center gap-1 text-xs text-foreground-secondary"
-          >
-            <span>Workspace</span>
-            <span>/</span>
-            <span className="text-foreground">Untitled note</span>
-          </nav>
+          <NoteBreadcrumb
+            workspaceName={workspaceName}
+            notePath={demoNotePath}
+            className="min-w-0 flex-1 mr-4"
+          />
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {/* Word count (visible in all edit modes) */}
             <span className="text-xs text-foreground-muted">
               {countWords(markdown).toLocaleString()} words

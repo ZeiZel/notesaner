@@ -57,6 +57,13 @@ export const configuration = () => ({
     token: process.env['GITHUB_TOKEN'] ?? undefined,
   },
 
+  // ── Embedding / Semantic Search ────────────────────────────────────────────
+  embedding: {
+    provider: process.env['EMBEDDING_PROVIDER'] ?? 'openai',
+    model: process.env['EMBEDDING_MODEL'] ?? 'text-embedding-3-small',
+    openaiApiKey: process.env['OPENAI_API_KEY'] ?? undefined,
+  },
+
   // ── Rate Limiting ──────────────────────────────────────────────────────────
   rateLimit: {
     global: {

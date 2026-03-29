@@ -19,6 +19,7 @@ import { cn } from '@/shared/lib/utils';
 import { useRibbonStore, getVisibleActions, type RibbonAction } from '@/shared/stores/ribbon-store';
 import { useSidebarStore } from '@/shared/stores/sidebar-store';
 import { useBreakpoint } from '@/shared/hooks/useBreakpoint';
+import { ThemeToggle as ThemeToggleCycler } from '@/shared/lib/theme';
 import { RibbonIcon } from './RibbonIcon';
 
 // ---------------------------------------------------------------------------
@@ -150,6 +151,7 @@ export function Ribbon() {
         'py-2',
       )}
     >
+      {/* Top: sortable action icons */}
       <DndContext
         sensors={sensors}
         collisionDetection={closestCenter}
@@ -169,6 +171,11 @@ export function Ribbon() {
           </div>
         </SortableContext>
       </DndContext>
+
+      {/* Bottom: compact cycling theme toggle pinned to ribbon footer */}
+      <div className="mt-auto pt-2">
+        <ThemeToggleCycler />
+      </div>
     </nav>
   );
 }

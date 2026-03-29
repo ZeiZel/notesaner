@@ -13,6 +13,9 @@ import {
   STORAGE_RECALCULATION_CRON,
   STORAGE_RECALCULATION_JOB,
   STORAGE_RECALCULATION_QUEUE,
+  TRASH_PURGE_CRON,
+  TRASH_PURGE_JOB,
+  TRASH_PURGE_QUEUE,
   WEBHOOK_BACKOFF_BASE_DELAY_MS,
   WEBHOOK_DELIVERY_QUEUE,
   WEBHOOK_MAX_ATTEMPTS,
@@ -23,6 +26,7 @@ import type {
   IndexNoteJobData,
   ReindexWorkspaceJobData,
   StorageRecalculationJobData,
+  TrashPurgeJobData,
 } from './jobs.types';
 
 /**
@@ -32,7 +36,8 @@ import type {
  *   - scheduleNoteIndex: debounced per-note indexing (deduplicates via jobId)
  *   - scheduleWorkspaceReindex: batch reindex for all notes in a workspace
  *   - scheduleFreshnessCheck: on-demand freshness check for a workspace
- *   - Daily cron-based freshness check (registered on module init)
+ *   - scheduleTrashPurge: on-demand trash purge
+ *   - Daily cron-based freshness check, storage recalculation, and trash purge (registered on module init)
  */
 @Injectable()
 export class JobsService implements OnModuleInit {
@@ -47,6 +52,8 @@ export class JobsService implements OnModuleInit {
     private readonly webhookDeliveryQueue: Queue<DeliverWebhookJobData>,
     @InjectQueue(STORAGE_RECALCULATION_QUEUE)
     private readonly storageRecalculationQueue: Queue<StorageRecalculationJobData>,
+    @InjectQueue(TRASH_PURGE_QUEUE)
+    private readonly trashPurgeQueue: Queue<TrashPurgeJobData>,
   ) {}
 
   /**
@@ -92,6 +99,26 @@ export class JobsService implements OnModuleInit {
       this.logger.log(`Registered daily storage recalculation cron: ${STORAGE_RECALCULATION_CRON}`);
     } catch (err) {
       this.logger.error(`Failed to register storage recalculation cron: ${String(err)}`);
+    }
+
+    // Register daily trash purge cron (02:00 UTC)
+    try {
+      await this.trashPurgeQueue.upsertJobScheduler(
+        'trash-purge-daily-scheduler',
+        { pattern: TRASH_PURGE_CRON },
+        {
+          name: TRASH_PURGE_JOB,
+          data: {} as TrashPurgeJobData,
+          opts: {
+            removeOnComplete: { count: 30 },
+            removeOnFail: { count: 20 },
+          },
+        },
+      );
+
+      this.logger.log(`Registered daily trash purge cron: ${TRASH_PURGE_CRON}`);
+    } catch (err) {
+      this.logger.error(`Failed to register trash purge cron: ${String(err)}`);
     }
   }
 
@@ -232,6 +259,32 @@ export class JobsService implements OnModuleInit {
     return job.id ?? jobId;
   }
 
+  // ─── Trash purge jobs ──────────────────────────────────────────────────────
+
+  /**
+   * Schedule an on-demand trash purge, optionally overriding the retention period.
+   *
+   * Useful for admin-triggered purges or testing without waiting for the daily cron.
+   *
+   * @param retentionDays Optional days override (default: 30)
+   * @returns BullMQ job ID for status tracking.
+   */
+  async scheduleTrashPurge(retentionDays?: number): Promise<string> {
+    const jobId = `trash-purge:on-demand:${Date.now()}`;
+    const data: TrashPurgeJobData = { retentionDays };
+
+    const job = await this.trashPurgeQueue.add(TRASH_PURGE_JOB, data, {
+      jobId,
+      attempts: 2,
+      backoff: { type: 'fixed', delay: 30_000 },
+      removeOnComplete: { count: 30 },
+      removeOnFail: { count: 20 },
+    });
+
+    this.logger.log(`Scheduled on-demand trash purge, job ${job.id}`);
+    return job.id ?? jobId;
+  }
+
   // ─── Job status ───────────────────────────────────────────────────────────
 
   /**
@@ -262,6 +315,12 @@ export class JobsService implements OnModuleInit {
     if (storageJob) {
       const state = await storageJob.getState();
       return { state, progress: storageJob.progress };
+    }
+
+    const trashPurgeJob = await this.trashPurgeQueue.getJob(jobId);
+    if (trashPurgeJob) {
+      const state = await trashPurgeJob.getState();
+      return { state, progress: trashPurgeJob.progress };
     }
 
     return null;

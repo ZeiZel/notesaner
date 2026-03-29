@@ -1,0 +1,304 @@
+/**
+ * print.css — Print-specific styles for note printing and print-to-PDF.
+ *
+ * These styles are imported by PrintView.tsx and apply only when the browser
+ * enters print mode (@media print). They suppress all editor chrome and
+ * optimize the note content for paper / PDF output.
+ *
+ * Design decisions:
+ *   - We set explicit `display: none !important` on chrome elements so that
+ *     even sticky / fixed-positioned items disappear from the printed output.
+ *   - Page margins follow standard document conventions (2.54 cm ≈ 1 inch).
+ *   - Code blocks get a visible border so they remain distinguishable without
+ *     colour on B&W printers.
+ *   - Links print their href in parentheses so the document is useful offline.
+ */
+
+/* ---------------------------------------------------------------------------
+   Page setup
+   --------------------------------------------------------------------------- */
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 2.54cm 2cm 2.54cm 2cm;
+  }
+
+  /* Reset html/body so the print view fills the page cleanly. */
+  html,
+  body {
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    background-color: #fff !important;
+    color: #000 !important;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Hide all editor chrome
+     --------------------------------------------------------------------------- */
+
+  /* Sidebar (navigation panel) */
+  [data-testid='sidebar'],
+  [data-sidebar],
+  .sidebar,
+  aside {
+    display: none !important;
+  }
+
+  /* Toolbar / action bar */
+  [data-testid='editor-toolbar'],
+  [data-toolbar],
+  .editor-toolbar,
+  [role='toolbar'] {
+    display: none !important;
+  }
+
+  /* Status bar */
+  [data-testid='status-bar'],
+  [data-status-bar],
+  .status-bar {
+    display: none !important;
+  }
+
+  /* Reading-mode toolbar */
+  [data-testid='reading-toolbar'] {
+    display: none !important;
+  }
+
+  /* Tab bar / workspace tabs */
+  [data-testid='tab-bar'],
+  .tab-bar {
+    display: none !important;
+  }
+
+  /* Presence / collaboration indicators */
+  [data-testid='presence-indicator'] {
+    display: none !important;
+  }
+
+  /* Any fixed or sticky UI overlay */
+  [data-print-hide] {
+    display: none !important;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Print view container
+     --------------------------------------------------------------------------- */
+
+  /* Only the print view itself is shown; everything else is suppressed. */
+  [data-print-view] {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Page header and footer (via @page content is limited; we use first-/last-child
+     tricks instead and rely on the React component for header/footer rendering)
+     --------------------------------------------------------------------------- */
+
+  .print-header {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: baseline;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 4pt;
+    margin-bottom: 16pt;
+    font-size: 9pt;
+    color: #555;
+  }
+
+  .print-footer {
+    display: flex !important;
+    justify-content: space-between;
+    align-items: baseline;
+    border-top: 1px solid #ccc;
+    padding-top: 4pt;
+    margin-top: 16pt;
+    font-size: 9pt;
+    color: #555;
+  }
+
+  /* ---------------------------------------------------------------------------
+     Content typography
+     --------------------------------------------------------------------------- */
+
+  .print-content {
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 11pt;
+    line-height: 1.6;
+    color: #000;
+  }
+
+  .print-content h1 {
+    font-size: 22pt;
+    font-weight: 700;
+    margin-top: 0;
+    margin-bottom: 12pt;
+    line-height: 1.2;
+    page-break-after: avoid;
+    color: #000;
+  }
+
+  .print-content h2 {
+    font-size: 16pt;
+    font-weight: 700;
+    margin-top: 18pt;
+    margin-bottom: 8pt;
+    page-break-after: avoid;
+    color: #000;
+  }
+
+  .print-content h3 {
+    font-size: 13pt;
+    font-weight: 700;
+    margin-top: 14pt;
+    margin-bottom: 6pt;
+    page-break-after: avoid;
+    color: #000;
+  }
+
+  .print-content h4,
+  .print-content h5,
+  .print-content h6 {
+    font-size: 11pt;
+    font-weight: 700;
+    margin-top: 10pt;
+    margin-bottom: 4pt;
+    page-break-after: avoid;
+    color: #000;
+  }
+
+  .print-content p {
+    margin-bottom: 8pt;
+    orphans: 3;
+    widows: 3;
+  }
+
+  .print-content blockquote {
+    border-left: 3pt solid #888;
+    margin: 10pt 0;
+    padding-left: 12pt;
+    color: #333;
+    font-style: italic;
+    page-break-inside: avoid;
+  }
+
+  .print-content ul,
+  .print-content ol {
+    padding-left: 20pt;
+    margin: 8pt 0;
+  }
+
+  .print-content li {
+    margin-bottom: 3pt;
+    page-break-inside: avoid;
+  }
+
+  /* Inline code */
+  .print-content code {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 9pt;
+    background-color: #f5f5f5 !important;
+    padding: 1pt 3pt;
+    border-radius: 2pt;
+    border: 0.5pt solid #ddd;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Code blocks */
+  .print-content pre {
+    font-family: 'Courier New', Courier, monospace;
+    font-size: 9pt;
+    line-height: 1.4;
+    background-color: #f8f8f8 !important;
+    border: 0.75pt solid #ccc;
+    padding: 8pt 10pt;
+    margin: 10pt 0;
+    overflow: visible;
+    white-space: pre-wrap;
+    word-break: break-all;
+    page-break-inside: avoid;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-content pre code {
+    background: transparent !important;
+    border: none;
+    padding: 0;
+  }
+
+  /* Tables */
+  .print-content table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 10pt 0;
+    page-break-inside: avoid;
+    font-size: 10pt;
+  }
+
+  .print-content th {
+    background-color: #eee !important;
+    font-weight: 700;
+    text-align: left;
+    padding: 4pt 8pt;
+    border: 0.75pt solid #aaa;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .print-content td {
+    padding: 4pt 8pt;
+    border: 0.75pt solid #ccc;
+    vertical-align: top;
+  }
+
+  /* Horizontal rule */
+  .print-content hr {
+    border: none;
+    border-top: 0.75pt solid #bbb;
+    margin: 16pt 0;
+  }
+
+  /* Images */
+  .print-content img {
+    max-width: 100%;
+    height: auto;
+    page-break-inside: avoid;
+  }
+
+  /* Print URLs next to links (useful when printing to paper) */
+  .print-content a[href]::after {
+    content: ' (' attr(href) ')';
+    font-size: 8pt;
+    color: #555;
+    word-break: break-all;
+  }
+
+  /* Don't print URL for anchor links or javascript: hrefs */
+  .print-content a[href^='#']::after,
+  .print-content a[href^='javascript:']::after {
+    content: '' !important;
+  }
+
+  /* Explicit page break helpers that authors can apply */
+  .page-break-before {
+    page-break-before: always;
+  }
+
+  .page-break-after {
+    page-break-after: always;
+  }
+
+  .page-break-avoid {
+    page-break-inside: avoid;
+  }
+}

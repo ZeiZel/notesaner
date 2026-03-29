@@ -1,4 +1,4 @@
-import { CanActivate, ExecutionContext, Injectable, Logger } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 import { IS_PUBLIC_KEY } from '../../../common/decorators/public.decorator';
@@ -25,8 +25,6 @@ import { UserApiKeyGuard } from './api-key.guard';
  */
 @Injectable()
 export class ApiKeyOrJwtGuard extends AuthGuard('jwt') implements CanActivate {
-  private readonly logger = new Logger(ApiKeyOrJwtGuard.name);
-
   constructor(
     private readonly reflector: Reflector,
     private readonly apiKeyGuard: UserApiKeyGuard,

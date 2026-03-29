@@ -3,13 +3,16 @@ import { SearchController } from './search.controller';
 import { SearchReplaceController } from './search-replace.controller';
 import { SearchService } from './search.service';
 import { SearchReplaceService } from './search-replace.service';
+import { EmbeddingService } from './embedding.service';
+import { SemanticSearchService } from './semantic-search.service';
 import { JobsModule } from '../jobs/jobs.module';
 import { FilesModule } from '../files/files.module';
 import { NotesModule } from '../notes/notes.module';
 
 /**
  * SearchModule — provides full-text search, fuzzy search, recent-search
- * history backed by ValKey, and workspace-level search & replace.
+ * history backed by ValKey, workspace-level search & replace, and semantic
+ * (vector embedding) search.
  *
  * Both PrismaModule and ValkeyModule are @Global(), so their providers
  * (PrismaService, ValkeyService) are injected automatically without
@@ -21,7 +24,7 @@ import { NotesModule } from '../notes/notes.module';
 @Module({
   imports: [JobsModule, FilesModule, forwardRef(() => NotesModule)],
   controllers: [SearchController, SearchReplaceController],
-  providers: [SearchService, SearchReplaceService],
-  exports: [SearchService, SearchReplaceService],
+  providers: [SearchService, SearchReplaceService, EmbeddingService, SemanticSearchService],
+  exports: [SearchService, SearchReplaceService, EmbeddingService, SemanticSearchService],
 })
 export class SearchModule {}

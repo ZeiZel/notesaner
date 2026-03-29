@@ -147,3 +147,19 @@ export type { VimStatusLineProps } from './components/VimStatusLine';
 // Heading fold toggle view
 export { HeadingFoldView } from './components/HeadingFoldView';
 export type { HeadingFoldViewProps } from './components/HeadingFoldView';
+
+// Mermaid diagram block
+export {
+  MermaidBlock,
+  detectDiagramType,
+  resolveMermaidTheme,
+  getMermaidStarter,
+  MERMAID_DIAGRAM_TYPES,
+  MERMAID_STARTERS,
+} from './extensions/mermaid-block';
+export type {
+  MermaidBlockOptions,
+  MermaidBlockAttrs,
+  MermaidDiagramType,
+  MermaidTheme,
+} from './extensions/mermaid-block';

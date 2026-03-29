@@ -12,7 +12,7 @@ import {
 } from 'class-validator';
 import { Transform } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { AuditAction } from '../audit.types';
+import { AuditAction, AuditActionGroup } from '../audit.types';
 
 /**
  * Query parameters for the paginated audit-log endpoint.
@@ -40,6 +40,17 @@ export class AuditQueryDto {
     return Array.isArray(value) ? value : [value];
   })
   actions?: AuditAction[];
+
+  @ApiPropertyOptional({
+    description:
+      'Convenience shorthand: filter by action group (expanded to all actions in the group). ' +
+      'Ignored when `actions` is also provided.',
+    enum: AuditActionGroup,
+    example: AuditActionGroup.MEMBERS,
+  })
+  @IsOptional()
+  @IsEnum(AuditActionGroup, { message: 'actionGroup must be a valid AuditActionGroup' })
+  actionGroup?: AuditActionGroup;
 
   @ApiPropertyOptional({
     description: 'Entries at or after this ISO 8601 date-time',

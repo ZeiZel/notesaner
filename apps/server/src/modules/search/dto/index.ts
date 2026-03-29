@@ -8,3 +8,4 @@ export {
   SearchReplaceFiltersDto,
 } from './search-replace-preview.dto';
 export { SearchReplaceExecuteDto, MatchReferenceDto } from './search-replace-execute.dto';
+export { SemanticQueryDto } from './semantic-query.dto';

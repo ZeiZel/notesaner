@@ -40,6 +40,7 @@ import { BackupModule } from './modules/backup/backup.module';
 import { PreferencesModule } from './modules/preferences/preferences.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { ActivityModule } from './modules/activity/activity.module';
+import { ApiV1Module } from './modules/api-v1/api-v1.module';
 
 @Module({
   imports: [
@@ -91,6 +92,8 @@ import { ActivityModule } from './modules/activity/activity.module';
     PreferencesModule,
     NotificationsModule,
     ActivityModule,
+    // Public REST API v1 — API key + JWT webhook management
+    ApiV1Module,
   ],
   providers: [
     // ── Throttler storage backed by ValKey ────────────────────────────────

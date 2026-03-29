@@ -6,6 +6,10 @@
  */
 
 // -- UI components --
+export { TimelineView } from './ui/TimelineView';
+export type { TimelineViewProps } from './ui/TimelineView';
+export { NoteBreadcrumb } from './ui/NoteBreadcrumb';
+export type { NoteBreadcrumbProps, BreadcrumbSegment } from './ui/NoteBreadcrumb';
 export { SnapLayoutPicker } from './ui/SnapLayoutPicker';
 export { MobileBottomNav, type MobileNavTab } from './ui/MobileBottomNav';
 export { NavigationButtons } from './ui/NavigationButtons';
@@ -17,6 +21,9 @@ export { MembersList } from './ui/MembersList';
 export { InviteMemberForm } from './ui/InviteMemberForm';
 export { PendingInvitesSection } from './ui/PendingInvitesSection';
 export { RemoveMemberDialog } from './ui/RemoveMemberDialog';
+export { FloatingWindow, DetachButton } from './ui/FloatingWindow';
+export { FloatingWindowsLayer } from './ui/FloatingWindowsLayer';
+export type { FloatingWindowContentRenderer } from './ui/FloatingWindowsLayer';
 
 // -- Model (stores, types, registry) --
 export {
@@ -43,9 +50,26 @@ export type {
 
 export { useNavigationHistoryStore } from './model/navigation-history-store';
 
+export {
+  useFloatingWindowsStore,
+  DEFAULT_WINDOW_SIZE,
+  MIN_WINDOW_WIDTH,
+  MIN_WINDOW_HEIGHT,
+  SNAP_EDGE_THRESHOLD,
+} from './model/floating-windows-store';
+export type {
+  FloatingWindow as FloatingWindowData,
+  FloatingWindowPosition,
+  FloatingWindowSize,
+  FloatingWindowContentType,
+  OpenWindowPayload,
+} from './model/floating-windows-store';
+
 export type { SavedLayout, SnapTemplateId, SnapTemplate } from './model/snap-layout-types';
 export { SNAP_TEMPLATES } from './model/snap-layout-types';
 
 // -- Lib (hooks, utilities) --
 export { useSnapLayout } from './lib/useSnapLayout';
 export { useLayoutPersistence } from './lib/useLayoutPersistence';
+export { useTimelineQuery, timelineKeys } from './lib/use-timeline-query';
+export type { TimelineFilters } from './lib/use-timeline-query';

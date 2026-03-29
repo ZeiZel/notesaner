@@ -1,6 +1,8 @@
 import { Controller, Get } from '@nestjs/common';
 import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { HealthCheck, HealthCheckService } from '@nestjs/terminus';
 import { Public } from '../../common/decorators/public.decorator';
+import { MigrationHealthIndicator } from '../../common/database';
 
 interface HealthResponse {
   status: 'ok' | 'error';
@@ -11,6 +13,11 @@ interface HealthResponse {
 @Public()
 @Controller('health')
 export class HealthController {
+  constructor(
+    private readonly health: HealthCheckService,
+    private readonly migrationHealth: MigrationHealthIndicator,
+  ) {}
+
   @Get()
   @ApiOperation({ summary: 'Health check' })
   @ApiOkResponse({
@@ -50,22 +57,12 @@ export class HealthController {
   }
 
   @Get('ready')
+  @HealthCheck()
   @ApiOperation({ summary: 'Readiness probe' })
   @ApiOkResponse({
-    description: 'Service is ready to accept traffic. Checks DB and Redis connectivity.',
-    schema: {
-      type: 'object',
-      properties: {
-        status: { type: 'string', enum: ['ok', 'error'], example: 'ok' },
-        timestamp: { type: 'string', format: 'date-time' },
-      },
-    },
+    description: 'Service is ready to accept traffic. Checks migration state and DB connectivity.',
   })
-  getReadiness(): HealthResponse {
-    // Full implementation will check DB + Redis connectivity
-    return {
-      status: 'ok',
-      timestamp: new Date().toISOString(),
-    };
+  getReadiness() {
+    return this.health.check([() => this.migrationHealth.isHealthy()]);
   }
 }

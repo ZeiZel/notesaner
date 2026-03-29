@@ -8,6 +8,7 @@ import {
   Param,
   Patch,
   Post,
+  UseInterceptors,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -23,6 +24,9 @@ import {
 } from '@nestjs/swagger';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { CurrentUser, JwtPayload } from '../../common/decorators/current-user.decorator';
+import { Audited } from '../audit/audit.decorator';
+import { AuditInterceptor } from '../audit/audit.interceptor';
+import { AuditAction } from '../audit/audit.types';
 import { WorkspacesService } from './workspaces.service';
 import { WorkspaceSwitchService } from './workspace-switch.service';
 
@@ -91,6 +95,7 @@ class UpdateMemberRoleDto {
 @ApiTags('Workspaces')
 @ApiBearerAuth('bearer')
 @Controller('workspaces')
+@UseInterceptors(AuditInterceptor)
 export class WorkspacesController {
   constructor(
     private readonly workspacesService: WorkspacesService,
@@ -99,6 +104,7 @@ export class WorkspacesController {
 
   @Post()
   @HttpCode(HttpStatus.CREATED)
+  @Audited(AuditAction.WORKSPACE_CREATED)
   @ApiOperation({ summary: 'Create a new workspace' })
   @ApiBody({ type: CreateWorkspaceDto })
   @ApiCreatedResponse({ description: 'Workspace created successfully.' })
@@ -149,6 +155,7 @@ export class WorkspacesController {
   }
 
   @Patch(':workspaceId')
+  @Audited(AuditAction.WORKSPACE_UPDATED)
   @ApiOperation({ summary: 'Update a workspace' })
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiBody({ type: UpdateWorkspaceDto })
@@ -161,6 +168,7 @@ export class WorkspacesController {
 
   @Delete(':workspaceId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Audited(AuditAction.WORKSPACE_DELETED)
   @ApiOperation({ summary: 'Delete a workspace' })
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiNoContentResponse({ description: 'Workspace deleted.' })
@@ -181,6 +189,7 @@ export class WorkspacesController {
 
   @Post(':workspaceId/members')
   @HttpCode(HttpStatus.CREATED)
+  @Audited(AuditAction.MEMBER_INVITED)
   @ApiOperation({ summary: 'Invite a member to the workspace' })
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiBody({ type: InviteMemberDto })
@@ -192,6 +201,7 @@ export class WorkspacesController {
   }
 
   @Patch(':workspaceId/members/:userId')
+  @Audited(AuditAction.MEMBER_ROLE_CHANGED)
   @ApiOperation({ summary: "Update a member's role" })
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiParam({ name: 'userId', description: 'User ID (UUID) of the member', type: String })
@@ -209,6 +219,7 @@ export class WorkspacesController {
 
   @Delete(':workspaceId/members/:userId')
   @HttpCode(HttpStatus.NO_CONTENT)
+  @Audited(AuditAction.MEMBER_REMOVED)
   @ApiOperation({ summary: 'Remove a member from the workspace' })
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiParam({ name: 'userId', description: 'User ID (UUID) of the member', type: String })

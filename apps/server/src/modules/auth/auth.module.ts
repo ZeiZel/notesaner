@@ -10,6 +10,7 @@ import { UserApiKeyController } from './api-keys/api-key.controller';
 import { UserApiKeyService } from './api-keys/api-key.service';
 import { UserApiKeyGuard } from './api-keys/api-key.guard';
 import { ApiKeyOrJwtGuard } from './api-keys/api-key-or-jwt.guard';
+import { AuditModule } from '../audit/audit.module';
 import { EmailModule } from '../email/email.module';
 import { ValkeyModule } from '../valkey/valkey.module';
 
@@ -24,6 +25,9 @@ import { ValkeyModule } from '../valkey/valkey.module';
       }),
       inject: [ConfigService],
     }),
+    // AuditModule provides AuditInterceptor for automatic audit logging
+    // on API key create, rotate, and revoke endpoints.
+    AuditModule,
     // EmailModule provides EmailService for sending verification and reset emails.
     EmailModule,
     // ValkeyModule provides ValkeyService for rate limiting.

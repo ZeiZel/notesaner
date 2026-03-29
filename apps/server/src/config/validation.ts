@@ -38,6 +38,11 @@ const envSchema = z.object({
   // GitHub
   GITHUB_TOKEN: z.string().optional(),
 
+  // ── Embedding / Semantic Search ────────────────────────────────────────────
+  EMBEDDING_PROVIDER: z.enum(['openai']).default('openai'),
+  EMBEDDING_MODEL: z.string().default('text-embedding-3-small'),
+  OPENAI_API_KEY: z.string().optional(),
+
   // OpenTelemetry
   OTEL_ENABLED: z.enum(['true', 'false']).default('true'),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().default('http://localhost:4318'),

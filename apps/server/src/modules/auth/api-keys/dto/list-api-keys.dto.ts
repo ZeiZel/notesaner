@@ -39,6 +39,12 @@ export class UserApiKeyResponseDto {
   lastUsedAt!: string | null;
 
   @ApiProperty({
+    description: 'Total number of successful requests made with this key',
+    example: 42,
+  })
+  requestCount!: number;
+
+  @ApiProperty({
     description: 'When the key was created',
     example: '2026-03-28T09:00:00.000Z',
   })
@@ -54,4 +60,22 @@ export class CreatedApiKeyResponseDto extends UserApiKeyResponseDto {
     example: 'nts_aB3dEf7gHi9jKlMnOpQrStUvWxYz012345678',
   })
   key!: string;
+}
+
+/**
+ * Response DTO returned when a key is rotated.
+ *
+ * Contains both the old key's ID (now revoked) and the new replacement key
+ * (with raw value exposed exactly once). Store the new key immediately.
+ */
+export class RotatedApiKeyResponseDto {
+  @ApiProperty({ description: 'The rotated (now revoked) key ID', example: 'b1c2d3e4-...' })
+  revokedKeyId!: string;
+
+  @ApiProperty({
+    description:
+      'The new replacement API key. Store the raw key securely -- it will not be shown again.',
+    type: () => CreatedApiKeyResponseDto,
+  })
+  newKey!: CreatedApiKeyResponseDto;
 }

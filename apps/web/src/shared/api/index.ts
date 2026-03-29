@@ -43,3 +43,5 @@ export { sessionsApi, sessionKeys } from './sessions';
 export type { SessionDto } from './sessions';
 export { preferencesApi } from './preferences';
 export type { PreferenceResponse, PreferencesMap, BulkPreferenceEntry } from './preferences';
+export { timelineApi } from './timeline';
+export type { TimelineNoteDto, TimelinePageResponse, GetTimelineParams } from './timeline';

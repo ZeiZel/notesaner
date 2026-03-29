@@ -26,7 +26,7 @@ import { Roles } from '../../common/decorators/roles.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { AuditService } from './audit.service';
 import { AuditQueryDto, AuditRetentionConfigDto } from './dto/audit-query.dto';
-import type { AuditFilter } from './audit.types';
+import { AuditAction, type AuditFilter } from './audit.types';
 
 /**
  * AuditController -- workspace-scoped audit-log endpoints.
@@ -45,7 +45,9 @@ export class AuditController {
   @ApiOperation({
     summary: 'Query audit log',
     description:
-      'Returns a paginated list of audit entries. Supports filtering by userId, action types, date range, and free text. Minimum role: ADMIN.',
+      'Returns a paginated list of audit entries. Supports filtering by userId, action types, ' +
+      'action group (e.g. "members", "workspace_settings"), date range, and free text. ' +
+      'Minimum role: ADMIN.',
   })
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiOkResponse({ description: 'Paginated audit entries with nextCursor and total.' })
@@ -56,6 +58,7 @@ export class AuditController {
       filter: {
         userId: dto.userId,
         actions: dto.actions,
+        actionGroup: dto.actionGroup,
         from: dto.from,
         to: dto.to,
         search: dto.search,
@@ -69,7 +72,9 @@ export class AuditController {
   @ApiOperation({
     summary: 'Export audit log as CSV',
     description:
-      'Streams the audit log as a CSV file download. Same filter options as the query endpoint. Minimum role: ADMIN.',
+      'Streams the audit log as a CSV file download. Same filter options as the query endpoint ' +
+      '(including actionGroup). The filename includes a UTC timestamp for unique identification. ' +
+      'Minimum role: ADMIN.',
   })
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiOkResponse({ description: 'CSV file download.' })
@@ -84,6 +89,7 @@ export class AuditController {
     const filter: AuditFilter = {
       userId: dto.userId,
       actions: dto.actions,
+      actionGroup: dto.actionGroup,
       from: dto.from,
       to: dto.to,
       search: dto.search,
@@ -93,7 +99,7 @@ export class AuditController {
 
     // Log the export action
     await this.auditService.log(
-      (await import('./audit.types')).AuditAction.AUDIT_LOG_EXPORTED,
+      AuditAction.AUDIT_LOG_EXPORTED,
       user.sub,
       workspaceId,
       { filters: filter },
@@ -101,7 +107,9 @@ export class AuditController {
       '',
     );
 
-    const filename = `audit-log-${workspaceId}.csv`;
+    // Include a compact UTC timestamp in the filename so downloads are uniquely identifiable.
+    const ts = new Date().toISOString().replace(/[:.]/g, '-').replace('T', '_').slice(0, 19);
+    const filename = `audit-log-${workspaceId}_${ts}.csv`;
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
     res.send(csv);
@@ -159,7 +167,7 @@ export class AuditController {
   ) {
     // Log the SAR action
     await this.auditService.log(
-      (await import('./audit.types')).AuditAction.GDPR_DATA_REQUESTED,
+      AuditAction.GDPR_DATA_REQUESTED,
       _requester.sub,
       workspaceId,
       { subjectUserId: userId },

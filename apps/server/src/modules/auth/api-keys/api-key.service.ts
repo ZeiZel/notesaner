@@ -10,7 +10,11 @@ import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../../../prisma/prisma.service';
 import { ValkeyService } from '../../valkey/valkey.service';
 import { CreateUserApiKeyDto, UserApiKeyScope } from './dto/create-api-key.dto';
-import type { UserApiKeyResponseDto, CreatedApiKeyResponseDto } from './dto/list-api-keys.dto';
+import type {
+  CreatedApiKeyResponseDto,
+  RotatedApiKeyResponseDto,
+  UserApiKeyResponseDto,
+} from './dto/list-api-keys.dto';
 
 // ─── Constants ─────────────────────────────────────────────────────────────────
 
@@ -57,6 +61,10 @@ export interface ValidatedUserApiKey {
  * - The `prefix` field stores the first 8 chars for user-friendly identification
  *   in the UI (e.g., "nts_a1b2...").
  * - Per-key rate limiting is enforced via ValKey counters.
+ * - requestCount is incremented atomically on every successful validation.
+ * - Key rotation creates a new key with the same name/scopes and revokes the
+ *   old one in a single DB transaction. The old key's rotatedToId links to the
+ *   new key for audit trail purposes.
  */
 @Injectable()
 export class UserApiKeyService {
@@ -127,6 +135,7 @@ export class UserApiKeyService {
       scopes: record.scopes.map((s) => this.fromPrismaScope(s)),
       expiresAt: record.expiresAt?.toISOString() ?? null,
       lastUsedAt: null,
+      requestCount: 0,
       createdAt: record.createdAt.toISOString(),
       key: rawKey,
     };
@@ -147,19 +156,41 @@ export class UserApiKeyService {
         scopes: true,
         expiresAt: true,
         lastUsedAt: true,
+        requestCount: true,
         createdAt: true,
       },
     });
 
-    return records.map((r) => ({
-      id: r.id,
-      name: r.name,
-      prefix: r.prefix,
-      scopes: r.scopes.map((s) => this.fromPrismaScope(s)),
-      expiresAt: r.expiresAt?.toISOString() ?? null,
-      lastUsedAt: r.lastUsedAt?.toISOString() ?? null,
-      createdAt: r.createdAt.toISOString(),
-    }));
+    return records.map((r) => this.toResponseDto(r));
+  }
+
+  /**
+   * Retrieve a single API key by ID.
+   * The key must belong to the authenticated user and must not be revoked.
+   * Raw key is never returned.
+   *
+   * @throws NotFoundException when the key does not exist or is revoked.
+   */
+  async getById(userId: string, apiKeyId: string): Promise<UserApiKeyResponseDto> {
+    const record = await this.prisma.apiKey.findFirst({
+      where: { id: apiKeyId, userId, revokedAt: null },
+      select: {
+        id: true,
+        name: true,
+        prefix: true,
+        scopes: true,
+        expiresAt: true,
+        lastUsedAt: true,
+        requestCount: true,
+        createdAt: true,
+      },
+    });
+
+    if (!record) {
+      throw new NotFoundException('API key not found or already revoked');
+    }
+
+    return this.toResponseDto(record);
   }
 
   /**
@@ -184,13 +215,93 @@ export class UserApiKeyService {
     this.logger.log(`API key ${apiKeyId} revoked by userId=${userId}`);
   }
 
+  /**
+   * Rotate an API key: generate a new replacement key with the same name and
+   * scopes as the old key, then immediately revoke the old key in a transaction.
+   *
+   * The old key's `rotatedToId` is set to the new key's ID, creating an audit
+   * trail linking old and new keys.
+   *
+   * The new key does NOT inherit expiresAt -- it starts with no expiry so the
+   * caller can explicitly set one if needed.
+   *
+   * The new key's raw value is returned exactly once -- the caller must store it.
+   *
+   * @throws NotFoundException when the key does not exist or belongs to another user.
+   */
+  async rotate(userId: string, apiKeyId: string): Promise<RotatedApiKeyResponseDto> {
+    // Fetch the key to be rotated (must belong to the user and not already be revoked)
+    const oldKey = await this.prisma.apiKey.findFirst({
+      where: { id: apiKeyId, userId, revokedAt: null },
+      select: {
+        id: true,
+        name: true,
+        scopes: true,
+      },
+    });
+
+    if (!oldKey) {
+      throw new NotFoundException('API key not found or already revoked');
+    }
+
+    const rawKey =
+      KEY_PREFIX +
+      randomBytes(KEY_RANDOM_LENGTH).toString('base64url').substring(0, KEY_RANDOM_LENGTH);
+    const keyHash = UserApiKeyService.hashKey(rawKey);
+    const prefix = rawKey.substring(0, DISPLAY_PREFIX_LENGTH);
+    const now = new Date();
+
+    // Use a transaction: atomically create the new key and revoke the old one.
+    const { newRecord } = await this.prisma.$transaction(async (tx) => {
+      const created = await tx.apiKey.create({
+        data: {
+          userId,
+          name: oldKey.name,
+          keyHash,
+          prefix,
+          scopes: oldKey.scopes,
+          // Intentionally omit expiresAt -- new key starts without an expiry date.
+        },
+      });
+
+      await tx.apiKey.update({
+        where: { id: oldKey.id },
+        data: {
+          revokedAt: now,
+          rotatedToId: created.id,
+        },
+      });
+
+      return { newRecord: created };
+    });
+
+    this.logger.log(`API key ${oldKey.id} rotated to ${newRecord.id} for userId=${userId}`);
+
+    return {
+      revokedKeyId: oldKey.id,
+      newKey: {
+        id: newRecord.id,
+        name: newRecord.name,
+        prefix: newRecord.prefix,
+        scopes: newRecord.scopes.map((s) => this.fromPrismaScope(s)),
+        expiresAt: newRecord.expiresAt?.toISOString() ?? null,
+        lastUsedAt: null,
+        requestCount: 0,
+        createdAt: newRecord.createdAt.toISOString(),
+        key: rawKey,
+      },
+    };
+  }
+
   // ── Validation ──────────────────────────────────────────────────────────────
 
   /**
    * Validate an incoming API key from the `X-API-Key` header.
    *
-   * Performs lookup by SHA-256 digest. Updates `lastUsedAt` asynchronously
-   * (fire-and-forget) to avoid adding latency to every request.
+   * Performs lookup by SHA-256 digest. Updates `lastUsedAt` and increments
+   * `requestCount` asynchronously (fire-and-forget) to avoid adding latency
+   * to every request. requestCount uses a Prisma atomic increment to prevent
+   * lost updates under concurrent requests.
    *
    * @throws UnauthorizedException when key is missing, invalid, expired, or revoked.
    */
@@ -220,14 +331,17 @@ export class UserApiKeyService {
       throw new UnauthorizedException('API key has expired');
     }
 
-    // Fire-and-forget lastUsedAt update
+    // Fire-and-forget: update lastUsedAt and increment requestCount atomically.
     this.prisma.apiKey
       .update({
         where: { id: record.id },
-        data: { lastUsedAt: new Date() },
+        data: {
+          lastUsedAt: new Date(),
+          requestCount: { increment: 1 },
+        },
       })
       .catch((err: unknown) =>
-        this.logger.warn(`Failed to update lastUsedAt for API key ${record.id}: ${String(err)}`),
+        this.logger.warn(`Failed to update usage stats for API key ${record.id}: ${String(err)}`),
       );
 
     return {
@@ -291,6 +405,32 @@ export class UserApiKeyService {
   }
 
   // ── Private Helpers ────────────────────────────────────────────────────────
+
+  /**
+   * Map a Prisma ApiKey select result to a UserApiKeyResponseDto.
+   * Centralises the mapping logic to avoid duplication across list/getById.
+   */
+  private toResponseDto(r: {
+    id: string;
+    name: string;
+    prefix: string;
+    scopes: string[];
+    expiresAt: Date | null;
+    lastUsedAt: Date | null;
+    requestCount: number;
+    createdAt: Date;
+  }): UserApiKeyResponseDto {
+    return {
+      id: r.id,
+      name: r.name,
+      prefix: r.prefix,
+      scopes: r.scopes.map((s) => this.fromPrismaScope(s)),
+      expiresAt: r.expiresAt?.toISOString() ?? null,
+      lastUsedAt: r.lastUsedAt?.toISOString() ?? null,
+      requestCount: r.requestCount,
+      createdAt: r.createdAt.toISOString(),
+    };
+  }
 
   /**
    * Map a DTO scope string to the Prisma ApiKeyScope enum value.

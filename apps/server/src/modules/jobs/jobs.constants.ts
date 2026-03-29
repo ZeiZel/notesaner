@@ -63,3 +63,14 @@ export const STORAGE_RECALCULATION_JOB = 'storage-daily-recalculation';
 
 /** Cron expression for the daily storage recalculation (every day at 03:00 UTC). */
 export const STORAGE_RECALCULATION_CRON = '0 3 * * *';
+
+// ─── Trash purge ───────────────────────────────────────────────────────────
+
+/** BullMQ queue name for trash purge jobs. */
+export const TRASH_PURGE_QUEUE = 'trash-purge';
+
+/** Job name for daily purge of notes expired from trash. */
+export const TRASH_PURGE_JOB = 'trash-daily-purge';
+
+/** Cron expression for the daily trash purge (every day at 02:00 UTC). */
+export const TRASH_PURGE_CRON = '0 2 * * *';

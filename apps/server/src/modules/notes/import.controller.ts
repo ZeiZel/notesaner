@@ -3,6 +3,7 @@ import {
   Controller,
   Post,
   Param,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -21,10 +22,11 @@ import {
   ApiBadRequestResponse,
 } from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ImportService } from './import.service';
 import { ImportOptionsSchema } from './dto/import.dto';
-import type { ImportPreviewResult, ImportResult } from './dto/import.dto';
+import type { ImportPreviewResult, ImportResult, ImportProgressEvent } from './dto/import.dto';
 import { mkdtemp, rm, writeFile, copyFile, unlink } from 'fs/promises';
 import { execSync } from 'child_process';
 import { join } from 'path';
@@ -58,6 +60,56 @@ interface MulterFile {
   buffer?: Buffer;
 }
 
+// Shared API body schema for all import endpoints
+const importBodySchema = {
+  type: 'object',
+  properties: {
+    file: { type: 'string', format: 'binary', description: 'ZIP or file archive' },
+    source: {
+      type: 'string',
+      enum: ['obsidian', 'notion', 'logseq', 'markdown'],
+      description: 'Source application',
+    },
+    preserveFolderStructure: {
+      type: 'boolean',
+      default: true,
+      description: 'Keep original folder structure',
+    },
+    targetFolder: {
+      type: 'string',
+      default: '',
+      description: 'Target folder within workspace',
+    },
+    convertLinks: {
+      type: 'boolean',
+      default: true,
+      description: 'Convert internal links to Notesaner format',
+    },
+    importAttachments: {
+      type: 'boolean',
+      default: true,
+      description: 'Import attachment files',
+    },
+    conflictStrategy: {
+      type: 'string',
+      enum: ['skip', 'overwrite', 'rename'],
+      default: 'rename',
+      description:
+        'What to do when a target note already exists. ' +
+        '"skip" leaves existing files untouched, ' +
+        '"overwrite" replaces them, ' +
+        '"rename" appends a numeric suffix to the new file.',
+    },
+    parseObsidianWorkspace: {
+      type: 'boolean',
+      default: false,
+      description:
+        'Obsidian only: read .obsidian/workspace.json to mark recently-open notes in the preview.',
+    },
+  },
+  required: ['file', 'source'],
+} as const;
+
 // ---------------------------------------------------------------------------
 // Controller
 // ---------------------------------------------------------------------------
@@ -67,6 +119,9 @@ interface MulterFile {
  *
  * Supports importing from Obsidian, Notion, Logseq, and generic markdown files.
  * Uses a two-phase approach: preview first, then execute.
+ *
+ * For large imports use `/execute-stream` to receive Server-Sent Events (SSE)
+ * progress updates during the operation.
  */
 @ApiTags('Notes / Import')
 @ApiBearerAuth('bearer')
@@ -94,38 +149,7 @@ export class ImportController {
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiBody({
     description: 'ZIP file or folder to preview, plus import options',
-    schema: {
-      type: 'object',
-      properties: {
-        file: { type: 'string', format: 'binary', description: 'ZIP or file archive' },
-        source: {
-          type: 'string',
-          enum: ['obsidian', 'notion', 'logseq', 'markdown'],
-          description: 'Source application',
-        },
-        preserveFolderStructure: {
-          type: 'boolean',
-          default: true,
-          description: 'Keep original folder structure',
-        },
-        targetFolder: {
-          type: 'string',
-          default: '',
-          description: 'Target folder within workspace',
-        },
-        convertLinks: {
-          type: 'boolean',
-          default: true,
-          description: 'Convert internal links to Notesaner format',
-        },
-        importAttachments: {
-          type: 'boolean',
-          default: true,
-          description: 'Import attachment files',
-        },
-      },
-      required: ['file', 'source'],
-    },
+    schema: importBodySchema,
   })
   @ApiOkResponse({ description: 'Import preview result with list of notes to be created.' })
   @ApiBadRequestResponse({ description: 'Invalid file or options.' })
@@ -156,7 +180,7 @@ export class ImportController {
   }
 
   // -----------------------------------------------------------------------
-  // Execute import
+  // Execute import (returns JSON when done)
   // -----------------------------------------------------------------------
 
   @Post('execute')
@@ -166,43 +190,14 @@ export class ImportController {
     summary: 'Execute an import',
     description:
       'Upload a ZIP file or folder to import into the workspace. ' +
-      'Notes are created in the target folder with the specified options.',
+      'Notes are created in the target folder with the specified options. ' +
+      'Returns a JSON summary when the entire import is complete. ' +
+      'For real-time progress use the `/execute-stream` endpoint.',
   })
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiBody({
     description: 'ZIP file or folder to import, plus import options',
-    schema: {
-      type: 'object',
-      properties: {
-        file: { type: 'string', format: 'binary', description: 'ZIP or file archive' },
-        source: {
-          type: 'string',
-          enum: ['obsidian', 'notion', 'logseq', 'markdown'],
-          description: 'Source application',
-        },
-        preserveFolderStructure: {
-          type: 'boolean',
-          default: true,
-          description: 'Keep original folder structure',
-        },
-        targetFolder: {
-          type: 'string',
-          default: '',
-          description: 'Target folder within workspace',
-        },
-        convertLinks: {
-          type: 'boolean',
-          default: true,
-          description: 'Convert internal links to Notesaner format',
-        },
-        importAttachments: {
-          type: 'boolean',
-          default: true,
-          description: 'Import attachment files',
-        },
-      },
-      required: ['file', 'source'],
-    },
+    schema: importBodySchema,
   })
   @ApiOkResponse({ description: 'Import result with counts and any errors.' })
   @ApiBadRequestResponse({ description: 'Invalid file or options.' })
@@ -229,6 +224,93 @@ export class ImportController {
       return await this.importService.executeImport(workspaceId, extractedPath, options);
     } finally {
       await this.cleanupTemp(extractedPath);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // Execute import with SSE progress streaming
+  // -----------------------------------------------------------------------
+
+  @Post('execute-stream')
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 500 * 1024 * 1024 } }))
+  @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Execute an import with SSE progress streaming',
+    description:
+      'Same as `/execute` but streams progress events as Server-Sent Events (SSE). ' +
+      'Each event has a `data` field with a JSON-encoded `ImportProgressEvent`. ' +
+      'The stream is closed when the import completes or encounters a fatal error.\n\n' +
+      'SSE event format:\n```\n' +
+      'data: {"phase":"importing","current":3,"total":10,"currentFile":"note.md","errors":[]}\n\n' +
+      'data: {"phase":"complete","current":10,"total":10,"errors":[]}\n\n```',
+  })
+  @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
+  @ApiBody({
+    description: 'ZIP file or folder to import, plus import options',
+    schema: importBodySchema,
+  })
+  @ApiOkResponse({
+    description:
+      'text/event-stream response. Each SSE event carries an ImportProgressEvent JSON payload.',
+  })
+  @ApiBadRequestResponse({ description: 'Invalid file or options.' })
+  @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
+  async executeImportStream(
+    @Param('workspaceId') workspaceId: string,
+    @UploadedFile() file: MulterFile | undefined,
+    @Body() body: Record<string, unknown>,
+    @Res() res: Response,
+  ): Promise<void> {
+    if (!file) {
+      throw new BadRequestException('No file uploaded');
+    }
+
+    const options = ImportOptionsSchema.parse(body);
+    let extractedPath: string;
+
+    try {
+      extractedPath = await this.extractUpload(file);
+    } catch (error) {
+      throw new BadRequestException(`Failed to extract uploaded file: ${String(error)}`);
+    }
+
+    // Set up SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    res.setHeader('X-Accel-Buffering', 'no'); // Disable Nginx proxy buffering
+    res.flushHeaders();
+
+    const sendEvent = (event: ImportProgressEvent): void => {
+      const payload = JSON.stringify(event);
+      res.write(`data: ${payload}\n\n`);
+      // Flush if the response supports it (Express w/ compression middleware)
+      if (typeof (res as unknown as { flush?: () => void }).flush === 'function') {
+        (res as unknown as { flush: () => void }).flush();
+      }
+    };
+
+    try {
+      await this.importService.executeImport(workspaceId, extractedPath, options, sendEvent);
+    } catch (error) {
+      // Emit a terminal error event before closing
+      const errorEvent: ImportProgressEvent = {
+        phase: 'error',
+        current: 0,
+        total: 0,
+        errors: [
+          {
+            file: '',
+            message: `Import failed: ${String(error)}`,
+            recoverable: false,
+          },
+        ],
+      };
+      sendEvent(errorEvent);
+      this.logger.error(`Import stream error for workspace ${workspaceId}: ${String(error)}`);
+    } finally {
+      await this.cleanupTemp(extractedPath);
+      res.end();
     }
   }
 

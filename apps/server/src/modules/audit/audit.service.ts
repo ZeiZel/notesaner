@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { ValkeyService } from '../valkey/valkey.service';
 import {
+  AUDIT_ACTION_GROUP_MAP,
   AuditAction,
   AuditEntry,
   AuditFilter,
@@ -371,10 +372,16 @@ export class AuditService {
   }
 
   private applyFilters(entries: AuditEntry[], filter: AuditFilter): AuditEntry[] {
+    // Resolve effective action set: explicit actions list takes precedence over actionGroup.
+    let effectiveActions: AuditAction[] | undefined = filter.actions;
+    if (!effectiveActions?.length && filter.actionGroup) {
+      effectiveActions = AUDIT_ACTION_GROUP_MAP[filter.actionGroup];
+    }
+
     return entries.filter((entry) => {
       if (filter.userId && entry.userId !== filter.userId) return false;
-      if (filter.actions && filter.actions.length > 0) {
-        if (!filter.actions.includes(entry.action)) return false;
+      if (effectiveActions && effectiveActions.length > 0) {
+        if (!effectiveActions.includes(entry.action)) return false;
       }
       if (filter.search) {
         const needle = filter.search.toLowerCase();
