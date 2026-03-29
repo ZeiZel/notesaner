@@ -24,6 +24,8 @@ export { RemoveMemberDialog } from './ui/RemoveMemberDialog';
 export { FloatingWindow, DetachButton } from './ui/FloatingWindow';
 export { FloatingWindowsLayer } from './ui/FloatingWindowsLayer';
 export type { FloatingWindowContentRenderer } from './ui/FloatingWindowsLayer';
+export { StorageQuotaPanel } from './ui/StorageQuotaPanel';
+export type { StorageQuotaPanelProps } from './ui/StorageQuotaPanel';
 
 // -- Model (stores, types, registry) --
 export {

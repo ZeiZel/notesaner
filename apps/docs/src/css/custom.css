@@ -1,0 +1,189 @@
+/**
+ * Notesaner Docusaurus Theme
+ * Custom CSS overrides for brand consistency
+ */
+
+/* ===== Design Tokens ===== */
+:root {
+  /* Primary brand colors */
+  --ifm-color-primary: #6c47ff;
+  --ifm-color-primary-dark: #5a35ef;
+  --ifm-color-primary-darker: #5230e5;
+  --ifm-color-primary-darkest: #4425c4;
+  --ifm-color-primary-light: #7e59ff;
+  --ifm-color-primary-lighter: #8a65ff;
+  --ifm-color-primary-lightest: #a888ff;
+
+  /* Typography */
+  --ifm-font-family-base: 'Inter', system-ui, -apple-system, sans-serif;
+  --ifm-font-family-monospace: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+  --ifm-font-size-base: 16px;
+  --ifm-line-height-base: 1.65;
+
+  /* Code block */
+  --ifm-code-font-size: 90%;
+  --docusaurus-highlighted-code-line-bg: rgba(108, 71, 255, 0.1);
+
+  /* Layout */
+  --ifm-navbar-height: 60px;
+  --ifm-sidebar-width: 280px;
+  --ifm-toc-border-color: var(--ifm-color-emphasis-200);
+
+  /* Border radius */
+  --ifm-border-radius: 8px;
+  --ifm-code-border-radius: 6px;
+  --ifm-alert-border-radius: 8px;
+}
+
+/* Dark mode overrides */
+[data-theme='dark'] {
+  --ifm-color-primary: #a888ff;
+  --ifm-color-primary-dark: #9270ff;
+  --ifm-color-primary-darker: #8a65ff;
+  --ifm-color-primary-darkest: #7e59ff;
+  --ifm-color-primary-light: #b89aff;
+  --ifm-color-primary-lighter: #c4aaff;
+  --ifm-color-primary-lightest: #d4c0ff;
+
+  --docusaurus-highlighted-code-line-bg: rgba(168, 136, 255, 0.15);
+  --ifm-background-color: #0f0f13;
+  --ifm-background-surface-color: #18181f;
+  --ifm-navbar-background-color: #0f0f13;
+}
+
+/* ===== Navbar ===== */
+.navbar {
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  box-shadow: none;
+}
+
+.navbar__title {
+  font-weight: 700;
+  font-size: 1.1rem;
+  letter-spacing: -0.02em;
+}
+
+/* ===== Hero / Home Page ===== */
+.hero {
+  background: linear-gradient(135deg, #6c47ff 0%, #a888ff 50%, #c4aaff 100%);
+  padding: 80px 0;
+}
+
+.hero__title {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.hero__subtitle {
+  font-size: 1.25rem;
+  opacity: 0.9;
+}
+
+/* ===== Sidebar ===== */
+.menu__link {
+  font-size: 0.9rem;
+}
+
+.menu__link--active {
+  font-weight: 600;
+}
+
+/* ===== Content ===== */
+.markdown h1:first-child {
+  font-size: 2rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin-bottom: 1rem;
+}
+
+.markdown h2 {
+  font-size: 1.4rem;
+  font-weight: 700;
+  margin-top: 2rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.markdown h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+}
+
+/* ===== Code Blocks ===== */
+.prism-code {
+  font-size: 0.875rem;
+  border-radius: var(--ifm-code-border-radius);
+}
+
+/* ===== Admonitions ===== */
+.alert {
+  border-radius: var(--ifm-alert-border-radius);
+  border-left-width: 4px;
+}
+
+/* ===== Tables ===== */
+table {
+  font-size: 0.9rem;
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table thead tr {
+  background-color: var(--ifm-color-emphasis-100);
+}
+
+table th {
+  font-weight: 600;
+  text-align: left;
+  padding: 0.75rem 1rem;
+  border-bottom: 2px solid var(--ifm-color-emphasis-300);
+}
+
+table td {
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--ifm-color-emphasis-200);
+  vertical-align: top;
+}
+
+/* ===== Cards (home page features) ===== */
+.card {
+  border-radius: 12px;
+  border: 1px solid var(--ifm-color-emphasis-200);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+
+.card:hover {
+  border-color: var(--ifm-color-primary);
+  box-shadow: 0 4px 20px rgba(108, 71, 255, 0.12);
+}
+
+/* ===== Breadcrumbs ===== */
+.breadcrumbs__item--active .breadcrumbs__link {
+  font-weight: 600;
+}
+
+/* ===== "Under Construction" notice styling ===== */
+.construction-notice {
+  background: var(--ifm-color-info-contrast-background);
+  border: 1px dashed var(--ifm-color-info);
+  border-radius: 8px;
+  padding: 1rem 1.25rem;
+  margin: 1.5rem 0;
+  font-size: 0.9rem;
+  color: var(--ifm-color-info-dark);
+}
+
+/* ===== Footer ===== */
+.footer {
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
+
+.footer__title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

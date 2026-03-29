@@ -1,0 +1,70 @@
+---
+title: System Architecture Diagram
+description: Full system architecture — web client, NestJS API, PostgreSQL, ValKey, filesystem, and WebSocket sync.
+---
+
+# System Architecture Diagram
+
+## High-Level Architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    Browser / Client                      │
+│                                                         │
+│  ┌─────────────────┐        ┌───────────────────────┐  │
+│  │   Next.js Web   │◄──────►│   Yjs (CRDT Engine)   │  │
+│  │   (React 19)    │        │   WebSocket Client    │  │
+│  └────────┬────────┘        └──────────┬────────────┘  │
+│           │ REST API                   │ WebSocket      │
+└───────────┼────────────────────────────┼───────────────┘
+            │                            │
+            ▼                            ▼
+┌─────────────────────────────────────────────────────────┐
+│                   NestJS API Server                      │
+│                                                         │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │  REST API    │  │  WebSocket   │  │  Auth Module │  │
+│  │  (modules)   │  │  Gateway     │  │  JWT/SAML    │  │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
+│         │                 │                  │          │
+│  ┌──────▼─────────────────▼──────────────────▼───────┐  │
+│  │              Service Layer (Clean Arch)           │  │
+│  └──────┬────────────────────────────────────────────┘  │
+│         │                                               │
+│  ┌──────▼──────────────────────────────────────────┐   │
+│  │              Repository Layer / Prisma          │   │
+│  └──────┬───────────────────────────────────────────┘  │
+└─────────┼──────────────────────────────────────────────┘
+          │
+    ┌─────┼───────────────┐
+    │     │               │
+    ▼     ▼               ▼
+┌───────┐ ┌────────┐ ┌──────────────────┐
+│Postgres│ │ValKey  │ │  Filesystem      │
+│  :5432 │ │  :6379 │ │  (MD files)      │
+│        │ │        │ │  /data/notes/    │
+│Metadata│ │Session │ │  note.md         │
+│FTS     │ │Pub/Sub │ │  attachments/    │
+└────────┘ └────────┘ └──────────────────┘
+```
+
+## Data Flow: Note Edit
+
+1. User types in editor → TipTap generates ProseMirror transaction
+2. Yjs encodes the change as a CRDT update
+3. Update is broadcast over WebSocket to all connected clients
+4. Server receives update → broadcasts to all other clients in the room
+5. Server debounces (500ms) → persists Markdown to filesystem
+6. Server updates note metadata in PostgreSQL (title, modified_at, search index)
+
+## Request Flow: REST API
+
+```
+Browser → Nginx → Next.js (API Route proxy) → NestJS API
+       OR
+Browser → Nginx → NestJS API (direct /api/* calls)
+```
+
+## Authentication Flow
+
+See [Authentication Flow](/docs/architecture/auth-flow) for the detailed JWT/SAML/OIDC flow diagram.

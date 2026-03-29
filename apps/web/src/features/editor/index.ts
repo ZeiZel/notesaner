@@ -161,8 +161,8 @@ export { useNoteCssClass } from './lib/use-note-css-class';
 export { usePrint, usePrintShortcut } from './lib/use-print';
 export type { UsePrintOptions, UsePrintReturn, UsePrintShortcutOptions } from './lib/use-print';
 
-export { CommentMark, COMMENT_MARK_CSS } from './lib/comment-mark';
-export type { CommentMarkAttributes } from './lib/comment-mark';
+export { CommentMark, COMMENT_MARK_CSS, COMMENT_MARK_CLICK_KEY } from './lib/comment-mark';
+export type { CommentMarkAttributes, CommentMarkOptions } from './lib/comment-mark';
 
 export {
   DropUploadExtension,
@@ -208,3 +208,6 @@ export {
   useRestoreVersion,
   versionKeys,
 } from './hooks/useVersionHistory';
+
+export { useEditorComments } from './hooks/useEditorComments';
+export type { UseEditorCommentsOptions, UseEditorCommentsReturn } from './hooks/useEditorComments';

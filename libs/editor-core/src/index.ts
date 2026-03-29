@@ -19,6 +19,18 @@ export {
   type HighlightOptions,
 } from './extensions/highlight';
 
+// Comment mark (inline comment annotations attached to text ranges)
+export {
+  CommentMark,
+  COMMENT_MARK_PLUGIN_KEY,
+  COMMENT_MARK_ACTIVE_BG,
+  COMMENT_MARK_RESOLVED_BG,
+  COMMENT_MARK_ACTIVE_BORDER,
+  COMMENT_MARK_RESOLVED_BORDER,
+  type CommentMarkAttrs,
+  type CommentMarkOptions,
+} from './extensions/comment-mark';
+
 // Toggle list (collapsible details/summary)
 export {
   ToggleList,
