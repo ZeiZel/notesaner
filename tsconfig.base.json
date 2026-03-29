@@ -43,7 +43,8 @@
       "@notesaner/plugin-daily-notes": ["packages/plugin-daily-notes/src/index.ts"],
       "@notesaner/plugin-pdf-export": ["packages/plugin-pdf-export/src/index.ts"],
       "@notesaner/plugin-mermaid": ["packages/plugin-mermaid/src/index.ts"],
-      "@notesaner/plugin-focus-mode": ["packages/plugin-focus-mode/src/index.ts"]
+      "@notesaner/plugin-focus-mode": ["packages/plugin-focus-mode/src/index.ts"],
+      "@notesaner/component-sdk": ["packages/component-sdk/src/index.ts"]
     }
   },
   "exclude": ["node_modules", "tmp"]
