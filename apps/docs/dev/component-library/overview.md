@@ -7,8 +7,10 @@ description: The @notesaner/ui shared component library — installation, usage,
 
 The `@notesaner/ui` package (`packages/ui`) provides shared React UI components used across the Notesaner web application.
 
-:::info Storybook
-An interactive component browser is planned via Storybook. This will be linked here when available.
+:::tip Storybook — Interactive Component Catalog
+Browse all components live in the [Storybook Component Catalog →](/storybook)
+
+Run locally: `pnpm storybook` (starts on http://localhost:6006)
 :::
 
 ## Installation

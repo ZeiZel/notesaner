@@ -50,6 +50,12 @@ GET /api/docs-json         # Raw OpenAPI JSON
 GET /api/docs-yaml         # Raw OpenAPI YAML
 ```
 
+:::tip Interactive API Explorer
+Try endpoints directly in the browser — [Open API Explorer →](/api-explorer)
+
+Requires a running backend (`pnpm nx serve server`).
+:::
+
 ## Error Format
 
 All errors follow a consistent format:

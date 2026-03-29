@@ -103,6 +103,16 @@ const config: Config = {
           position: 'left',
         },
         {
+          to: '/storybook',
+          label: 'Components',
+          position: 'left',
+        },
+        {
+          to: '/api-explorer',
+          label: 'API Explorer',
+          position: 'left',
+        },
+        {
           href: 'https://github.com/notesaner/notesaner',
           label: 'GitHub',
           position: 'right',
@@ -128,10 +138,12 @@ const config: Config = {
             { label: 'Self-Hosting', to: '/docs/self-hosting/overview' },
             { label: 'Architecture', to: '/docs/architecture/system-diagram' },
             { label: 'API Reference', to: '/docs/api-reference/overview' },
+            { label: 'API Explorer', to: '/api-explorer' },
             {
               label: 'Plugin Development',
               to: '/docs/plugin-development/getting-started/architecture',
             },
+            { label: 'Component Library', to: '/storybook' },
           ],
         },
         {
