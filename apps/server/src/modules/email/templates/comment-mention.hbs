@@ -1,0 +1,31 @@
+{{!-- subject --}}
+{{mentionedByName}} mentioned you in {{noteTitle}}
+{{!-- /subject --}}
+
+{{!-- html --}}
+<h1>You were mentioned</h1>
+<p>Hi {{displayName}},</p>
+<p><strong>{{mentionedByName}}</strong> mentioned you in a comment on <strong>{{noteTitle}}</strong>:</p>
+<blockquote style="border-left: 3px solid #5b50f0; margin: 16px 0; padding: 8px 16px; background: #f8f7ff; border-radius: 0 4px 4px 0;">
+  <p style="margin: 0; font-style: italic;">{{commentPreview}}</p>
+</blockquote>
+<a href="{{{noteUrl}}}" class="btn">View comment</a>
+<hr class="divider" />
+{{#if workspaceName}}<p class="muted">In workspace: {{workspaceName}}</p>{{/if}}
+{{!-- /html --}}
+
+{{!-- text --}}
+{{mentionedByName}} mentioned you in {{noteTitle}}
+
+Hi {{displayName}},
+
+{{mentionedByName}} mentioned you in a comment on "{{noteTitle}}":
+
+  "{{commentPreview}}"
+
+View the comment: {{{noteUrl}}}
+{{#if workspaceName}}
+Workspace: {{workspaceName}}
+{{/if}}
+— The Notesaner team
+{{!-- /text --}}
