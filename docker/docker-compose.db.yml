@@ -1,0 +1,49 @@
+# =============================================================================
+# Notesaner — Database services (PostgreSQL 17 + ValKey 8)
+# For local development: ports exposed, no resource limits
+# =============================================================================
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-notesaner}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-notesaner}
+      POSTGRES_DB: ${POSTGRES_DB:-notesaner}
+      POSTGRES_INITDB_ARGS: '--encoding=UTF8 --locale=C'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sh:/docker-entrypoint-initdb.d/01-init.sh:ro
+    ports:
+      - '5432:5432'
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER:-notesaner} -d ${POSTGRES_DB:-notesaner}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles: ['dev', 'all']
+
+  valkey:
+    image: valkey/valkey:8-alpine
+    restart: unless-stopped
+    command:
+      - valkey-server
+      - '--requirepass'
+      - '${VALKEY_PASSWORD:-valkey}'
+      - '--appendonly'
+      - 'yes'
+    volumes:
+      - valkey_data:/data
+    ports:
+      - '6379:6379'
+    healthcheck:
+      test: ['CMD', 'valkey-cli', '-a', '${VALKEY_PASSWORD:-valkey}', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    profiles: ['dev', 'all']
+
+volumes:
+  postgres_data:
+  valkey_data:

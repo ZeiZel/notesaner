@@ -1,0 +1,55 @@
+# =============================================================================
+# Notesaner — Backend service (NestJS 11)
+# Dev: builds from source with hot-reload via volume mount
+# =============================================================================
+
+services:
+  server:
+    build:
+      context: ..
+      dockerfile: docker/server.Dockerfile
+      target: runner
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      PORT: 4000
+      DATABASE_URL: postgresql://${POSTGRES_USER:-notesaner}:${POSTGRES_PASSWORD:-notesaner}@postgres:5432/${POSTGRES_DB:-notesaner}?schema=public
+      REDIS_HOST: valkey
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ${VALKEY_PASSWORD:-valkey}
+      REDIS_DB: 0
+      QUEUE_REDIS_HOST: valkey
+      QUEUE_REDIS_PORT: 6379
+      QUEUE_REDIS_PASSWORD: ${VALKEY_PASSWORD:-valkey}
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-prod}
+      JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-900}
+      JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL:-2592000}
+      ALLOWED_ORIGINS: ${FRONTEND_URL:-http://localhost:3000}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      STORAGE_ROOT: /data/notes
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-true}
+      REQUIRE_EMAIL_VERIFICATION: ${REQUIRE_EMAIL_VERIFICATION:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-debug}
+      GITHUB_TOKEN: ${GITHUB_TOKEN:-}
+    volumes:
+      - notes_data:/data/notes
+      # Hot-reload: mount compiled dist from host (rebuild triggers restart)
+      - ../dist/apps/server:/app
+      - ../apps/server/prisma:/app/prisma:ro
+    ports:
+      - '4000:4000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://localhost:4000/health || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    profiles: ['dev', 'all']
+
+volumes:
+  notes_data:
