@@ -22,6 +22,12 @@
       "cache": true,
       "inputs": ["default"],
       "outputs": ["{projectRoot}/storybook-static"]
+    },
+    "storybook:test": {
+      "command": "test-storybook --config-dir packages/ui/.storybook",
+      "options": {
+        "cwd": "{workspaceRoot}"
+      }
     }
   }
 }

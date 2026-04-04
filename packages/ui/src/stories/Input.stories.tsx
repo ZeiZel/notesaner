@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react';
+import { within, userEvent, expect } from '@storybook/test';
 import { Input } from '../components/input';
 import { Button } from '../components/button';
 
@@ -92,6 +93,21 @@ export const WithValue: Story = {
 export const File: Story = {
   args: {
     type: 'file',
+  },
+};
+
+// Interaction: type text and verify value
+export const TypingInteraction: Story = {
+  args: {
+    placeholder: 'Type here...',
+    type: 'text',
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByRole('textbox');
+    await userEvent.click(input);
+    await userEvent.type(input, 'Hello, notes!');
+    await expect(input).toHaveValue('Hello, notes!');
   },
 };
 

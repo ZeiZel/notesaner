@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from 'storybook/test';
+import { within, userEvent, expect } from '@storybook/test';
 import { useState } from 'react';
 import { CommandPalette, type CommandPaletteAction } from '../components/command-palette';
 import { Button } from '../components/button';
@@ -281,6 +282,59 @@ export const WithDisabledItems: Story = {
       </div>
     ),
   ],
+};
+
+// Interaction: open palette, search, verify filtered results
+export const SearchInteraction: Story = {
+  args: {
+    open: true,
+    onClose: fn(),
+    actions: sampleActions,
+    placeholder: 'Type a command or search...',
+  },
+  decorators: [
+    (Story) => (
+      <div style={{ height: '600px', position: 'relative' }}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByRole('combobox');
+    await userEvent.type(input, 'export');
+    const exportMd = await canvas.findByText('Export as Markdown');
+    await expect(exportMd).toBeVisible();
+    const newNote = canvas.queryByText('New Note');
+    await expect(newNote).not.toBeInTheDocument();
+  },
+};
+
+// Interaction: select an action via keyboard
+export const SelectActionInteraction: Story = {
+  args: {
+    open: true,
+    onClose: fn(),
+    actions: sampleActions,
+    placeholder: 'Type a command or search...',
+  },
+  decorators: [
+    (Story) => (
+      <div style={{ height: '600px', position: 'relative' }}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByRole('combobox');
+    await userEvent.type(input, 'new note');
+    const item = await canvas.findByText('New Note');
+    await userEvent.click(item);
+    const newNoteAction = sampleActions.find((a) => a.id === 'new-note');
+    await expect(newNoteAction?.onSelect).toHaveBeenCalledTimes(1);
+    await expect(args.onClose).toHaveBeenCalledTimes(1);
+  },
 };
 
 // Empty state
