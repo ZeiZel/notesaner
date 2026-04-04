@@ -1,0 +1,57 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Build outputs — dist/ intentionally NOT excluded; new Dockerfiles COPY from dist/
+# dist/
+# Exclude only .next/cache to keep build context small; static assets under
+# apps/web/.next/static must be accessible for web.Dockerfile COPY.
+**/.next/cache/
+out/
+storybook-static/
+
+# NX cache
+.nx/
+tmp/
+
+# Environment files (injected via docker-compose)
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Testing artifacts
+coverage/
+playwright-report/
+test-results/
+reports/
+.benchmarks/
+.lighthouseci/
+
+# Git
+.git/
+.gitignore
+
+# Documentation (not needed in build)
+docs/
+*.md
+LICENSE
+
+# Docker (prevent recursive COPY)
+docker-compose.yml
+docker-compose.*.yml
+Dockerfile*
+
+# Misc
+.husky/
+.turbo/
