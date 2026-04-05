@@ -1,0 +1,27 @@
+# Documentation - changes should not trigger rebuilds
+*.md
+docs/
+apps/docs/
+LICENSE
+
+# IDE and editor configs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Claude Code artifacts
+.claude/
+.beads/
+
+# Repomix snapshots
+.repomix-output.txt
+
+# Design assets
+designs/
+*.fig
+*.sketch
