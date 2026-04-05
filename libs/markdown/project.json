@@ -8,5 +8,5 @@
       "command": "tsc --noEmit -p libs/markdown/tsconfig.json"
     }
   },
-  "tags": ["scope:lib"]
+  "tags": ["scope:lib", "type:lib"]
 }

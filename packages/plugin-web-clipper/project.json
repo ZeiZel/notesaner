@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "packages/plugin-web-clipper/src",
   "projectType": "library",
-  "tags": ["scope:shared"],
+  "tags": ["scope:shared", "type:plugin"],
   "targets": {
     "type-check": {
       "command": "tsc --noEmit -p packages/plugin-web-clipper/tsconfig.json"

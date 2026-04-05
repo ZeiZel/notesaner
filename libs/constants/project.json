@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/constants/src",
   "projectType": "library",
-  "tags": ["scope:lib"],
+  "tags": ["scope:lib", "type:lib"],
   "targets": {
     "type-check": {
       "command": "tsc --noEmit -p libs/constants/tsconfig.json"

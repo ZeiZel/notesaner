@@ -1,18 +1,14 @@
 {
-  "name": "plugin-slides",
+  "name": "plugin-mermaid",
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
-  "sourceRoot": "packages/plugin-slides/src",
+  "sourceRoot": "packages/plugin-mermaid/src",
   "projectType": "library",
   "tags": ["scope:shared", "type:plugin"],
   "targets": {
     "type-check": {
-      "command": "tsc --noEmit -p packages/plugin-slides/tsconfig.json"
-    },
-    "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "pnpm vitest run",
-        "cwd": "packages/plugin-slides"
+        "commands": ["tsc --noEmit -p packages/plugin-mermaid/tsconfig.json"]
       }
     }
   }
