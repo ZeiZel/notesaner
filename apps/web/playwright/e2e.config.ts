@@ -1,9 +1,8 @@
 /**
  * Playwright configuration for end-to-end (e2e) functional tests.
  *
- * Provides a regression baseline for all existing user flows before
- * major refactoring (FSD migration). Tests verify pages render and
- * key interactions work — smoke/integration level, not exhaustive.
+ * Comprehensive E2E suite covering auth, notes CRUD, editor, collaboration,
+ * plugins, graph, backlinks, settings, layout, and navigation flows.
  *
  * Usage:
  *   npx playwright test --config=apps/web/playwright/e2e.config.ts
@@ -16,7 +15,7 @@ import { defineConfig, devices } from '@playwright/test';
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
 
 export default defineConfig({
-  testDir: '../src/__tests__/e2e',
+  testDir: './e2e',
   testMatch: '**/*.spec.ts',
 
   /* Timeout per test — 30 seconds */
@@ -60,13 +59,15 @@ export default defineConfig({
     },
   ],
 
-  /* Auto-start the Next.js dev server */
-  webServer: {
-    command: 'pnpm nx serve web',
-    url: BASE_URL,
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-    stdout: 'pipe',
-    stderr: 'pipe',
-  },
+  /* Auto-start the Next.js dev server (skip in CI — pre-built) */
+  ...(!process.env.CI && {
+    webServer: {
+      command: 'pnpm nx serve web',
+      url: BASE_URL,
+      reuseExistingServer: true,
+      timeout: 120_000,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    },
+  }),
 });
