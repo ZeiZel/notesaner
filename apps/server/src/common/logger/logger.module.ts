@@ -121,7 +121,8 @@ import type { IncomingMessage } from 'node:http';
                 },
           },
         };
-      }) as unknown,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any,
     }),
   ],
 })
