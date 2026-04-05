@@ -28,6 +28,12 @@
       "options": {
         "cwd": "{workspaceRoot}"
       }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["eslint {projectRoot}/src --ext .ts,.tsx"]
+      }
     }
   }
 }

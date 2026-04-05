@@ -14,6 +14,12 @@
         "command": "pnpm vitest run",
         "cwd": "packages/plugin-daily-notes"
       }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["eslint {projectRoot}/src --ext .ts,.tsx"]
+      }
     }
   }
 }

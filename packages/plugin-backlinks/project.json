@@ -10,6 +10,12 @@
       "options": {
         "commands": ["tsc --noEmit -p packages/plugin-backlinks/tsconfig.json"]
       }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["eslint {projectRoot}/src --ext .ts,.tsx"]
+      }
     }
   }
 }

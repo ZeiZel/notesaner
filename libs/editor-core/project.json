@@ -6,6 +6,12 @@
   "targets": {
     "type-check": {
       "command": "tsc --noEmit -p libs/editor-core/tsconfig.json"
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["eslint {projectRoot}/src --ext .ts,.tsx"]
+      }
     }
   },
   "tags": ["scope:lib", "type:lib"]

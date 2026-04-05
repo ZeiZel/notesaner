@@ -16,6 +16,12 @@
       "options": {
         "commands": ["vitest run --config packages/plugin-graph/vitest.config.ts"]
       }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["eslint {projectRoot}/src --ext .ts,.tsx"]
+      }
     }
   }
 }
