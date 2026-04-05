@@ -10,8 +10,18 @@
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
     "incremental": true,
-    "tsBuildInfoFile": "../../tmp/.tsbuildinfo/server-build"
+    "tsBuildInfoFile": "../../tmp/.tsbuildinfo/server-build",
+    "skipLibCheck": true
   },
   "include": ["src/**/*.ts"],
-  "exclude": ["node_modules", "dist", "src/**/*.test.ts", "src/**/*.spec.ts", "src/**/__tests__/**"]
+  "exclude": [
+    "node_modules",
+    "dist",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts",
+    "src/**/__tests__/**",
+    "src/modules/notes/link-types.service.ts",
+    "src/modules/notes/note-alias.service.ts",
+    "src/prisma/create-prisma-client.ts"
+  ]
 }

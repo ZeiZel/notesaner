@@ -31,13 +31,6 @@ interface ParsedNote {
   wasRecentlyOpen: boolean;
 }
 
-interface _UploadedFile {
-  originalname: string;
-  path: string;
-  mimetype: string;
-  size: number;
-}
-
 /** Callback invoked after each note is processed during executeImport. */
 export type ImportProgressCallback = (event: ImportProgressEvent) => void;
 

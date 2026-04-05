@@ -149,7 +149,7 @@ export class ImportController {
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiBody({
     description: 'ZIP file or folder to preview, plus import options',
-    schema: importBodySchema,
+    schema: importBodySchema as Record<string, unknown>,
   })
   @ApiOkResponse({ description: 'Import preview result with list of notes to be created.' })
   @ApiBadRequestResponse({ description: 'Invalid file or options.' })
@@ -197,7 +197,7 @@ export class ImportController {
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiBody({
     description: 'ZIP file or folder to import, plus import options',
-    schema: importBodySchema,
+    schema: importBodySchema as Record<string, unknown>,
   })
   @ApiOkResponse({ description: 'Import result with counts and any errors.' })
   @ApiBadRequestResponse({ description: 'Invalid file or options.' })
@@ -247,7 +247,7 @@ export class ImportController {
   @ApiParam({ name: 'workspaceId', description: 'Workspace ID (UUID)', type: String })
   @ApiBody({
     description: 'ZIP file or folder to import, plus import options',
-    schema: importBodySchema,
+    schema: importBodySchema as Record<string, unknown>,
   })
   @ApiOkResponse({
     description:

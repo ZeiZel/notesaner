@@ -9,10 +9,9 @@ export const SamlConfigSchema = z.object({
   certificate: z
     .string()
     .min(1, 'SAML certificate is required')
-    .refine(
-      (v) => v.includes('BEGIN CERTIFICATE') || v.includes('BEGIN X509'),
-      { message: 'certificate must be a valid PEM-encoded X.509 certificate' },
-    ),
+    .refine((v) => v.includes('BEGIN CERTIFICATE') || v.includes('BEGIN X509'), {
+      message: 'certificate must be a valid PEM-encoded X.509 certificate',
+    }),
 
   /** IdP Single Sign-On URL */
   ssoUrl: z
@@ -53,10 +52,7 @@ export const OidcConfigSchema = z.object({
   clientSecret: z.string().min(1, 'OIDC client secret is required'),
 
   /** OAuth2 callback URL registered with the IdP */
-  callbackUrl: z
-    .string()
-    .url({ message: 'callbackUrl must be a valid URL' })
-    .optional(),
+  callbackUrl: z.string().url({ message: 'callbackUrl must be a valid URL' }).optional(),
 
   /** OAuth2 scopes to request (default: openid email profile) */
   scopes: z.array(z.string()).optional().default(['openid', 'email', 'profile']),
@@ -110,9 +106,7 @@ export const UpdateAuthProviderSchema = z
   .object({
     name: z.string().min(1).max(100).optional(),
     isEnabled: z.boolean().optional(),
-    config: z
-      .union([SamlConfigSchema.partial(), OidcConfigSchema.partial()])
-      .optional(),
+    config: z.union([SamlConfigSchema.partial(), OidcConfigSchema.partial()]).optional(),
   })
   .describe('UpdateAuthProviderDto');
 
@@ -123,7 +117,7 @@ export type UpdateAuthProviderDto = z.infer<typeof UpdateAuthProviderSchema>;
 // ---------------------------------------------------------------------------
 
 export const ToggleAuthProviderSchema = z.object({
-  isEnabled: z.boolean({ required_error: 'isEnabled is required' }),
+  isEnabled: z.boolean({ message: 'isEnabled is required' }),
 });
 
 export type ToggleAuthProviderDto = z.infer<typeof ToggleAuthProviderSchema>;

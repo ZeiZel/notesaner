@@ -226,7 +226,7 @@ export class ConflictResolutionService {
   /**
    * Persist the Yjs document state to Valkey.
    */
-  async persistDocState(noteId: string, workspaceId: string, doc: Y.Doc): Promise<void> {
+  async persistDocState(noteId: string, _workspaceId: string, doc: Y.Doc): Promise<void> {
     const key = docStateKey(noteId);
     const state = Y.encodeStateAsUpdate(doc);
     const encoded = Buffer.from(state).toString('base64');

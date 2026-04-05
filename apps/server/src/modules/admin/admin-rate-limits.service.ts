@@ -3,7 +3,7 @@ import { ValkeyThrottlerStorage } from '../../common/throttler/valkey-throttler-
 import { AccountLockoutService } from '../../common/services/account-lockout.service';
 import { WsConnectionLimitGuard } from '../../common/guards/ws-connection-limit.guard';
 
-interface RateLimitStatus {
+export interface RateLimitStatus {
   userId: string;
   rateLimits: {
     global: { totalHits: number; ttlSeconds: number } | null;

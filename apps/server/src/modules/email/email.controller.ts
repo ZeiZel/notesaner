@@ -208,5 +208,7 @@ function buildSampleVariables(template: EmailTemplateName): Record<string, unkno
           },
         ],
       };
+    default:
+      return base;
   }
 }

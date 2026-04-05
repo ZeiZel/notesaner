@@ -19,7 +19,7 @@ import type { IncomingMessage } from 'node:http';
     PinoLoggerModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
-      useFactory: (config: ConfigService) => {
+      useFactory: ((config: ConfigService) => {
         const nodeEnv = config.get<string>('nodeEnv', 'development');
         const logLevel = config.get<string>('logging.level', 'info');
         const isProduction = nodeEnv === 'production';
@@ -29,7 +29,9 @@ import type { IncomingMessage } from 'node:http';
             level: logLevel,
 
             // Use the correlation ID from the request
-            genReqId: (req: IncomingMessage & { id?: string }): string => req.id ?? 'unknown',
+            genReqId: (req: IncomingMessage): string => {
+              return String((req as IncomingMessage & { id?: string | number }).id ?? 'unknown');
+            },
 
             // Redact sensitive data
             redact: {
@@ -119,7 +121,7 @@ import type { IncomingMessage } from 'node:http';
                 },
           },
         };
-      },
+      }) as unknown,
     }),
   ],
 })

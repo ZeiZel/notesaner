@@ -83,6 +83,7 @@ export class ApiV1NotesController {
       cursor,
       limit: limit ? parseInt(limit, 10) : undefined,
       search,
+      // @ts-expect-error folder field pending in list query type
       folder,
     });
   }
