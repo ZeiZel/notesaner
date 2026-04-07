@@ -39,6 +39,9 @@ test-results/
 reports/benchmarks/
 reports/lighthouse/
 
+# E2E HTML reports (generated)
+reports/e2e-html/
+
 # Prisma
 apps/server/prisma/*.db
 
@@ -48,6 +51,15 @@ docker/data/
 # Logs
 *.log
 logs/
+
+# Temp build artifacts
+tmp/
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Repomix output
+.repomix-output.txt
 
 # Claude Code
 .claude/backups/
