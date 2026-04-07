@@ -14,13 +14,13 @@ services:
       NODE_ENV: development
       PORT: 4000
       DATABASE_URL: postgresql://${POSTGRES_USER:-notesaner}:${POSTGRES_PASSWORD:-notesaner}@postgres:5432/${POSTGRES_DB:-notesaner}?schema=public
-      REDIS_HOST: valkey
+      REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${VALKEY_PASSWORD:-valkey}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-redis}
       REDIS_DB: 0
-      QUEUE_REDIS_HOST: valkey
+      QUEUE_REDIS_HOST: redis
       QUEUE_REDIS_PORT: 6379
-      QUEUE_REDIS_PASSWORD: ${VALKEY_PASSWORD:-valkey}
+      QUEUE_REDIS_PASSWORD: ${REDIS_PASSWORD:-redis}
       JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-change-in-prod}
       JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-900}
       JWT_REFRESH_TOKEN_TTL: ${JWT_REFRESH_TOKEN_TTL:-2592000}
@@ -41,7 +41,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      valkey:
+      redis:
         condition: service_healthy
     healthcheck:
       test: ['CMD-SHELL', 'wget --spider -q http://localhost:4000/health || exit 1']

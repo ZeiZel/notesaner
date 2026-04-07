@@ -102,9 +102,14 @@ export const configuration = () => ({
   },
 
   valkey: {
-    url:
-      process.env['VALKEY_URL'] ??
-      `redis://${process.env['REDIS_HOST'] ?? 'localhost'}:${process.env['REDIS_PORT'] ?? '6379'}/${process.env['REDIS_DB'] ?? '0'}`,
+    url: (() => {
+      const host = process.env['REDIS_HOST'] ?? 'localhost';
+      const port = process.env['REDIS_PORT'] ?? '6379';
+      const db = process.env['REDIS_DB'] ?? '0';
+      const password = process.env['REDIS_PASSWORD'];
+      const auth = password ? `:${encodeURIComponent(password)}@` : '';
+      return `redis://${auth}${host}:${port}/${db}`;
+    })(),
   },
 
   // ── Backup & Disaster Recovery ────────────────────────────────────────────

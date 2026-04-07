@@ -6,13 +6,7 @@
  */
 
 import { test, expect } from '../fixtures/test-fixtures';
-import {
-  waitForEditor,
-  typeInEditor,
-  getEditorContent,
-  navigateToNote,
-  waitForNetworkIdle,
-} from '../utils/helpers';
+import { waitForEditor, typeInEditor, navigateToNote, waitForNetworkIdle } from '../utils/helpers';
 
 test.describe('Backlinks panel', () => {
   test('backlinks panel is accessible from the editor view', async ({
@@ -20,11 +14,6 @@ test.describe('Backlinks panel', () => {
     testNote,
   }) => {
     await navigateToNote(page, testNote.id, testNote.workspaceId);
-
-    // Backlinks may be in a right sidebar panel, a tab, or a dedicated section
-    const backlinksPanel = page.locator(
-      '[data-testid="backlinks-panel"], [aria-label="Backlinks"], [data-testid="backlinks"]',
-    );
 
     // Try toggling the right sidebar if backlinks are there
     const rightSidebarToggle = page.getByLabel('Toggle right sidebar');
@@ -104,9 +93,9 @@ test.describe('Backlinks panel', () => {
     }
 
     // Find a backlink entry (if any exist for this note)
-    const backlinkItem = page.locator(
-      '[data-testid="backlink-item"] a, [data-testid="backlinks-panel"] a',
-    ).first();
+    const backlinkItem = page
+      .locator('[data-testid="backlink-item"] a, [data-testid="backlinks-panel"] a')
+      .first();
 
     if (await backlinkItem.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const currentUrl = page.url();
@@ -115,10 +104,9 @@ test.describe('Backlinks panel', () => {
       await backlinkItem.click();
 
       // Should navigate to the referring note
-      await page.waitForURL(
-        (url) => url.pathname !== new URL(currentUrl).pathname,
-        { timeout: 10_000 },
-      );
+      await page.waitForURL((url) => url.pathname !== new URL(currentUrl).pathname, {
+        timeout: 10_000,
+      });
 
       // Editor should load for the new note
       await waitForEditor(page);
@@ -161,9 +149,7 @@ test.describe('Backlink count', () => {
     await navigateToNote(page, testNote.id, testNote.workspaceId);
 
     // Some UIs show a backlink count badge
-    const backlinkCount = page.locator(
-      '[data-testid="backlink-count"], [aria-label*="backlink"]',
-    );
+    const backlinkCount = page.locator('[data-testid="backlink-count"], [aria-label*="backlink"]');
 
     const hasCount = await backlinkCount
       .first()

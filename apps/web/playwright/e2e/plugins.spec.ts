@@ -88,9 +88,9 @@ test.describe('Plugin management', () => {
     await page.goto(PLUGIN_SETTINGS_URL);
 
     // Find a plugin toggle/switch
-    const pluginToggle = page.locator(
-      '[data-testid="plugin-toggle"], button[role="switch"], .ant-switch',
-    ).first();
+    const pluginToggle = page
+      .locator('[data-testid="plugin-toggle"], button[role="switch"], .ant-switch')
+      .first();
 
     if (await pluginToggle.isVisible({ timeout: 5_000 }).catch(() => false)) {
       // Get initial state
@@ -112,9 +112,11 @@ test.describe('Plugin management', () => {
     await page.goto(PLUGIN_SETTINGS_URL);
 
     // Find an active plugin toggle
-    const activeToggle = page.locator(
-      '[data-testid="plugin-toggle"][aria-checked="true"], button[role="switch"][aria-checked="true"], .ant-switch-checked',
-    ).first();
+    const activeToggle = page
+      .locator(
+        '[data-testid="plugin-toggle"][aria-checked="true"], button[role="switch"][aria-checked="true"], .ant-switch-checked',
+      )
+      .first();
 
     if (await activeToggle.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await activeToggle.click();
@@ -158,7 +160,7 @@ test.describe('Plugin iframe rendering', () => {
     await page.goto(`/workspaces/${WORKSPACE_ID}`);
 
     // Set up a message listener before any plugin loads
-    const messages: string[] = [];
+    const _messages: string[] = [];
     await page.evaluate(() => {
       window.addEventListener('message', (event) => {
         (window as unknown as { __e2eMessages: string[] }).__e2eMessages =

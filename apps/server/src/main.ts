@@ -13,7 +13,6 @@ import { AppModule } from './app.module';
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
-    // Buffer logs until Pino logger is available
     bufferLogs: true,
   });
 

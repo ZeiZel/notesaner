@@ -1,5 +1,5 @@
 # =============================================================================
-# Notesaner — Database services (PostgreSQL 17 + ValKey 8)
+# Notesaner — Database services (PostgreSQL 17 + Redis 7)
 # For local development: ports exposed, no resource limits
 # =============================================================================
 
@@ -24,21 +24,21 @@ services:
       retries: 10
     profiles: ['dev', 'all']
 
-  valkey:
-    image: valkey/valkey:8-alpine
+  redis:
+    image: redis:7-alpine
     restart: unless-stopped
     command:
-      - valkey-server
+      - redis-server
       - '--requirepass'
-      - '${VALKEY_PASSWORD:-valkey}'
+      - '${REDIS_PASSWORD:-redis}'
       - '--appendonly'
       - 'yes'
     volumes:
-      - valkey_data:/data
+      - redis_data:/data
     ports:
       - '6379:6379'
     healthcheck:
-      test: ['CMD', 'valkey-cli', '-a', '${VALKEY_PASSWORD:-valkey}', 'ping']
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD:-redis}', 'ping']
       interval: 5s
       timeout: 5s
       retries: 10
@@ -46,4 +46,4 @@ services:
 
 volumes:
   postgres_data:
-  valkey_data:
+  redis_data:

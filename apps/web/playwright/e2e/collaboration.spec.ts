@@ -10,7 +10,7 @@ import { test, expect } from '../fixtures/test-fixtures';
 import { waitForEditor, typeInEditor, getEditorContent } from '../utils/helpers';
 
 const BASE_URL = process.env.BASE_URL ?? 'http://localhost:3000';
-const WORKSPACE_ID = process.env.E2E_WORKSPACE_ID ?? 'test-workspace-1';
+const _WORKSPACE_ID = process.env.E2E_WORKSPACE_ID ?? 'test-workspace-1';
 
 /**
  * Create an authenticated browser context via API login.
@@ -31,7 +31,7 @@ async function createAuthenticatedContext(
 }
 
 test.describe('Real-time collaboration', () => {
-  test('two users see each other\'s edits in real time', async ({ browser, testNote }) => {
+  test("two users see each other's edits in real time", async ({ browser, testNote }) => {
     // Create two separate authenticated contexts (simulating two users)
     const contextA = await createAuthenticatedContext(browser);
     const contextB = await createAuthenticatedContext(browser);
@@ -64,7 +64,10 @@ test.describe('Real-time collaboration', () => {
     await contextB.close();
   });
 
-  test('concurrent typing from both users merges without conflict', async ({ browser, testNote }) => {
+  test('concurrent typing from both users merges without conflict', async ({
+    browser,
+    testNote,
+  }) => {
     const contextA = await createAuthenticatedContext(browser);
     const contextB = await createAuthenticatedContext(browser);
 

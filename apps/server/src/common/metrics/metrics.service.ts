@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectMetric } from '@willsoto/nestjs-prometheus';
 import { Counter, Gauge, Histogram } from 'prom-client';
-import { METRICS } from './metrics.module';
+import { METRICS } from './metrics.constants';
 
 /**
  * Centralised facade for recording application metrics.

@@ -8,10 +8,7 @@
       "command": "tsc --noEmit -p packages/component-sdk/tsconfig.json"
     },
     "test": {
-      "executor": "@nx/vite:test",
-      "options": {
-        "reportsDirectory": "../../coverage/packages/component-sdk"
-      }
+      "command": "vitest run --config packages/component-sdk/vitest.config.ts"
     },
     "lint": {
       "executor": "nx:run-commands",

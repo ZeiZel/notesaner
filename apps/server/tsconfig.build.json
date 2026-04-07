@@ -9,9 +9,10 @@
     "emitDecoratorMetadata": true,
     "experimentalDecorators": true,
     "allowSyntheticDefaultImports": true,
-    "incremental": true,
-    "tsBuildInfoFile": "../../tmp/.tsbuildinfo/server-build",
-    "skipLibCheck": true
+    "incremental": false,
+    "skipLibCheck": true,
+    "rootDir": "src",
+    "paths": {}
   },
   "include": ["src/**/*.ts"],
   "exclude": [

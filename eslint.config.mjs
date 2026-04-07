@@ -27,7 +27,11 @@ export default tseslint.config(
       '**/.nx/**',
       '**/coverage/**',
       '**/.turbo/**',
+      '**/.claude/**',
       'pnpm-lock.yaml',
+      // Ignore build artifacts that may land in src/ directories
+      '**/*.d.ts',
+      '**/*.js.map',
     ],
   },
 
@@ -50,11 +54,15 @@ export default tseslint.config(
         projectService: {
           allowDefaultProject: [
             'vitest.workspace.ts',
+            'vitest.config.ts',
             'libs/*/vitest.config.ts',
             'packages/*/vitest.config.ts',
             'packages/component-sdk/src/__tests__/*.ts',
+            'libs/constants/src/__tests__/*.ts',
+            'libs/utils/src/__tests__/*.ts',
             'apps/server/vitest.config.ts',
             'apps/server/prisma/seed.ts',
+            'apps/server/prisma/prisma.config.ts',
             'apps/server/prisma/fixtures/index.ts',
             'apps/server/prisma/fixtures/notes.ts',
             'apps/server/prisma/fixtures/users.ts',
@@ -63,8 +71,9 @@ export default tseslint.config(
             'apps/server/scripts/check-migrations.ts',
             'apps/server/scripts/migrate-safe.ts',
             'scripts/benchmark.ts',
+            'apps/server/esbuild.config.mjs',
           ],
-          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 20,
+          maximumDefaultProjectFileMatchCount_THIS_WILL_SLOW_DOWN_LINTING: 30,
         },
         tsconfigRootDir: import.meta.dirname,
       },
@@ -176,6 +185,14 @@ export default tseslint.config(
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-non-null-assertion': 'off',
       '@typescript-eslint/no-floating-promises': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'warn',
+        {
+          argsIgnorePattern: '^_',
+          varsIgnorePattern: '^_',
+          caughtErrorsIgnorePattern: '^_',
+        },
+      ],
       'no-console': 'off',
     },
   },

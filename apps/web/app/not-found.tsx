@@ -1,10 +1,10 @@
 import Link from 'next/link';
 
 /**
- * Global 404 page.
+ * Global 404 page (root level).
  *
- * Provides helpful navigation options: go home, search, or report a broken link.
- * Server Component — no 'use client' needed.
+ * Handles routes that don't match any segment, including invalid locale prefixes.
+ * The locale-specific not-found page lives at [locale]/not-found.tsx.
  */
 export default function NotFound() {
   return (
