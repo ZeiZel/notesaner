@@ -9,16 +9,15 @@
       "executor": "nx:run-commands",
       "outputs": ["{workspaceRoot}/dist/apps/server"],
       "options": {
-        "command": "tsc -p tsconfig.build.json",
+        "command": "node esbuild.config.mjs",
         "cwd": "apps/server"
       }
     },
     "serve": {
-      "executor": "@nx/js:node",
+      "executor": "nx:run-commands",
       "options": {
-        "buildTarget": "server:build",
-        "watch": true,
-        "inspect": false
+        "command": "pnpm nest start --watch",
+        "cwd": "apps/server"
       }
     },
     "test": {

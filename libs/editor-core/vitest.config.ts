@@ -1,6 +1,9 @@
 // Vitest configuration for @notesaner/editor-core.
 // Path aliases mirror tsconfig.base.json so that internal imports
 // resolve correctly during tests without requiring a full build.
+//
+// Uses jsdom environment because many editor extensions depend on DOM APIs
+// (document, HTMLElement, etc.) for parsing, rendering, and theme detection.
 
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'path';
@@ -10,7 +13,7 @@ const root = resolve(__dirname, '../..');
 export default defineConfig({
   test: {
     name: 'editor-core',
-    environment: 'node',
+    environment: 'jsdom',
     include: ['src/**/*.{test,spec}.ts'],
     globals: false,
     coverage: {

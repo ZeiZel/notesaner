@@ -1,0 +1,30 @@
+# =============================================================================
+# Notesaner — Root Docker Compose (LOCAL DEVELOPMENT)
+# Includes modular compose files from docker/
+#
+# Profiles:
+#   dev   — db + back + web (standard local dev stack)
+#   infra — nginx + prometheus + grafana + jaeger (observability)
+#   all   — everything (dev + infra)
+#
+# Usage:
+#   docker compose --profile dev up -d          # Start dev stack
+#   docker compose --profile dev logs -f        # Follow logs
+#   docker compose --profile infra up -d        # Start observability
+#   docker compose --profile all up -d          # Start everything
+#   docker compose --profile dev down -v        # Teardown + remove volumes
+#
+# Prerequisites:
+#   cp docker/.env.example docker/.env          # Configure environment
+#   pnpm nx build server web                    # Build artifacts (for hot-reload)
+# =============================================================================
+
+include:
+  - path: docker/docker-compose.db.yml
+    env_file: docker/.env
+  - path: docker/docker-compose.back.yml
+    env_file: docker/.env
+  - path: docker/docker-compose.web.yml
+    env_file: docker/.env
+  - path: docker/docker-compose.infra.yml
+    env_file: docker/.env

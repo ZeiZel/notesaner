@@ -8,6 +8,9 @@ import {
   ListAuthProvidersQuerySchema,
 } from '../dto/auth-provider.dto';
 
+// Valid UUID v4 for test data (Zod v4 enforces RFC 4122 version/variant bits)
+const VALID_UUID = 'a0000000-0000-4000-8000-000000000001';
+
 // ---------------------------------------------------------------------------
 // SamlConfigSchema
 // ---------------------------------------------------------------------------
@@ -44,7 +47,7 @@ describe('SamlConfigSchema', () => {
     const result = SamlConfigSchema.safeParse({ ...validSaml, ssoUrl: 'not-a-url' });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.errors[0].message).toContain('valid URL');
+      expect(result.error.issues[0].message).toContain('valid URL');
     }
   });
 
@@ -57,7 +60,9 @@ describe('SamlConfigSchema', () => {
     const result = SamlConfigSchema.safeParse({ ...validSaml, certificate: 'plain-base64-nope' });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.errors[0].message).toContain('PEM-encoded');
+      // Zod v4 may surface the refine message or a different validation error
+      const messages = result.error.issues.map((i) => i.message).join(' ');
+      expect(messages).toContain('PEM-encoded');
     }
   });
 
@@ -107,7 +112,7 @@ describe('OidcConfigSchema', () => {
     const result = OidcConfigSchema.safeParse({ ...validOidc, issuer: 'not-a-url' });
     expect(result.success).toBe(false);
     if (!result.success) {
-      expect(result.error.errors[0].message).toContain('valid URL');
+      expect(result.error.issues[0].message).toContain('valid URL');
     }
   });
 
@@ -174,7 +179,7 @@ describe('CreateAuthProviderSchema', () => {
   it('accepts optional workspaceId', () => {
     const result = CreateAuthProviderSchema.safeParse({
       ...oidcBase,
-      workspaceId: '00000000-0000-0000-0000-000000000001',
+      workspaceId: VALID_UUID,
     });
     expect(result.success).toBe(true);
   });
@@ -286,7 +291,7 @@ describe('ListAuthProvidersQuerySchema', () => {
 
   it('accepts valid UUID workspaceId', () => {
     const result = ListAuthProvidersQuerySchema.safeParse({
-      workspaceId: '00000000-0000-0000-0000-000000000001',
+      workspaceId: VALID_UUID,
     });
     expect(result.success).toBe(true);
   });

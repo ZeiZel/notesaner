@@ -1,10 +1,11 @@
 /**
  * workspaces.ts
  *
- * API client for workspace listing and switching endpoints.
+ * API client for workspace CRUD and switching endpoints.
  */
 
 import { apiClient } from './client';
+import type { CreateWorkspaceDto } from '@notesaner/contracts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,6 +40,15 @@ export interface WorkspaceSwitchResultDto {
   };
 }
 
+export interface WorkspaceCreatedDto {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
 // ---------------------------------------------------------------------------
 // API client
 // ---------------------------------------------------------------------------
@@ -50,6 +60,13 @@ export const workspacesApi = {
    */
   listWorkspaces: (token: string) =>
     apiClient.get<WorkspaceSummaryDto[]>('/api/workspaces', { token }),
+
+  /**
+   * POST /api/workspaces
+   * Create a new workspace.
+   */
+  createWorkspace: (token: string, dto: CreateWorkspaceDto) =>
+    apiClient.post<WorkspaceCreatedDto>('/api/workspaces', dto, { token }),
 
   /**
    * POST /api/workspaces/:workspaceId/switch

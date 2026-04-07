@@ -284,7 +284,6 @@ describe('ContentHashService', () => {
         NOTE_ID,
         expect.any(String), // title
         newContent,
-        {},
       );
     });
 

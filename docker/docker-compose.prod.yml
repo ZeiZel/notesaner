@@ -4,7 +4,7 @@
 #
 # Network topology:
 #   frontend-net  — nginx <-> web (Next.js)
-#   backend-net   — nginx <-> server (NestJS), server <-> postgres, server <-> valkey
+#   backend-net   — nginx <-> server (NestJS), server <-> postgres, server <-> redis
 #
 # Prerequisites:
 #   1. Copy and configure environment:
@@ -39,8 +39,8 @@ volumes:
   # PostgreSQL WAL + data
   postgres_data:
     driver: local
-  # ValKey AOF + RDB snapshots
-  valkey_data:
+  # Redis AOF + RDB snapshots
+  redis_data:
     driver: local
   # Notes stored on disk (source of truth per architecture)
   notes_data:
@@ -60,7 +60,7 @@ networks:
   frontend-net:
     driver: bridge
     internal: false
-  # Private: nginx + NestJS + PostgreSQL + ValKey. Never exposed to host.
+  # Private: nginx + NestJS + PostgreSQL + Redis. Never exposed to host.
   backend-net:
     driver: bridge
     internal: true
@@ -112,18 +112,18 @@ services:
     security_opt:
       - no-new-privileges:true
 
-  # ─── ValKey 8 (Redis-compatible cache + BullMQ broker) ────────────────────
-  valkey:
-    image: valkey/valkey:8-alpine
+  # ─── Redis 7 (cache + BullMQ broker) ──────────────────────────────────────
+  redis:
+    image: redis:7-alpine
     restart: always
     env_file:
       - path: .env
         required: true
     command:
-      - valkey-server
+      - redis-server
       # Require password auth
       - '--requirepass'
-      - '${VALKEY_PASSWORD}'
+      - '${REDIS_PASSWORD}'
       # AOF persistence for durability
       - '--appendonly'
       - 'yes'
@@ -134,22 +134,22 @@ services:
       - '60 1'
       # Limit memory to avoid OOM killing the host
       - '--maxmemory'
-      - '${VALKEY_MAX_MEMORY:-256mb}'
+      - '${REDIS_MAX_MEMORY:-256mb}'
       - '--maxmemory-policy'
       - 'allkeys-lru'
       # Disable dangerous commands in production
       - '--rename-command'
-      - 'CONFIG VALKEY_CONFIG_${VALKEY_CONFIG_TOKEN}'
+      - 'CONFIG REDIS_CONFIG_${REDIS_CONFIG_TOKEN}'
       - '--rename-command'
-      - 'FLUSHALL VALKEY_FLUSHALL_${VALKEY_CONFIG_TOKEN}'
+      - 'FLUSHALL REDIS_FLUSHALL_${REDIS_CONFIG_TOKEN}'
       - '--rename-command'
-      - 'DEBUG VALKEY_DEBUG_${VALKEY_CONFIG_TOKEN}'
+      - 'DEBUG REDIS_DEBUG_${REDIS_CONFIG_TOKEN}'
     volumes:
-      - valkey_data:/data
+      - redis_data:/data
     networks:
       - backend-net
     healthcheck:
-      test: ['CMD', 'valkey-cli', '-a', '${VALKEY_PASSWORD}', 'ping']
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
       interval: 10s
       timeout: 5s
       retries: 5
@@ -187,14 +187,14 @@ services:
       PORT: 4000
       # Database
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
-      # ValKey (used by both session cache and BullMQ)
-      REDIS_HOST: valkey
+      # Redis (used by both session cache and BullMQ)
+      REDIS_HOST: redis
       REDIS_PORT: 6379
-      REDIS_PASSWORD: ${VALKEY_PASSWORD}
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
       REDIS_DB: 0
-      QUEUE_REDIS_HOST: valkey
+      QUEUE_REDIS_HOST: redis
       QUEUE_REDIS_PORT: 6379
-      QUEUE_REDIS_PASSWORD: ${VALKEY_PASSWORD}
+      QUEUE_REDIS_PASSWORD: ${REDIS_PASSWORD}
       # JWT — use strong secrets; rotate on breach
       JWT_SECRET: ${JWT_SECRET}
       JWT_ACCESS_TOKEN_TTL: ${JWT_ACCESS_TOKEN_TTL:-900}
@@ -226,7 +226,7 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      valkey:
+      redis:
         condition: service_healthy
     healthcheck:
       # The NestJS app exposes /health via @nestjs/terminus

@@ -170,7 +170,7 @@ export class PresenceGateway implements OnGatewayConnection, OnGatewayDisconnect
    */
   @SubscribeMessage('presence:snapshot')
   handlePresenceSnapshot(
-    @ConnectedSocket() client: AuthenticatedSocket,
+    @ConnectedSocket() _client: AuthenticatedSocket,
     @MessageBody() payload: { noteId: string },
   ): WsResponse<PresenceSnapshotResponse> {
     const users = this.presenceService.getPresenceForNote(payload.noteId);

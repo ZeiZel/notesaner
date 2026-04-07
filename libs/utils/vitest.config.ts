@@ -6,10 +6,11 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'path';
 
-const root = resolve(__dirname, '../..');
+const monorepoRoot = resolve(__dirname, '../..');
 
 export default defineConfig({
   test: {
+    root: __dirname,
     name: 'utils',
     environment: 'node',
     include: ['src/**/*.{test,spec}.ts'],
@@ -24,9 +25,9 @@ export default defineConfig({
     alias: {
       // Resolve workspace package aliases to their source entry points so
       // that tests run against TypeScript source rather than compiled output.
-      '@notesaner/constants': resolve(root, 'libs/constants/src/index.ts'),
-      '@notesaner/contracts': resolve(root, 'libs/contracts/src/index.ts'),
-      '@notesaner/utils': resolve(root, 'libs/utils/src/index.ts'),
+      '@notesaner/constants': resolve(monorepoRoot, 'libs/constants/src/index.ts'),
+      '@notesaner/contracts': resolve(monorepoRoot, 'libs/contracts/src/index.ts'),
+      '@notesaner/utils': resolve(monorepoRoot, 'libs/utils/src/index.ts'),
     },
   },
 });

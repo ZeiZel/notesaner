@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 import { fn } from 'storybook/test';
+import { within, userEvent, expect } from '@storybook/test';
 import { Button } from '../components/button';
 
 const meta = {
@@ -136,6 +137,19 @@ export const WithIcon: Story = {
       </Button>
     </div>
   ),
+};
+
+// Interaction: click fires onClick handler
+export const ClickInteraction: Story = {
+  args: {
+    children: 'Click me',
+  },
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const button = canvas.getByRole('button', { name: /click me/i });
+    await userEvent.click(button);
+    await expect(args.onClick).toHaveBeenCalledTimes(1);
+  },
 };
 
 // Destructive confirmation pattern

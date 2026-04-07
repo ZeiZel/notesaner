@@ -1,0 +1,21 @@
+{
+  "name": "plugin-backlinks",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/plugin-backlinks/src",
+  "projectType": "library",
+  "tags": ["scope:shared", "type:plugin"],
+  "targets": {
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["tsc --noEmit -p packages/plugin-backlinks/tsconfig.json"]
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["eslint {projectRoot}/src --ext .ts,.tsx"]
+      }
+    }
+  }
+}

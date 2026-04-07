@@ -8,11 +8,14 @@
       "command": "tsc --noEmit -p packages/component-sdk/tsconfig.json"
     },
     "test": {
-      "executor": "@nx/vite:test",
+      "command": "vitest run --config packages/component-sdk/vitest.config.ts"
+    },
+    "lint": {
+      "executor": "nx:run-commands",
       "options": {
-        "reportsDirectory": "../../coverage/packages/component-sdk"
+        "commands": ["eslint {projectRoot}/src --ext .ts,.tsx"]
       }
     }
   },
-  "tags": ["scope:shared"]
+  "tags": ["scope:shared", "type:component"]
 }

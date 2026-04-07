@@ -5,7 +5,6 @@
 // in the future, they should use local component state or React Context.
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { getDefaultPanelLayout } from '@/features/workspace/model/PanelRegistry';
 import type { SidebarSide } from '@/features/workspace/model/PanelRegistry';
 
 // ---------------------------------------------------------------------------
@@ -69,7 +68,7 @@ interface SidebarState {
   togglePanelCollapse: (panelId: string) => void;
   /** Set the collapsed state of a panel explicitly. */
   setPanelCollapsed: (panelId: string, collapsed: boolean) => void;
-  /** Reset panel layout to defaults. */
+  /** Reset panel layout to defaults (empty sidebars). */
   resetPanelLayout: () => void;
 
   // -- Actions: file explorer (carried over) --
@@ -97,10 +96,6 @@ function clampWidth(width: number): number {
   return Math.max(MIN_SIDEBAR_WIDTH, Math.min(width, maxWidth));
 }
 
-function getDefaults(): { left: string[]; right: string[] } {
-  return getDefaultPanelLayout();
-}
-
 // ---------------------------------------------------------------------------
 // Store
 // ---------------------------------------------------------------------------
@@ -109,16 +104,16 @@ export const useSidebarStore = create<SidebarState>()(
   devtools(
     persist(
       (set) => {
-        const defaults = getDefaults();
-
         return {
           // -- Initial state --
+          // Sidebars are ALWAYS visible (not toggled)
           leftSidebarOpen: true,
-          rightSidebarOpen: false,
+          rightSidebarOpen: true,
           leftSidebarWidth: DEFAULT_LEFT_WIDTH,
           rightSidebarWidth: DEFAULT_RIGHT_WIDTH,
-          leftPanels: defaults.left,
-          rightPanels: defaults.right,
+          // Sidebars start EMPTY — user drags panels into them
+          leftPanels: [],
+          rightPanels: [],
           collapsedPanels: {},
           expandedFolders: [],
           selectedFileId: null,
@@ -222,10 +217,9 @@ export const useSidebarStore = create<SidebarState>()(
           resetPanelLayout: () =>
             set(
               () => {
-                const d = getDefaults();
                 return {
-                  leftPanels: d.left,
-                  rightPanels: d.right,
+                  leftPanels: [],
+                  rightPanels: [],
                   collapsedPanels: {},
                 };
               },
@@ -251,7 +245,7 @@ export const useSidebarStore = create<SidebarState>()(
       },
       {
         name: 'notesaner-sidebar',
-        version: 2,
+        version: 3,
         partialize: (state) => ({
           leftSidebarOpen: state.leftSidebarOpen,
           rightSidebarOpen: state.rightSidebarOpen,
@@ -263,15 +257,16 @@ export const useSidebarStore = create<SidebarState>()(
           expandedFolders: state.expandedFolders,
         }),
         migrate: (persisted: unknown, version: number) => {
-          // Migrate from v1 (leftActiveTab/rightActiveTab) to v2 (panel arrays)
-          if (version < 2) {
+          // Migrate from v1 or v2 to v3 (empty default panels, both sidebars open)
+          if (version < 3) {
             const old = persisted as Record<string, unknown>;
-            const defaults = getDefaults();
             return {
               ...old,
-              leftPanels: defaults.left,
-              rightPanels: defaults.right,
+              leftPanels: [],
+              rightPanels: [],
               collapsedPanels: {},
+              leftSidebarOpen: true,
+              rightSidebarOpen: true,
               // Remove legacy keys
               leftActiveTab: undefined,
               rightActiveTab: undefined,

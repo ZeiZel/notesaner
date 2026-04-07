@@ -601,12 +601,21 @@ export class AuthService {
     }
   }
 
+  /**
+   * Parses `input` against a Zod schema and throws a NestJS `BadRequestException`
+   * with a human-readable validation message on failure.
+   *
+   * Compatible with Zod v4 (uses PropertyKey[] for path, .issues for error list).
+   */
   private parseOrThrow<T>(
     schema: {
       safeParse: (v: unknown) => {
         success: boolean;
         data?: T;
-        error?: { errors: Array<{ path: (string | number)[]; message: string }> };
+        error?: {
+          issues?: Array<{ path: PropertyKey[]; message: string }>;
+          errors?: Array<{ path: PropertyKey[]; message: string }>;
+        };
       };
     },
     input: unknown,
@@ -614,9 +623,8 @@ export class AuthService {
     const result = schema.safeParse(input);
 
     if (!result.success) {
-      const messages = (result.error?.errors ?? []).map(
-        (e) => `${e.path.join('.') || 'body'}: ${e.message}`,
-      );
+      const issueList = result.error?.issues ?? result.error?.errors ?? [];
+      const messages = issueList.map((e) => `${String(e.path.join('.')) || 'body'}: ${e.message}`);
       throw new BadRequestException(messages.join('; '));
     }
 

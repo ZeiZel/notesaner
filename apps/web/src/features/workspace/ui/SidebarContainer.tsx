@@ -10,9 +10,11 @@
  * Features:
  *   - Vertical sortable list of accordion panels
  *   - Drop zone indicator when dragging over the sidebar
- *   - Empty state when all panels have been dragged away
+ *   - Empty state when no panels are present (user can drag panels here)
  *   - Resize handle on the inner edge
- *   - Close button in the header
+ *   - Close button in the header (tablet overlay mode only)
+ *   - Background matches the main workspace area (bg-background)
+ *   - Full width and height — no collapsing
  *
  * The SidebarContainer does NOT own the DndContext -- that lives in
  * WorkspaceShell so it can coordinate cross-sidebar drags.
@@ -58,14 +60,14 @@ function EmptySidebarState() {
     <div className="flex flex-1 flex-col items-center justify-center gap-2 px-4 py-8">
       <svg
         viewBox="0 0 16 16"
-        className="h-6 w-6 text-sidebar-muted/40"
+        className="h-6 w-6 text-foreground-muted/40"
         fill="currentColor"
         aria-hidden="true"
       >
         <path d="M3.75 1.5a.25.25 0 00-.25.25v12.5c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25V6H9.75A1.75 1.75 0 018 4.25V1.5H3.75z" />
         <path d="M9.5 1.5v2.75c0 .138.112.25.25.25h2.75L9.5 1.5z" />
       </svg>
-      <p className="text-center text-xs text-sidebar-muted">Drag panels here</p>
+      <p className="text-center text-xs text-foreground-muted">Drag panels here</p>
     </div>
   );
 }
@@ -165,9 +167,10 @@ export function SidebarContainer({
       data-side={side}
       style={overlay ? { width: `${width}px` } : { width: `${width}px`, minWidth: `${width}px` }}
       className={cn(
-        'relative flex flex-col bg-sidebar-background overflow-hidden',
+        // Use bg-background to match the main workspace area
+        'relative flex h-full flex-col bg-background overflow-hidden',
         borderSide,
-        'border-sidebar-border',
+        'border-border',
         overlay
           ? `fixed ${positionClass} top-0 bottom-0 z-50 shadow-floating`
           : 'transition-[width,min-width] duration-slow',
@@ -177,19 +180,22 @@ export function SidebarContainer({
       <ResizeHandle side={side} onResize={onResize} />
 
       {/* Sidebar header */}
-      <div className="flex h-9 items-center justify-between border-b border-sidebar-border px-2">
-        <span className="text-xs font-medium text-sidebar-muted select-none">
+      <div className="flex h-9 items-center justify-between border-b border-border px-2">
+        <span className="text-xs font-medium text-foreground-muted select-none">
           {side === 'left' ? 'Explorer' : 'Inspector'}
         </span>
-        <button
-          onClick={onClose}
-          aria-label={`Close ${side} sidebar`}
-          className="flex h-6 w-6 items-center justify-center rounded text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
-        >
-          <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor" aria-hidden="true">
-            <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.749.749 0 011.275.326.749.749 0 01-.215.734L9.06 8l3.22 3.22a.749.749 0 01-.326 1.275.749.749 0 01-.734-.215L8 9.06l-3.22 3.22a.751.751 0 01-1.042-.018.751.751 0 01-.018-1.042L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
-          </svg>
-        </button>
+        {/* Close button only shown on tablet (overlay mode) */}
+        {overlay && (
+          <button
+            onClick={onClose}
+            aria-label={`Close ${side} sidebar`}
+            className="flex h-6 w-6 items-center justify-center rounded text-foreground-muted transition-colors hover:bg-background-hover hover:text-foreground"
+          >
+            <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor" aria-hidden="true">
+              <path d="M3.72 3.72a.75.75 0 011.06 0L8 6.94l3.22-3.22a.749.749 0 011.275.326.749.749 0 01-.215.734L9.06 8l3.22 3.22a.749.749 0 01-.326 1.275.749.749 0 01-.734-.215L8 9.06l-3.22 3.22a.751.751 0 01-1.042-.018.751.751 0 01-.018-1.042L6.94 8 3.72 4.78a.75.75 0 010-1.06z" />
+            </svg>
+          </button>
+        )}
       </div>
 
       {/* Droppable panel area */}
@@ -209,7 +215,7 @@ export function SidebarContainer({
               <DraggablePanel key={id} panelId={id}>
                 {panelContent[id] ?? (
                   <div className="flex items-center justify-center py-4">
-                    <p className="text-xs text-sidebar-muted">Panel content not available</p>
+                    <p className="text-xs text-foreground-muted">Panel content not available</p>
                   </div>
                 )}
               </DraggablePanel>

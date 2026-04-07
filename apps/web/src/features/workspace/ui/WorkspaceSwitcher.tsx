@@ -14,6 +14,7 @@
  */
 
 import { useState, useCallback, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useWorkspaceStore } from '@/shared/stores/workspace-store';
 import { useAuthStore } from '@/shared/stores/auth-store';
 
@@ -76,12 +77,11 @@ function getRoleBadgeClass(role: string): string {
 export function WorkspaceSwitcher() {
   const accessToken = useAuthStore((s) => s.accessToken);
   const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
-  // TODO: Use activeWorkspaceRole for permission-gated UI elements
-  // const activeWorkspaceRole = useWorkspaceStore((s) => s.activeWorkspaceRole);
   const workspaceSummaries = useWorkspaceStore((s) => s.workspaceSummaries);
   const isSwitching = useWorkspaceStore((s) => s.isSwitching);
   const switchWorkspace = useWorkspaceStore((s) => s.switchWorkspace);
   const fetchWorkspaces = useWorkspaceStore((s) => s.fetchWorkspaces);
+  const router = useRouter();
 
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
@@ -126,6 +126,12 @@ export function WorkspaceSwitcher() {
     },
     [accessToken, activeWorkspaceId, switchWorkspace],
   );
+
+  const handleCreateWorkspace = useCallback(() => {
+    setIsOpen(false);
+    // Navigate to the workspaces page where the create modal lives
+    router.push('/workspaces');
+  }, [router]);
 
   // Handle keyboard navigation
   const handleKeyDown = useCallback((event: React.KeyboardEvent) => {
@@ -234,10 +240,7 @@ export function WorkspaceSwitcher() {
             <button
               type="button"
               className="flex w-full items-center gap-2 px-3 py-2.5 text-sm text-foreground-muted hover:bg-background-hover hover:text-foreground transition-colors"
-              onClick={() => {
-                setIsOpen(false);
-                // TODO: Navigate to workspace creation page
-              }}
+              onClick={handleCreateWorkspace}
             >
               <PlusIcon className="h-4 w-4" />
               Create new workspace

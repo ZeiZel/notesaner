@@ -15,11 +15,16 @@ import {
   verticalListSortingStrategy,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
+import { useRouter } from 'next/navigation';
 import { cn } from '@/shared/lib/utils';
 import { useRibbonStore, getVisibleActions, type RibbonAction } from '@/shared/stores/ribbon-store';
 import { useSidebarStore } from '@/shared/stores/sidebar-store';
+import { useWorkspaceStore } from '@/shared/stores/workspace-store';
+import { useTabStore } from '@/shared/stores/tab-store';
+import { useAuthStore } from '@/shared/stores/auth-store';
 import { useBreakpoint } from '@/shared/hooks/useBreakpoint';
 import { ThemeToggle as ThemeToggleCycler } from '@/shared/lib/theme';
+import { notesApi } from '@/shared/api/notes';
 import { RibbonIcon } from './RibbonIcon';
 
 // ---------------------------------------------------------------------------
@@ -32,35 +37,75 @@ import { RibbonIcon } from './RibbonIcon';
  */
 function useRibbonHandlers(): Record<string, () => void> {
   const toggleLeftSidebar = useSidebarStore((s) => s.toggleLeftSidebar);
+  const activeWorkspaceId = useWorkspaceStore((s) => s.activeWorkspaceId);
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const openTab = useTabStore((s) => s.openTab);
+  const router = useRouter();
 
   return useMemo(
     () => ({
       'file-explorer': toggleLeftSidebar,
       search: () => {
         // Open the left sidebar with the search panel focused.
-        // For now, toggle left sidebar as the search panel lives there.
-        // A more granular approach (focusing the search panel) can be added later.
         toggleLeftSidebar();
       },
       'graph-view': () => {
-        // Placeholder: navigate to graph view or open graph panel.
-        // This will be wired to the graph feature when available.
-        // TODO: wire to feature handler
-        void '[Ribbon] Graph view action triggered';
+        if (activeWorkspaceId) {
+          router.push(`/workspaces/${activeWorkspaceId}/graph`);
+        }
       },
       'daily-note': () => {
-        // Placeholder: create or navigate to today's daily note.
-        // TODO: wire to feature handler
-        void '[Ribbon] Daily note action triggered';
+        // Create or navigate to today's daily note
+        if (!activeWorkspaceId || !accessToken) return;
+
+        const today = new Date();
+        const dateStr = today.toISOString().split('T')[0];
+        const title = `Daily Note ${dateStr}`;
+        const path = `Daily Notes/${dateStr}.md`;
+
+        // Open a tab for the daily note, then create it via API
+        const noteId = `daily-${dateStr}`;
+        openTab({ noteId, title, path });
+
+        // Attempt to create the note on the server (ignore if already exists)
+        void notesApi
+          .create(accessToken, activeWorkspaceId, {
+            path,
+            title,
+            content: `# ${title}\n\n`,
+          })
+          .catch(() => {
+            // Note may already exist -- that's fine
+          });
+
+        router.push(`/workspaces/${activeWorkspaceId}/notes/${noteId}`);
       },
       'new-note': () => {
-        // Placeholder: create a new note.
-        // Will be wired to the note creation feature.
-        // TODO: wire to feature handler
-        void '[Ribbon] New note action triggered';
+        if (!activeWorkspaceId || !accessToken) return;
+
+        const timestamp = Date.now();
+        const title = 'Untitled';
+        const path = `Untitled-${timestamp}.md`;
+
+        // Create the note via API and open it
+        void notesApi
+          .create(accessToken, activeWorkspaceId, {
+            path,
+            title,
+            content: '',
+          })
+          .then((note) => {
+            openTab({ noteId: note.id, title: note.title, path: note.path });
+            router.push(`/workspaces/${activeWorkspaceId}/notes/${note.id}`);
+          })
+          .catch(() => {
+            // Fallback: open a local untitled tab
+            const fallbackId = `untitled-${timestamp}`;
+            openTab({ noteId: fallbackId, title, path });
+          });
       },
     }),
-    [toggleLeftSidebar],
+    [toggleLeftSidebar, activeWorkspaceId, accessToken, openTab, router],
   );
 }
 

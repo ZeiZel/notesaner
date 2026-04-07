@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "libs/query-factory/src",
   "projectType": "library",
-  "tags": ["scope:lib"],
+  "tags": ["scope:lib", "type:lib"],
   "targets": {
     "type-check": {
       "command": "tsc --noEmit -p libs/query-factory/tsconfig.json"
@@ -13,6 +13,12 @@
     },
     "test:watch": {
       "command": "vitest --config libs/query-factory/vitest.config.ts"
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["eslint {projectRoot}/src --ext .ts,.tsx"]
+      }
     }
   }
 }

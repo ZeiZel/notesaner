@@ -3,7 +3,7 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "sourceRoot": "packages/ui/src",
   "projectType": "library",
-  "tags": ["scope:shared"],
+  "tags": ["scope:shared", "type:ui"],
   "targets": {
     "type-check": {
       "command": "tsc --noEmit -p packages/ui/tsconfig.json"
@@ -22,6 +22,18 @@
       "cache": true,
       "inputs": ["default"],
       "outputs": ["{projectRoot}/storybook-static"]
+    },
+    "storybook:test": {
+      "command": "test-storybook --config-dir packages/ui/.storybook",
+      "options": {
+        "cwd": "{workspaceRoot}"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["eslint {projectRoot}/src --ext .ts,.tsx"]
+      }
     }
   }
 }

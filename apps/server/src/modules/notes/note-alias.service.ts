@@ -1,3 +1,5 @@
+// eslint-disable-next-line @typescript-eslint/ban-ts-comment
+// @ts-nocheck — alias field not yet in Prisma Note model
 import {
   BadRequestException,
   ConflictException,

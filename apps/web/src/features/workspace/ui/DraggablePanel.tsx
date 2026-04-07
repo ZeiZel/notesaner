@@ -12,6 +12,8 @@
  *
  * Uses @dnd-kit/sortable for reordering within a sidebar and cross-sidebar
  * moves. The panel adapts to the `collapsed` state from the sidebar store.
+ *
+ * Background uses bg-background to match the main workspace area.
  */
 
 import { type ReactNode } from 'react';
@@ -41,7 +43,7 @@ function PanelIcon({ iconPath }: { iconPath: string }) {
   return (
     <svg
       viewBox="0 0 16 16"
-      className="h-3.5 w-3.5 shrink-0 text-sidebar-muted"
+      className="h-3.5 w-3.5 shrink-0 text-foreground-muted"
       fill="currentColor"
       aria-hidden="true"
     >
@@ -64,7 +66,7 @@ function DragHandle({
   return (
     <button
       type="button"
-      className="flex h-5 w-4 cursor-grab items-center justify-center rounded text-sidebar-muted/50 hover:text-sidebar-muted active:cursor-grabbing"
+      className="flex h-5 w-4 cursor-grab items-center justify-center rounded text-foreground-muted/50 hover:text-foreground-muted active:cursor-grabbing"
       aria-label="Drag to reorder"
       {...attributes}
       {...listeners}
@@ -92,7 +94,7 @@ function CollapseChevron({ collapsed, onClick }: { collapsed: boolean; onClick: 
       type="button"
       onClick={onClick}
       aria-label={collapsed ? 'Expand panel' : 'Collapse panel'}
-      className="flex h-5 w-5 items-center justify-center rounded text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+      className="flex h-5 w-5 items-center justify-center rounded text-foreground-muted transition-colors hover:bg-background-hover hover:text-foreground"
     >
       <svg
         viewBox="0 0 16 16"
@@ -143,7 +145,7 @@ export function DraggablePanel({ panelId, children }: DraggablePanelProps) {
       ref={setNodeRef}
       style={style}
       className={cn(
-        'rounded-md border border-sidebar-border bg-sidebar-background transition-shadow',
+        'rounded-md border border-border bg-background transition-shadow',
         isDragging && 'z-50 opacity-50 shadow-floating',
         isOverTarget && !isDragging && 'ring-1 ring-primary/40',
       )}
@@ -151,10 +153,7 @@ export function DraggablePanel({ panelId, children }: DraggablePanelProps) {
     >
       {/* Panel header */}
       <div
-        className={cn(
-          'flex h-8 items-center gap-1 px-1.5',
-          !collapsed && 'border-b border-sidebar-border',
-        )}
+        className={cn('flex h-8 items-center gap-1 px-1.5', !collapsed && 'border-b border-border')}
       >
         {/* Drag handle */}
         <DragHandle listeners={listeners} attributes={attributes} />
@@ -163,7 +162,7 @@ export function DraggablePanel({ panelId, children }: DraggablePanelProps) {
         <PanelIcon iconPath={definition.iconPath} />
 
         {/* Title */}
-        <span className="flex-1 truncate text-xs font-medium text-sidebar-foreground select-none">
+        <span className="flex-1 truncate text-xs font-medium text-foreground select-none">
           {definition.title}
         </span>
 
@@ -175,7 +174,7 @@ export function DraggablePanel({ panelId, children }: DraggablePanelProps) {
             onClick={action.onClick}
             aria-label={action.label}
             title={action.label}
-            className="flex h-5 w-5 items-center justify-center rounded text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground"
+            className="flex h-5 w-5 items-center justify-center rounded text-foreground-muted transition-colors hover:bg-background-hover hover:text-foreground"
           >
             <svg viewBox="0 0 16 16" className="h-3 w-3" fill="currentColor" aria-hidden="true">
               <path d={action.iconPath} />

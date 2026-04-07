@@ -17,7 +17,10 @@
     "../src/__tests__/accessibility/**/*.ts",
     "../src/__tests__/e2e/**/*.ts",
     "../src/__tests__/benchmarks/**/*.ts",
-    "./**/*.ts"
+    "./**/*.ts",
+    "./e2e/**/*.ts",
+    "./fixtures/**/*.ts",
+    "./utils/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

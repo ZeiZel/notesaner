@@ -5,13 +5,15 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'path';
 
-const root = resolve(__dirname, '../..');
+const monorepoRoot = resolve(__dirname, '../..');
 
 export default defineConfig({
   test: {
+    root: __dirname,
     name: 'contracts',
     environment: 'node',
     include: ['src/**/*.{test,spec}.ts'],
+    passWithNoTests: true,
     globals: false,
     coverage: {
       provider: 'v8',
@@ -21,8 +23,8 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@notesaner/constants': resolve(root, 'libs/constants/src/index.ts'),
-      '@notesaner/contracts': resolve(root, 'libs/contracts/src/index.ts'),
+      '@notesaner/constants': resolve(monorepoRoot, 'libs/constants/src/index.ts'),
+      '@notesaner/contracts': resolve(monorepoRoot, 'libs/contracts/src/index.ts'),
     },
   },
 });

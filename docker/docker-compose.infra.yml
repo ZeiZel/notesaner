@@ -1,0 +1,97 @@
+# =============================================================================
+# Notesaner — Infrastructure / Observability services
+# Profiles: infra, all
+#
+# Includes:
+#   - Nginx (reverse proxy — requires dev profile, so only in 'all')
+#   - Prometheus (metrics scraping)
+#   - Grafana (dashboards)
+#   - Jaeger (distributed tracing)
+#
+# Usage:
+#   docker compose --profile infra up -d    # Observability only
+#   docker compose --profile all up -d      # Everything incl. nginx
+# =============================================================================
+
+services:
+  # ─── Nginx ──────────────────────────────────────────────────────────────────
+  # Nginx requires web + server to be running, so it's only in the 'all' profile.
+  # Use --profile infra for standalone observability without nginx.
+  nginx:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    ports:
+      - '${HTTP_PORT:-80}:80'
+      - '${HTTPS_PORT:-443}:443'
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - nginx_certs:/etc/nginx/certs:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      web:
+        condition: service_healthy
+      server:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget --spider -q http://localhost/healthz || exit 1']
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    profiles: ['all']
+
+  # ─── Prometheus ─────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=15d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - prometheus_data:/prometheus
+      # Place your prometheus.yml in docker/prometheus/prometheus.yml
+      - ./prometheus:/etc/prometheus:ro
+    ports:
+      - '9090:9090'
+    profiles: ['infra', 'all']
+
+  # ─── Grafana ─────────────────────────────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:10.4.0
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - grafana_data:/var/lib/grafana
+      # Provision dashboards and datasources from docker/grafana/
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+    ports:
+      - '3001:3000'
+    depends_on:
+      - prometheus
+    profiles: ['infra', 'all']
+
+  # ─── Jaeger (distributed tracing) ───────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:1.57
+    restart: unless-stopped
+    environment:
+      COLLECTOR_OTLP_ENABLED: 'true'
+    ports:
+      - '16686:16686'   # Jaeger UI
+      - '4317:4317'     # OTLP gRPC
+      - '4318:4318'     # OTLP HTTP
+    volumes:
+      - jaeger_data:/tmp
+    profiles: ['infra', 'all']
+
+volumes:
+  nginx_certs:
+  nginx_logs:
+  prometheus_data:
+  grafana_data:
+  jaeger_data:

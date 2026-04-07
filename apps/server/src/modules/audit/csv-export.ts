@@ -19,6 +19,7 @@ const HEADER_LABELS: Record<(typeof HEADERS)[number], string> = {
   action: 'Action',
   userId: 'User ID',
   workspaceId: 'Workspace ID',
+  metadata: 'Metadata (raw)',
   ipAddress: 'IP Address',
   userAgent: 'User Agent',
   metadataJson: 'Metadata',

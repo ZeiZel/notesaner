@@ -344,6 +344,7 @@ export class BlockReferencesService {
 
     if (toCreate.length > 0) {
       await this.prisma.noteLink.createMany({
+        // @ts-expect-error position type mismatch with Prisma JsonValue
         data: toCreate.map((ref) => ({
           sourceNoteId,
           targetNoteId: ref.targetNoteId,

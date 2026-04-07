@@ -294,7 +294,7 @@ export class ContentHashService {
    */
   private async reindexNote(noteId: string, title: string, content: string): Promise<void> {
     try {
-      await this.searchService.indexNote(noteId, title, content, {});
+      await this.searchService.indexNote(noteId, title, content);
       this.logger.debug(`Re-indexed note ${noteId} after external change detection`);
     } catch (error) {
       this.logger.error(

@@ -1,3 +1,4 @@
+import type { RateLimitStatus } from './admin-rate-limits.service';
 import { Controller, Delete, Get, HttpCode, HttpStatus, Param, UseGuards } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -39,7 +40,7 @@ export class AdminRateLimitsController {
   @ApiOkResponse({ description: 'Rate limit status for the user.' })
   @ApiForbiddenResponse({ description: 'Requires super-admin.' })
   @ApiUnauthorizedResponse({ description: 'Missing or invalid JWT.' })
-  async getRateLimitStatus(@Param('userId') userId: string) {
+  async getRateLimitStatus(@Param('userId') userId: string): Promise<RateLimitStatus> {
     return this.service.getRateLimitStatus(userId);
   }
 

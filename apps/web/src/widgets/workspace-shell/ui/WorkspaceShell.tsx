@@ -47,19 +47,18 @@ interface WorkspaceShellProps {
  * Desktop (>1024px):
  *   +--------+--------------------+---------------------------+-----------------+
  *   | Ribbon | Left Sidebar       | Main Content Area         | Right Sidebar   |
- *   | 44px   | 260px (resizable)  | flex-1                    | 280px (toggle)  |
+ *   | 44px   | 260px (resizable)  | flex-1                    | 280px (resize)  |
  *   +--------+--------------------+---------------------------+-----------------+
+ *
+ * Both sidebars are ALWAYS visible on desktop. They start EMPTY and users
+ * drag widget panels into them. The sidebars fill their full allocated
+ * width and height.
  *
  * Tablet (640-1024px):
  *   Ribbon visible, sidebars open as overlays. Single content pane by default.
- *   Left sidebar toggle available in toolbar.
  *
  * Mobile (<640px):
  *   Ribbon hidden (replaced by bottom nav). Full-screen single pane.
- *   Sidebars are hidden; content panels (files, search, outline)
- *   replace the main area via bottom nav tabs.
- *
- * Panel visibility and widths are persisted in the sidebar Zustand store.
  */
 export function WorkspaceShell({ children }: WorkspaceShellProps) {
   // Register Cmd+Shift+L shortcut for snap layout picker
@@ -254,10 +253,11 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
   // On tablet, sidebars render as overlay panels (fixed position)
   const sidebarAsOverlay = isTablet;
 
-  // On mobile, sidebars are not rendered at all -- content is
-  // switched via the bottom nav.
-  const showLeftSidebar = !isMobile && leftSidebarOpen;
-  const showRightSidebar = !isMobile && rightSidebarOpen;
+  // On desktop: sidebars are ALWAYS visible at full width/height
+  // On tablet: sidebars show/hide as overlays
+  // On mobile: sidebars are not rendered (bottom nav replaces them)
+  const showLeftSidebar = isDesktop || (isTablet && leftSidebarOpen);
+  const showRightSidebar = isDesktop || (isTablet && rightSidebarOpen);
   const showBottomNav = isMobile;
   const showStatusBar = !isMobile;
   const showToolbar = !isMobile;
@@ -291,7 +291,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
             {/* ---- Ribbon (quick-action icon strip) ---- */}
             <Ribbon />
 
-            {/* ---- Left Sidebar ---- */}
+            {/* ---- Left Sidebar (always visible on desktop) ---- */}
             {showLeftSidebar && (
               <SidebarContainer
                 side="left"
@@ -323,24 +323,6 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                   role="banner"
                   className="flex h-9 items-center border-b border-border bg-background-surface px-2"
                 >
-                  {/* Toggle left sidebar when closed */}
-                  {!leftSidebarOpen && (
-                    <button
-                      onClick={toggleLeftSidebar}
-                      aria-label="Open file explorer"
-                      className="mr-2 flex h-7 w-7 items-center justify-center rounded text-foreground-muted transition-colors hover:bg-secondary hover:text-foreground sm:h-6 sm:w-6"
-                    >
-                      <svg
-                        viewBox="0 0 16 16"
-                        className="h-3.5 w-3.5"
-                        fill="currentColor"
-                        aria-hidden="true"
-                      >
-                        <path d="M3 4.5A1.5 1.5 0 014.5 3h7A1.5 1.5 0 0113 4.5v7A1.5 1.5 0 0111.5 13h-7A1.5 1.5 0 013 11.5v-7zM4.5 4a.5.5 0 00-.5.5v7a.5.5 0 00.5.5H7V4H4.5zm3.5 8h3.5a.5.5 0 00.5-.5v-7a.5.5 0 00-.5-.5H8v8z" />
-                      </svg>
-                    </button>
-                  )}
-
                   {/* Navigation back/forward buttons */}
                   <NavigationButtons />
 
@@ -357,22 +339,6 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
 
                     {/* Snap layout picker toggle -- hidden on tablet (no split panes) */}
                     {isDesktop && <SnapLayoutButton />}
-
-                    <button
-                      onClick={toggleRightSidebar}
-                      aria-label="Toggle right sidebar"
-                      aria-pressed={rightSidebarOpen}
-                      className="flex h-7 w-7 items-center justify-center rounded text-foreground-muted transition-colors hover:bg-secondary hover:text-foreground aria-pressed:bg-secondary aria-pressed:text-foreground sm:h-6 sm:w-6"
-                    >
-                      <svg
-                        viewBox="0 0 16 16"
-                        className="h-3.5 w-3.5"
-                        fill="currentColor"
-                        aria-hidden="true"
-                      >
-                        <path d="M3 4.5A1.5 1.5 0 014.5 3h7A1.5 1.5 0 0113 4.5v7A1.5 1.5 0 0111.5 13h-7A1.5 1.5 0 013 11.5v-7zM4.5 4a.5.5 0 00-.5.5v7a.5.5 0 00.5.5H7V4H4.5zm3.5 8h3.5a.5.5 0 00.5-.5v-7a.5.5 0 00-.5-.5H8v8z" />
-                      </svg>
-                    </button>
                   </div>
 
                   {/* Floating snap layout picker (keyboard-triggered, no anchor) */}
@@ -415,7 +381,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
               {showStatusBar && <StatusBar />}
             </main>
 
-            {/* ---- Right Sidebar ---- */}
+            {/* ---- Right Sidebar (always visible on desktop) ---- */}
             {showRightSidebar && (
               <SidebarContainer
                 side="right"
@@ -438,7 +404,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
           {/* ---- Drag overlay (ghost following cursor) ---- */}
           <DragOverlay>
             {activeDragDefinition ? (
-              <div className="w-48 rounded-md border border-primary/30 bg-sidebar-background px-3 py-2 shadow-floating">
+              <div className="w-48 rounded-md border border-primary/30 bg-background px-3 py-2 shadow-floating">
                 <div className="flex items-center gap-2">
                   <svg
                     viewBox="0 0 16 16"
@@ -448,7 +414,7 @@ export function WorkspaceShell({ children }: WorkspaceShellProps) {
                   >
                     <path d={activeDragDefinition.iconPath} />
                   </svg>
-                  <span className="text-xs font-medium text-sidebar-foreground">
+                  <span className="text-xs font-medium text-foreground">
                     {activeDragDefinition.title}
                   </span>
                 </div>
@@ -564,7 +530,7 @@ function FileExplorerPlaceholder() {
   return (
     <div className="space-y-0.5">
       {/* Workspace header */}
-      <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-sidebar-muted">
+      <div className="flex items-center gap-1.5 px-2 py-1 text-xs font-semibold uppercase tracking-wider text-foreground-muted">
         <span>My Workspace</span>
       </div>
 
@@ -572,11 +538,11 @@ function FileExplorerPlaceholder() {
       {['Getting Started', 'Projects', 'Daily Notes', 'Archive'].map((folder) => (
         <button
           key={folder}
-          className="flex w-full items-center gap-1.5 rounded-sm px-2 py-2 text-left text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground sm:py-1"
+          className="flex w-full items-center gap-1.5 rounded-sm px-2 py-2 text-left text-sm text-foreground transition-colors hover:bg-background-hover sm:py-1"
         >
           <svg
             viewBox="0 0 16 16"
-            className="h-3.5 w-3.5 shrink-0 text-sidebar-muted"
+            className="h-3.5 w-3.5 shrink-0 text-foreground-muted"
             fill="currentColor"
             aria-hidden="true"
           >
@@ -588,7 +554,7 @@ function FileExplorerPlaceholder() {
 
       {/* New note button */}
       <div className="pt-2">
-        <button className="flex w-full items-center gap-1.5 rounded-sm px-2 py-2 text-left text-xs text-sidebar-muted transition-colors hover:bg-sidebar-accent hover:text-sidebar-foreground sm:py-1">
+        <button className="flex w-full items-center gap-1.5 rounded-sm px-2 py-2 text-left text-xs text-foreground-muted transition-colors hover:bg-background-hover hover:text-foreground sm:py-1">
           <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="currentColor" aria-hidden="true">
             <path d="M8 2a.75.75 0 01.75.75v4.5h4.5a.75.75 0 010 1.5h-4.5v4.5a.75.75 0 01-1.5 0v-4.5h-4.5a.75.75 0 010-1.5h4.5v-4.5A.75.75 0 018 2z" />
           </svg>
@@ -610,9 +576,9 @@ function SearchPanelPlaceholder() {
         type="search"
         placeholder="Search notes..."
         aria-label="Search notes"
-        className="w-full rounded-sm border border-sidebar-border bg-background-input px-3 py-2.5 text-base text-foreground placeholder:text-foreground-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-sidebar-ring sm:px-2 sm:py-1.5 sm:text-sm"
+        className="w-full rounded-sm border border-border bg-background-input px-3 py-2.5 text-base text-foreground placeholder:text-foreground-muted focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary sm:px-2 sm:py-1.5 sm:text-sm"
       />
-      <p className="px-2 text-xs text-sidebar-muted">Type to search across all notes.</p>
+      <p className="px-2 text-xs text-foreground-muted">Type to search across all notes.</p>
     </div>
   );
 }
@@ -620,7 +586,7 @@ function SearchPanelPlaceholder() {
 function EmptyPanelState({ label }: { label: string }) {
   return (
     <div className="flex h-full items-center justify-center py-8">
-      <p className="text-xs text-sidebar-muted">{label}</p>
+      <p className="text-xs text-foreground-muted">{label}</p>
     </div>
   );
 }

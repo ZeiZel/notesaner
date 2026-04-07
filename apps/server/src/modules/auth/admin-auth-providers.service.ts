@@ -1,10 +1,5 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotFoundException,
-} from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
+import { BadRequestException, Injectable, Logger, NotFoundException } from '@nestjs/common';
+import { PrismaClient, Prisma } from '@prisma/client';
 import {
   CreateAuthProviderDto,
   CreateAuthProviderSchema,
@@ -90,7 +85,7 @@ export class AdminAuthProvidersService {
       data: {
         type: dto.type,
         name: dto.name,
-        config: dto.config as Record<string, unknown>,
+        config: dto.config as unknown as Prisma.InputJsonValue,
         isEnabled: dto.isEnabled ?? true,
         workspaceId: dto.workspaceId ?? null,
       },
@@ -114,7 +109,7 @@ export class AdminAuthProvidersService {
       data: {
         ...(dto.name !== undefined && { name: dto.name }),
         ...(dto.isEnabled !== undefined && { isEnabled: dto.isEnabled }),
-        ...(dto.config !== undefined && { config: dto.config as Record<string, unknown> }),
+        ...(dto.config !== undefined && { config: dto.config as unknown as Prisma.InputJsonValue }),
       },
     });
   }
@@ -142,9 +137,7 @@ export class AdminAuthProvidersService {
     // Verify the provider exists before toggling
     await this.getProvider(id);
 
-    this.logger.log(
-      `Toggling auth provider id="${id}" isEnabled=${dto.isEnabled}`,
-    );
+    this.logger.log(`Toggling auth provider id="${id}" isEnabled=${dto.isEnabled}`);
 
     return this.prisma.authProvider.update({
       where: { id },
@@ -159,20 +152,31 @@ export class AdminAuthProvidersService {
   /**
    * Parses `input` against a Zod schema and throws a NestJS `BadRequestException`
    * with a human-readable validation message on failure.
+   *
+   * Compatible with Zod v4 (uses PropertyKey[] for path, .issues for error list).
    */
   private parseOrThrow<T>(
-    schema: { safeParse: (v: unknown) => { success: boolean; data?: T; error?: { errors: Array<{ path: (string | number)[]; message: string }> } } },
+    schema: {
+      safeParse: (v: unknown) => {
+        success: boolean;
+        data?: T;
+        error?: {
+          issues?: Array<{ path: PropertyKey[]; message: string }>;
+          errors?: Array<{ path: PropertyKey[]; message: string }>;
+        };
+      };
+    },
     input: unknown,
   ): T {
     const result = schema.safeParse(input);
 
     if (!result.success) {
-      const messages = result.error!.errors.map(
-        (e) => `${e.path.join('.') || 'body'}: ${e.message}`,
-      );
+      // Zod v4 uses .issues, Zod v3 uses .errors (which is an alias for .issues)
+      const issueList = result.error?.issues ?? result.error?.errors ?? [];
+      const messages = issueList.map((e) => `${String(e.path.join('.')) || 'body'}: ${e.message}`);
       throw new BadRequestException(messages.join('; '));
     }
 
-    return result.data!;
+    return result.data as T;
   }
 }

@@ -1,0 +1,27 @@
+{
+  "name": "plugin-graph",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/plugin-graph/src",
+  "projectType": "library",
+  "tags": ["scope:shared", "type:plugin"],
+  "targets": {
+    "type-check": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["tsc --noEmit -p packages/plugin-graph/tsconfig.json"]
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["vitest run --config packages/plugin-graph/vitest.config.ts"]
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "commands": ["eslint {projectRoot}/src --ext .ts,.tsx"]
+      }
+    }
+  }
+}

@@ -139,10 +139,10 @@ export function QuickCaptureModal() {
         </Flex>
       }
       width={560}
-      destroyOnClose
+      destroyOnHidden
       afterOpenChange={handleAfterOpenChange}
       keyboard
-      maskClosable={false}
+      mask={{ closable: false }}
       styles={{
         body: { paddingTop: 12 },
       }}

@@ -183,7 +183,7 @@ export function ComponentOverridesPage({ accessToken, workspaceId }: ComponentOv
         styles={{ body: { padding: 0, overflow: 'hidden', height: '100%' } }}
         title={null}
         closable={false}
-        destroyOnClose
+        destroyOnHidden
       >
         {editingMeta && (
           <OverrideEditor

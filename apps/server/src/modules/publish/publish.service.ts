@@ -1,9 +1,7 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../prisma/prisma.service';
 import { PublicVaultService } from './public-vault.service';
-import { FilesService } from '../files/files.service';
 import { ValkeyService } from '../valkey/valkey.service';
-import { renderToHtml as _renderToHtml } from '@notesaner/markdown';
 
 /**
  * PublishService -- manages individual note publish state and rendering.
@@ -23,7 +21,6 @@ export class PublishService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly publicVaultService: PublicVaultService,
-    private readonly filesService: FilesService,
     private readonly valkeyService: ValkeyService,
   ) {}
 
