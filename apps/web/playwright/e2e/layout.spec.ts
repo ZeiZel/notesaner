@@ -1,104 +1,94 @@
 /**
  * Layout E2E tests.
  *
- * Covers sidebar toggle (left/right), split view panels,
+ * Covers sidebar visibility (always visible on desktop),
+ * sidebar panel drag-and-drop, split view panels,
  * and panel resize interactions.
  */
 
 import { test, expect } from '../fixtures/test-fixtures';
-import { toggleLeftSidebar, toggleRightSidebar } from '../utils/helpers';
 
 const WORKSPACE_ID = process.env.E2E_WORKSPACE_ID ?? 'test-workspace-1';
 const WORKSPACE_URL = `/workspaces/${WORKSPACE_ID}`;
 
-test.describe('Sidebar toggle', () => {
-  test('left sidebar is visible by default on desktop', async ({ authenticatedPage: page }) => {
+test.describe('Sidebar layout', () => {
+  test('left sidebar is always visible on desktop', async ({ authenticatedPage: page }) => {
     await page.goto(WORKSPACE_URL);
 
-    // Sidebar should show the file explorer content
-    const sidebar = page.locator('text=My Workspace');
-    await expect(sidebar).toBeVisible({ timeout: 10_000 });
+    // Left sidebar should always be visible on desktop (not toggled)
+    const leftSidebar = page.locator('aside[data-side="left"]');
+    await expect(leftSidebar).toBeVisible({ timeout: 10_000 });
   });
 
-  test('toggling left sidebar hides the file tree', async ({ authenticatedPage: page }) => {
+  test('right sidebar is always visible on desktop', async ({ authenticatedPage: page }) => {
     await page.goto(WORKSPACE_URL);
 
-    // Wait for sidebar to render
-    const sidebarContent = page.locator('text=My Workspace');
-    await expect(sidebarContent).toBeVisible({ timeout: 10_000 });
-
-    // Toggle sidebar closed
-    await toggleLeftSidebar(page);
-    await page.waitForTimeout(500);
-
-    // Sidebar content should be hidden
-    const isHidden = await sidebarContent.isHidden().catch(() => false);
-    // May animate — check after delay
-    if (!isHidden) {
-      await page.waitForTimeout(500);
-    }
-
-    // Toggle sidebar open again
-    await toggleLeftSidebar(page);
-    await page.waitForTimeout(500);
-
-    // Content should reappear
-    await expect(sidebarContent).toBeVisible({ timeout: 5_000 });
+    // Right sidebar should also be always visible on desktop
+    const rightSidebar = page.locator('aside[data-side="right"]');
+    await expect(rightSidebar).toBeVisible({ timeout: 10_000 });
   });
 
-  test('right sidebar toggle button changes aria-pressed state', async ({
+  test('sidebars start with empty state (no pre-populated panels)', async ({
     authenticatedPage: page,
   }) => {
+    // Clear localStorage to get fresh defaults
+    await page.goto(WORKSPACE_URL);
+    await page.evaluate(() => {
+      localStorage.removeItem('notesaner-sidebar');
+    });
+    await page.reload();
+    await page.waitForTimeout(1_000);
+
+    // Both sidebars should show the empty "Drag panels here" state
+    const emptyStates = page.locator('text=Drag panels here');
+    const count = await emptyStates.count();
+
+    // Both sidebars should be in empty state
+    expect(count).toBeGreaterThanOrEqual(2);
+  });
+
+  test('sidebars fill their full allocated height', async ({ authenticatedPage: page }) => {
     await page.goto(WORKSPACE_URL);
 
-    const toggleButton = page.getByLabel('Toggle right sidebar');
-    await expect(toggleButton).toBeVisible();
+    const leftSidebar = page.locator('aside[data-side="left"]');
+    await expect(leftSidebar).toBeVisible({ timeout: 10_000 });
 
-    // Get initial state
-    const initialPressed = await toggleButton.getAttribute('aria-pressed');
+    const sidebarBox = await leftSidebar.boundingBox();
+    expect(sidebarBox).toBeTruthy();
 
-    // Toggle
-    await toggleButton.click();
-    await page.waitForTimeout(300);
-
-    const newPressed = await toggleButton.getAttribute('aria-pressed');
-
-    // aria-pressed should have changed
-    if (initialPressed !== null && newPressed !== null) {
-      expect(newPressed).not.toBe(initialPressed);
+    if (sidebarBox) {
+      const viewportSize = page.viewportSize();
+      if (viewportSize) {
+        // Sidebar height should be close to viewport height (full height)
+        expect(sidebarBox.height).toBeGreaterThan(viewportSize.height * 0.9);
+      }
     }
   });
 
-  test('right sidebar shows panels when opened', async ({ authenticatedPage: page }) => {
-    await page.goto(`${WORKSPACE_URL}/notes/test-note-1`);
+  test('sidebars have same background as workspace area', async ({ authenticatedPage: page }) => {
+    await page.goto(WORKSPACE_URL);
 
-    // Open right sidebar
-    await toggleRightSidebar(page);
-    await page.waitForTimeout(500);
+    const leftSidebar = page.locator('aside[data-side="left"]');
+    const mainContent = page.locator('#main-content');
 
-    // Right sidebar should show panels (backlinks, outline, etc.)
-    const rightSidebar = page.locator(
-      '[data-testid="right-sidebar"], aside:last-of-type',
+    await expect(leftSidebar).toBeVisible({ timeout: 10_000 });
+    await expect(mainContent).toBeVisible();
+
+    // Get computed background colors
+    const sidebarBg = await leftSidebar.evaluate(
+      (el) => window.getComputedStyle(el).backgroundColor,
     );
+    const mainBg = await mainContent.evaluate((el) => window.getComputedStyle(el).backgroundColor);
 
-    const hasSidebar = await rightSidebar
-      .isVisible({ timeout: 5_000 })
-      .catch(() => false);
+    // Backgrounds should be the same color
+    expect(sidebarBg).toBe(mainBg);
+  });
 
-    if (hasSidebar) {
-      // Should have panel content (Backlinks, Outline, Properties, etc.)
-      const panelContent = rightSidebar.locator(
-        'text=Backlinks, text=Outline, text=Properties, text=Table of Contents',
-      );
-      const hasContent = await panelContent
-        .first()
-        .isVisible({ timeout: 3_000 })
-        .catch(() => false);
+  test('sidebar header shows Explorer/Inspector labels', async ({ authenticatedPage: page }) => {
+    await page.goto(WORKSPACE_URL);
 
-      if (hasContent) {
-        await expect(panelContent.first()).toBeVisible();
-      }
-    }
+    await expect(page.locator('text=Explorer')).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('text=Inspector')).toBeVisible({ timeout: 10_000 });
   });
 });
 
@@ -115,9 +105,9 @@ test.describe('Split view', () => {
     if (await paletteInput.isVisible({ timeout: 5_000 }).catch(() => false)) {
       await paletteInput.fill('split');
 
-      const splitCommand = page.locator(
-        'text=Split right, text=Split down, text=Split view',
-      ).first();
+      const splitCommand = page
+        .locator('text=Split right, text=Split down, text=Split view')
+        .first();
 
       if (await splitCommand.isVisible({ timeout: 3_000 }).catch(() => false)) {
         await splitCommand.click();
@@ -166,9 +156,11 @@ test.describe('Panel resize', () => {
     await page.goto(WORKSPACE_URL);
 
     // Find the resize handle/divider between sidebar and main content
-    const divider = page.locator(
-      '[data-testid="resize-handle"], [data-testid="divider"], .resize-handle, [role="separator"]',
-    ).first();
+    const divider = page
+      .locator(
+        '[data-testid="resize-handle"], [data-testid="divider"], .resize-handle, [role="separator"]',
+      )
+      .first();
 
     if (await divider.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const dividerBox = await divider.boundingBox();
@@ -197,9 +189,9 @@ test.describe('Panel resize', () => {
   test('sidebar resize persists after page reload', async ({ authenticatedPage: page }) => {
     await page.goto(WORKSPACE_URL);
 
-    const divider = page.locator(
-      '[data-testid="resize-handle"], .resize-handle, [role="separator"]',
-    ).first();
+    const divider = page
+      .locator('[data-testid="resize-handle"], .resize-handle, [role="separator"]')
+      .first();
 
     if (await divider.isVisible({ timeout: 5_000 }).catch(() => false)) {
       const dividerBox = await divider.boundingBox();
@@ -221,9 +213,9 @@ test.describe('Panel resize', () => {
         await page.reload();
         await page.waitForTimeout(1_000);
 
-        const afterReloadDivider = page.locator(
-          '[data-testid="resize-handle"], .resize-handle, [role="separator"]',
-        ).first();
+        const afterReloadDivider = page
+          .locator('[data-testid="resize-handle"], .resize-handle, [role="separator"]')
+          .first();
 
         if (await afterReloadDivider.isVisible({ timeout: 5_000 }).catch(() => false)) {
           const reloadBox = await afterReloadDivider.boundingBox();
