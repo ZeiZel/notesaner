@@ -169,7 +169,7 @@ export function SettingsDialog({
         body: { padding: 0, height: '80vh', display: 'flex', overflow: 'hidden' },
         root: { padding: 0 },
       }}
-      destroyOnClose={false}
+      destroyOnHidden={false}
       title={null}
       closable={false}
     >

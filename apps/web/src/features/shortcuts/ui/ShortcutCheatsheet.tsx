@@ -211,7 +211,7 @@ export function ShortcutCheatsheet({ open, onClose }: ShortcutCheatsheetProps) {
           paddingTop: 16,
         },
       }}
-      destroyOnClose
+      destroyOnHidden
     >
       <Input
         placeholder="Filter shortcuts..."

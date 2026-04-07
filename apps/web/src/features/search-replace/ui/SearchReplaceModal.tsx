@@ -53,7 +53,7 @@ export function SearchReplaceModal() {
           overflow: 'hidden',
         },
       }}
-      destroyOnClose={false}
+      destroyOnHidden={false}
       keyboard
       closable
     >

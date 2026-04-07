@@ -411,8 +411,8 @@ export function CommentPopover({
         if (!visible) onClose();
       }}
       placement="bottomLeft"
-      overlayInnerStyle={{ padding: 0 }}
-      destroyTooltipOnHide
+      styles={{ body: { padding: 0 } }}
+      destroyOnHidden
     >
       {children}
     </Popover>

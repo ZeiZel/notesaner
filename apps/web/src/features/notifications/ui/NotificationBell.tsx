@@ -52,9 +52,8 @@ export function NotificationBell() {
       trigger="click"
       placement="bottomRight"
       arrow={false}
-      overlayInnerStyle={{ padding: 0 }}
-      overlayStyle={{ width: 400 }}
-      destroyTooltipOnHide
+      styles={{ root: { width: 400 }, body: { padding: 0 } }}
+      destroyOnHidden
     >
       <button
         type="button"
